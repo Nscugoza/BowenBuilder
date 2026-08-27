@@ -883,7 +883,21 @@ $('addLot').onclick=()=>openLotDialogLive();
 $('editLot').onclick=()=>openLotDialogLive(currentLot);
 $('lotX').onclick=()=>$('lotDialog').close();
 $('lotCancel').onclick=()=>$('lotDialog').close();
-$('emailLot').onclick=()=>{let l=lots.find(x=>x.id===currentLot);location.href=`mailto:?subject=${encodeURIComponent(l.lot_name+' - '+(l.plan_name||'Lot Information'))}&body=${encodeURIComponent(`Lot: ${l.lot_name}\nPermit Number: ${l.permit_number||'Not added'}\nPlan: ${l.plan_name||'Not added'}\n\nIncluded Options:\n${l.included_options||'None added'}`)}`};
+$('emailLot').onclick=()=>{
+  const l=lots.find(x=>x.id===currentLot);
+  if(!l) return;
+  const subject=l.lot_name||'Lot';
+  const body=[
+    `Lot: ${l.lot_name||''}`,
+    `Address: ${l.address||'Not added'}`,
+    `Permit Number: ${l.permit_number||'Not added'}`,
+    `Plan: ${l.plan_name||'Not added'}`,
+    '',
+    'Included Options:',
+    l.included_options||'None added'
+  ].join('\n');
+  location.href=`mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+};
 document.querySelectorAll('.lot-tab').forEach(b=>b.onclick=()=>{document.querySelectorAll('.lot-tab').forEach(x=>x.classList.toggle('active',x===b));$('overviewPanel').classList.toggle('hidden',b.dataset.lottab!=='overview');$('filesPanel').classList.toggle('hidden',b.dataset.lottab!=='files')});
 document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{if(b.dataset.view==='subdivisions')showSubs();else if(b.dataset.view==='schedule'){if(!currentSubdivision){alert('Open a subdivision first.');return}showLots();}});
 const {data:{session}}=await db.auth.getSession();
