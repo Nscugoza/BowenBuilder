@@ -551,6 +551,49 @@ dialog::backdrop{background:rgba(7,21,39,.7);backdrop-filter:blur(4px)}
   display:block;
 }
 
+
+.lot-swipe-wrap{
+  position:relative;
+  overflow:hidden;
+  border-radius:21px;
+}
+.lot-delete-action{
+  position:absolute;
+  inset:0 0 0 auto;
+  width:96px;
+  border:0;
+  background:#b42318;
+  color:#fff;
+  font-weight:850;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border-radius:0 21px 21px 0;
+  z-index:1;
+}
+.lot-swipe-card{
+  position:relative;
+  z-index:2;
+  transition:transform .2s ease;
+  touch-action:pan-y;
+  background:#fff;
+}
+.lot-swipe-wrap.revealed .lot-swipe-card{
+  transform:translateX(-96px);
+}
+.lot-swipe-wrap.deleting{
+  opacity:.55;
+  pointer-events:none;
+}
+@media(min-width:900px){
+  .lot-delete-action{
+    width:86px;
+  }
+  .lot-swipe-wrap:hover .lot-delete-action{
+    filter:brightness(1.03);
+  }
+}
+
 </style>
 </head>
 <body>
@@ -697,16 +740,103 @@ function showLots(){
  $('subdivisionsView').classList.add('hidden');$('lotView').classList.add('hidden');$('scheduleView').classList.add('hidden');$('lotsView').classList.remove('hidden');
  const s=subdivisions.find(x=>x.id===currentSubdivision);$('heroTitle').textContent=s?.name||'Lots';$('heroSub').textContent='Lots and schedules in this subdivision.';$('subdivisionName').textContent=s?.name||'';
  const arr=lots.filter(l=>l.subdivision_id===currentSubdivision);
- $('lotsGrid').innerHTML=arr.map(l=>`<button class="card click-card" data-lot="${l.id}">
-  <span class="pill">${esc(l.county||'Lot')}</span>
-  ${l.color_rendering_url?`<div class="lot-card-rendering"><img src="${l.color_rendering_url}" alt="${esc(l.lot_name)} color rendering"></div>`:''}
-  <h3>${esc(l.lot_name)}</h3>
-  <div class="muted">${esc(l.address||l.plan_name||'Address not added')}</div>
-  <div class="muted">${esc(l.plan_name||'Plan not added')}</div>
-  <div class="muted" style="margin-top:10px">${items.filter(i=>i.lot_id===l.id).length} schedule items</div>
-</button>`).join('');
- document.querySelectorAll('[data-lot]').forEach(b=>b.onclick=()=>{currentLot=b.dataset.lot;showLot()});
+ $('lotsGrid').innerHTML=arr.map(l=>`
+<div class="lot-swipe-wrap" data-lot-wrap="${l.id}">
+  <button type="button" class="lot-delete-action" data-delete-lot="${l.id}" aria-label="Delete ${esc(l.lot_name)}">Delete</button>
+  <button class="card click-card lot-swipe-card" data-lot="${l.id}" type="button">
+    <span class="pill">${esc(l.county||'Lot')}</span>
+    ${l.color_rendering_url?`<div class="lot-card-rendering"><img src="${l.color_rendering_url}" alt="${esc(l.lot_name)} color rendering"></div>`:''}
+    <h3>${esc(l.lot_name)}</h3>
+    <div class="muted">${esc(l.address||l.plan_name||'Address not added')}</div>
+    <div class="muted">${esc(l.plan_name||'Plan not added')}</div>
+    <div class="muted" style="margin-top:10px">${items.filter(i=>i.lot_id===l.id).length} schedule items</div>
+  </button>
+</div>`).join('');
+
+ wireLotSwipeDelete();
+
 }
+
+async function deleteLotLive(lotId){
+  const lot=lots.find(l=>l.id===lotId);
+  if(!lot) return;
+  const ok=confirm(`Delete ${lot.lot_name}?\n\nThis will also remove schedule items linked to this lot.`);
+  if(!ok) return;
+
+  const wrap=document.querySelector(`[data-lot-wrap="${lotId}"]`);
+  if(wrap) wrap.classList.add('deleting');
+
+  const {error}=await db.from('lots').delete().eq('id',lotId);
+  if(error){
+    if(wrap) wrap.classList.remove('deleting');
+    alert(error.message);
+    return;
+  }
+
+  await load();
+  currentSubdivision=lot.subdivision_id;
+  showLots();
+}
+
+function wireLotSwipeDelete(){
+  document.querySelectorAll('[data-lot-wrap]').forEach(wrap=>{
+    const card=wrap.querySelector('[data-lot]');
+    const del=wrap.querySelector('[data-delete-lot]');
+    let startX=0, currentX=0, dragging=false, moved=false;
+
+    const reveal=()=>wrap.classList.add('revealed');
+    const close=()=>wrap.classList.remove('revealed');
+
+    card.addEventListener('pointerdown',e=>{
+      startX=e.clientX;
+      currentX=e.clientX;
+      dragging=true;
+      moved=false;
+      try{card.setPointerCapture(e.pointerId)}catch(_){}
+    });
+
+    card.addEventListener('pointermove',e=>{
+      if(!dragging) return;
+      currentX=e.clientX;
+      const dx=currentX-startX;
+      if(Math.abs(dx)>8) moved=true;
+      if(dx < -22) reveal();
+      if(dx > 22) close();
+    });
+
+    card.addEventListener('pointerup',e=>{
+      if(!dragging) return;
+      dragging=false;
+      const dx=currentX-startX;
+      if(dx < -35) reveal();
+      else if(dx > 25) close();
+
+      if(!moved && !wrap.classList.contains('revealed')){
+        currentLot=card.dataset.lot;
+        showLot();
+      }
+    });
+
+    card.addEventListener('click',e=>{
+      // Pointer handlers above own normal navigation to prevent accidental open after swipe.
+      e.preventDefault();
+    });
+
+    del.addEventListener('click',e=>{
+      e.preventDefault();
+      e.stopPropagation();
+      deleteLotLive(del.dataset.deleteLot);
+    });
+  });
+
+  // Clicking elsewhere closes any revealed delete action.
+  document.addEventListener('pointerdown',e=>{
+    document.querySelectorAll('.lot-swipe-wrap.revealed').forEach(w=>{
+      if(!w.contains(e.target)) w.classList.remove('revealed');
+    });
+  },{once:true});
+}
+
 function showLot(){
  const l=lots.find(x=>x.id===currentLot);if(!l)return;
  $('lotsView').classList.add('hidden');$('lotView').classList.remove('hidden');$('heroTitle').textContent=l.lot_name;$('heroSub').textContent='Live BowenBuilder lot information and schedule.';$('lotTitle').textContent=l.lot_name;$('lotSubtitle').textContent=[l.plan_name,l.county].filter(Boolean).join(' · ');
