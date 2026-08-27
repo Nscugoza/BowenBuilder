@@ -1338,7 +1338,7 @@ async function renderPunchout(lotId){
       if(!!a.completed!==!!b.completed) return a.completed?1:-1;
       return new Date(b.created_at||0)-new Date(a.created_at||0);
     });
-  selectedPunchouts=new Set([...selectedPunchouts].filter(id=>list.some(p=>p.id===id)));
+  selectedPunchouts=new Set([...selectedPunchouts].filter(id=>list.some(p=>p.id===id && !p.completed)));
 
   if(!list.length){
     root.innerHTML='<div class="card punchout-empty">No punchout items yet. Tap <strong>Add Punchout Item</strong> to create one.</div>';
@@ -1359,7 +1359,7 @@ async function renderPunchout(lotId){
 
     return `<div class="punchout-card ${p.completed?'completed':''}" data-punchout="${p.id}">
       <div class="punchout-topline">
-        <input class="punchout-select" type="checkbox" data-select-punchout="${p.id}" ${selectedPunchouts.has(p.id)?'checked':''} aria-label="Select punchout item">
+        ${p.completed?'':`<input class="punchout-select" type="checkbox" data-select-punchout="${p.id}" ${selectedPunchouts.has(p.id)?'checked':''} aria-label="Select punchout item">`}
         <div class="punchout-topline-main">
           <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap">
             <div class="punchout-text">${esc(p.description)}</div>
