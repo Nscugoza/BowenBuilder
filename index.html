@@ -703,6 +703,21 @@ dialog::backdrop{background:rgba(7,21,39,.7);backdrop-filter:blur(4px)}
 </form></dialog>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<dialog id="deleteLotDialog">
+  <div class="sheet">
+    <div class="dialog-head">
+      <h2>Delete Lot?</h2>
+      <button id="deleteLotX" class="xbtn" type="button">×</button>
+    </div>
+    <p id="deleteLotMessage" style="margin:0 0 16px;line-height:1.5;color:#475569"></p>
+    <div class="actions">
+      <button id="deleteLotCancel" class="secondary" type="button">Cancel</button>
+      <button id="deleteLotConfirm" class="primary" type="button" style="background:#b42318">Confirm Delete</button>
+    </div>
+  </div>
+</dialog>
+
 <script>
 (async()=>{
 const $=id=>document.getElementById(id);
@@ -757,85 +772,114 @@ function showLots(){
 
 }
 
-async function deleteLotLive(lotId){
+
+let pendingDeleteLotId=null;
+
+function requestDeleteLot(lotId){
   const lot=lots.find(l=>l.id===lotId);
   if(!lot) return;
-  const ok=confirm(`Delete ${lot.lot_name}?\n\nThis will also remove schedule items linked to this lot.`);
-  if(!ok) return;
+  pendingDeleteLotId=lotId;
+  $('deleteLotMessage').textContent=`Are you sure you want to permanently delete ${lot.lot_name}? This will also remove schedule items linked to this lot.`;
+  $('deleteLotDialog').showModal();
+}
+
+async function confirmDeleteLot(){
+  const lotId=pendingDeleteLotId;
+  const lot=lots.find(l=>l.id===lotId);
+  if(!lot) return;
+
+  $('deleteLotConfirm').disabled=true;
+  $('deleteLotConfirm').textContent='Deleting...';
 
   const wrap=document.querySelector(`[data-lot-wrap="${lotId}"]`);
   if(wrap) wrap.classList.add('deleting');
 
   const {error}=await db.from('lots').delete().eq('id',lotId);
+
+  $('deleteLotConfirm').disabled=false;
+  $('deleteLotConfirm').textContent='Confirm Delete';
+
   if(error){
     if(wrap) wrap.classList.remove('deleting');
     alert(error.message);
     return;
   }
 
+  $('deleteLotDialog').close();
+  pendingDeleteLotId=null;
   await load();
   currentSubdivision=lot.subdivision_id;
   showLots();
 }
 
+
+
 function wireLotSwipeDelete(){
   document.querySelectorAll('[data-lot-wrap]').forEach(wrap=>{
     const card=wrap.querySelector('[data-lot]');
     const del=wrap.querySelector('[data-delete-lot]');
-    let startX=0, currentX=0, dragging=false, moved=false;
+    let startX=0,startY=0,lastX=0,tracking=false,moved=false;
 
     const reveal=()=>wrap.classList.add('revealed');
     const close=()=>wrap.classList.remove('revealed');
 
-    card.addEventListener('pointerdown',e=>{
-      startX=e.clientX;
-      currentX=e.clientX;
-      dragging=true;
+    function begin(x,y){
+      startX=lastX=x;
+      startY=y;
+      tracking=true;
       moved=false;
-      try{card.setPointerCapture(e.pointerId)}catch(_){}
-    });
-
-    card.addEventListener('pointermove',e=>{
-      if(!dragging) return;
-      currentX=e.clientX;
-      const dx=currentX-startX;
+    }
+    function move(x,y){
+      if(!tracking) return;
+      lastX=x;
+      const dx=x-startX;
+      const dy=y-startY;
       if(Math.abs(dx)>8) moved=true;
-      if(dx < -22) reveal();
-      if(dx > 22) close();
-    });
-
-    card.addEventListener('pointerup',e=>{
-      if(!dragging) return;
-      dragging=false;
-      const dx=currentX-startX;
-      if(dx < -35) reveal();
-      else if(dx > 25) close();
-
-      if(!moved && !wrap.classList.contains('revealed')){
+      if(Math.abs(dx)>Math.abs(dy)){
+        if(dx<-28) reveal();
+        else if(dx>22) close();
+      }
+    }
+    function end(){
+      if(!tracking) return;
+      const dx=lastX-startX;
+      tracking=false;
+      if(dx<-42) reveal();
+      else if(dx>28) close();
+      else if(!moved && !wrap.classList.contains('revealed')){
         currentLot=card.dataset.lot;
         showLot();
       }
-    });
+    }
+
+    card.addEventListener('touchstart',e=>{
+      const t=e.touches[0];
+      if(t) begin(t.clientX,t.clientY);
+    },{passive:true});
+
+    card.addEventListener('touchmove',e=>{
+      const t=e.touches[0];
+      if(t) move(t.clientX,t.clientY);
+    },{passive:true});
+
+    card.addEventListener('touchend',end,{passive:true});
+
+    card.addEventListener('mousedown',e=>begin(e.clientX,e.clientY));
+    window.addEventListener('mousemove',e=>move(e.clientX,e.clientY));
+    window.addEventListener('mouseup',end);
 
     card.addEventListener('click',e=>{
-      // Pointer handlers above own normal navigation to prevent accidental open after swipe.
-      e.preventDefault();
+      if(moved || wrap.classList.contains('revealed')) e.preventDefault();
     });
 
     del.addEventListener('click',e=>{
       e.preventDefault();
       e.stopPropagation();
-      deleteLotLive(del.dataset.deleteLot);
+      requestDeleteLot(del.dataset.deleteLot);
     });
   });
-
-  // Clicking elsewhere closes any revealed delete action.
-  document.addEventListener('pointerdown',e=>{
-    document.querySelectorAll('.lot-swipe-wrap.revealed').forEach(w=>{
-      if(!w.contains(e.target)) w.classList.remove('revealed');
-    });
-  },{once:true});
 }
+
 
 function showLot(){
  const l=lots.find(x=>x.id===currentLot);if(!l)return;
@@ -1055,6 +1099,14 @@ document.querySelectorAll('.lot-tab').forEach(b=>b.onclick=()=>{document.querySe
 document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{if(b.dataset.view==='subdivisions')showSubs();else if(b.dataset.view==='schedule'){if(!currentSubdivision){alert('Open a subdivision first.');return}showLots();}});
 const {data:{session}}=await db.auth.getSession();
 if(session){appOn();await load()}else{$('login').classList.remove('hidden');$('app').classList.add('hidden')}
+
+$('deleteLotX').onclick=()=>{pendingDeleteLotId=null;$('deleteLotDialog').close();};
+$('deleteLotCancel').onclick=()=>{pendingDeleteLotId=null;$('deleteLotDialog').close();};
+$('deleteLotConfirm').onclick=confirmDeleteLot;
+$('deleteLotDialog').addEventListener('click',e=>{
+  if(e.target===e.currentTarget){pendingDeleteLotId=null;$('deleteLotDialog').close();}
+});
+
 })();
 </script>
 </body>
