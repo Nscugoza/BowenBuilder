@@ -580,7 +580,11 @@ function showLot(){
  const l=lots.find(x=>x.id===currentLot);if(!l)return;
  $('lotsView').classList.add('hidden');$('lotView').classList.remove('hidden');$('heroTitle').textContent=l.lot_name;$('heroSub').textContent='Live BowenBuilder lot information and schedule.';$('lotTitle').textContent=l.lot_name;$('lotSubtitle').textContent=[l.plan_name,l.county].filter(Boolean).join(' · ');
  const links=[['County Permit',l.permit_url],['Deco Sheet',l.deco_url],['HLP',l.hlp_url],['LGP',l.lgp_url]].filter(x=>safe(x[1]));
- $('lotInfo').innerHTML=`<div class="info-grid"><div class="info"><small>Permit Number</small><strong>${esc(l.permit_number||'Not added')}</strong></div><div class="info"><small>Plan</small><strong>${esc(l.plan_name||'Not added')}</strong></div><div class="info"><small>Included Options</small><strong>${esc(l.included_options||'None added')}</strong></div><div class="info"><small>County</small><strong>${esc(l.county||'Not added')}</strong></div></div>${links.length?`<div class="resource-row">${links.map(x=>`<a href="${safe(x[1])}" target="_blank">${x[0]} ↗</a>`).join('')}</div>`:''}`;
+ $('lotInfo').innerHTML=`<div class="info-grid"><div class="info"><small>Permit Number</small><strong>${esc(l.permit_number||'Not added')}</strong></div><div class="info"><small>Plan</small><strong>${esc(l.plan_name||'Not added')}</strong></div><div class="info"><small>Included Options</small><strong>${esc(l.included_options||'None added')}</strong></div><div class="info"><small>County</small><strong>${esc(l.county||'Not added')}</strong></div></div>${links.length?`<div class="resource-row">${links.map(x=>`<a href="${safe(x[1])}" target="_blank">${x[0]} ↗</a>`).join('')}</div>`:''}${l.color_rendering_url?`<div class="card" style="margin-top:14px"><small class="muted">Color Rendering</small><div style="margin-top:8px"><img src="${l.color_rendering_url}" alt="${esc(l.lot_name)} color rendering" style="max-width:100%;max-height:320px;border-radius:14px;cursor:zoom-in" id="liveRendering"></div></div>`:''}`;
+ const liveRendering=$('liveRendering');
+ if(liveRendering){
+   liveRendering.onclick=()=>window.open(l.color_rendering_url,'_blank');
+ }
  const li=items.filter(i=>i.lot_id===l.id);
  $('lotSchedule').innerHTML=li.length?li.map(i=>`<div class="schedule-card"><div><span class="pill">${esc(i.status)}</span><h4>${esc(i.name)}</h4><div class="schedule-meta">${esc(i.item_type)}${i.crew?' · '+esc(i.crew):''}<br>${fmt(i.starts_at)} → ${fmt(i.ends_at)}</div></div></div>`).join(''):'<div class="card muted">No schedule items yet.</div>';
 }
@@ -601,8 +605,98 @@ $('addSchedule').onclick=()=>{
 $('scheduleForm').onsubmit=saveSchedule;$('scheduleX').onclick=()=>$('scheduleDialog').close();$('scheduleCancel').onclick=()=>$('scheduleDialog').close();
 $('addSubdivision').onclick=()=>$('subDialog').showModal();$('subX').onclick=()=>$('subDialog').close();$('subCancel').onclick=()=>$('subDialog').close();
 $('subForm').onsubmit=async e=>{e.preventDefault();let name=$('subName').value.trim();let {error}=await db.from('subdivisions').insert({name});if(error){alert(error.message);return}$('subDialog').close();await load()};
-$('addLot').onclick=()=>alert('Live Add Lot is the next form to connect. Your existing GoldFinch lots are already live.');
-$('editLot').onclick=()=>alert('Live lot editing is the next form to connect.');
+
+let pendingRenderingData='';
+
+function openLotDialogLive(id=''){
+  $('lotForm').reset();
+  $('editLotId').value=id;
+  pendingRenderingData='';
+
+  const l=lots.find(x=>x.id===id);
+  $('lotDialogTitle').textContent=l ? `Edit ${l.lot_name}` : 'Add Lot';
+
+  if(l){
+    $('lotName').value=l.lot_name||'';
+    $('permitNumber').value=l.permit_number||'';
+    $('planName').value=l.plan_name||'';
+    $('county').value=l.county||'';
+    $('permitUrl').value=l.permit_url||'';
+    $('decoUrl').value=l.deco_url||'';
+    $('includedOptions').value=l.included_options||'';
+    $('hlpUrl').value=l.hlp_url||'';
+    $('lgpUrl').value=l.lgp_url||'';
+  } else {
+    $('county').value='Barrow County, GA';
+  }
+
+  $('lotDialog').showModal();
+}
+
+$('renderingFile').onchange=e=>{
+  const f=e.target.files?.[0];
+  if(!f){ pendingRenderingData=''; return; }
+  if(f.size>1800000){
+    alert('For now, use an image under about 1.8 MB.');
+    e.target.value='';
+    return;
+  }
+  const reader=new FileReader();
+  reader.onload=()=>{ pendingRenderingData=String(reader.result||''); };
+  reader.readAsDataURL(f);
+};
+
+$('lotForm').onsubmit=async e=>{
+  e.preventDefault();
+
+  const editId=$('editLotId').value;
+  const payload={
+    subdivision_id: currentSubdivision,
+    lot_name:$('lotName').value.trim(),
+    permit_number:$('permitNumber').value.trim()||null,
+    plan_name:$('planName').value.trim()||null,
+    county:$('county').value.trim()||null,
+    permit_url:$('permitUrl').value.trim()||null,
+    deco_url:$('decoUrl').value.trim()||null,
+    included_options:$('includedOptions').value.trim()||null,
+    hlp_url:$('hlpUrl').value.trim()||null,
+    lgp_url:$('lgpUrl').value.trim()||null
+  };
+
+  if(!payload.lot_name){
+    alert('Please enter a lot name.');
+    return;
+  }
+
+  // Keep existing rendering unless a new one was uploaded.
+  if(pendingRenderingData){
+    payload.color_rendering_url=pendingRenderingData;
+  }
+
+  let result;
+  if(editId){
+    result=await db.from('lots').update(payload).eq('id',editId).select().single();
+  }else{
+    result=await db.from('lots').insert(payload).select().single();
+  }
+
+  if(result.error){
+    alert(result.error.message);
+    return;
+  }
+
+  $('lotDialog').close();
+  await load();
+
+  currentSubdivision=result.data.subdivision_id;
+  currentLot=result.data.id;
+  showLot();
+};
+
+$('addLot').onclick=()=>openLotDialogLive();
+$('editLot').onclick=()=>openLotDialogLive(currentLot);
+$('lotX').onclick=()=>$('lotDialog').close();
+$('lotCancel').onclick=()=>$('lotDialog').close();
 $('emailLot').onclick=()=>{let l=lots.find(x=>x.id===currentLot);location.href=`mailto:?subject=${encodeURIComponent(l.lot_name+' - '+(l.plan_name||'Lot Information'))}&body=${encodeURIComponent(`Lot: ${l.lot_name}\nPermit Number: ${l.permit_number||'Not added'}\nPlan: ${l.plan_name||'Not added'}\n\nIncluded Options:\n${l.included_options||'None added'}`)}`};
 document.querySelectorAll('.lot-tab').forEach(b=>b.onclick=()=>{document.querySelectorAll('.lot-tab').forEach(x=>x.classList.toggle('active',x===b));$('overviewPanel').classList.toggle('hidden',b.dataset.lottab!=='overview');$('filesPanel').classList.toggle('hidden',b.dataset.lottab!=='files')});
 document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{if(b.dataset.view==='subdivisions')showSubs();else if(b.dataset.view==='schedule'){if(!currentSubdivision){alert('Open a subdivision first.');return}showLots();}});
