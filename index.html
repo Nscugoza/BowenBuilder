@@ -1661,6 +1661,11 @@ async function savePunchout(e){
 
 function showLot(){
  const l=lots.find(x=>x.id===currentLot);if(!l)return;
+ requestAnimationFrame(()=>{
+   window.scrollTo({top:0,left:0,behavior:'auto'});
+   const mainEl=document.querySelector('main');
+   if(mainEl) mainEl.scrollTop=0;
+ });
  joinLotPresence(currentLot);
  $('lotsView').classList.add('hidden');$('lotView').classList.remove('hidden');$('heroTitle').textContent=l.lot_name;$('heroSub').textContent='Live BowenBuilder lot information and schedule.';$('lotTitle').textContent=l.lot_name;$('lotSubtitle').textContent=[l.plan_name,l.county].filter(Boolean).join(' · ');
  const links=[['County Permit',l.permit_url],['Plans',l.plans_url],['Deco Sheet',l.deco_url],['HLP',l.hlp_url],['LGP',l.lgp_url]].filter(x=>safe(x[1]));
@@ -1682,6 +1687,10 @@ function showLot(){
    btn.onclick=()=>openScheduleDialogLive(btn.dataset.editSchedule);
  });
  renderPunchout(l.id);
+ requestAnimationFrame(()=>{
+   const header=document.querySelector('#lotView .lot-header');
+   if(header) header.scrollIntoView({block:'start',behavior:'auto'});
+ });
 }
 
 async function saveLotChecklistField(field,value){
