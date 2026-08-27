@@ -705,6 +705,65 @@ dialog::backdrop{background:rgba(7,21,39,.7);backdrop-filter:blur(4px)}
   border-top:1px solid #edf1f6;
 }
 
+
+.punchout-card.completed{
+  opacity:.82;
+  background:#f7faf8;
+  border-color:#cfe4d7;
+}
+.punchout-status{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  padding:5px 9px;
+  border-radius:999px;
+  font-size:12px;
+  font-weight:850;
+  background:#fff4e5;
+  color:#8a5712;
+  border:1px solid #f0dfc4;
+}
+.punchout-status.completed{
+  background:#edf9f2;
+  color:#1f704b;
+  border-color:#cfe8d9;
+}
+.punchout-gallery{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(110px,1fr));
+  gap:9px;
+  margin-top:12px;
+  max-width:620px;
+}
+.punchout-gallery .punchout-photo{
+  width:100%;
+  height:120px;
+  margin-top:0;
+  object-fit:cover;
+}
+.punchout-actions{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  align-items:center;
+}
+.complete-btn{
+  background:#edf9f2;
+  color:#1f704b;
+  border:1px solid #cfe8d9;
+  border-radius:12px;
+  padding:9px 12px;
+  font-weight:800;
+}
+.reopen-btn{
+  background:#eef4fb;
+  color:#244f7e;
+  border:1px solid #d8e4f0;
+  border-radius:12px;
+  padding:9px 12px;
+  font-weight:800;
+}
+
 </style>
 </head>
 <body>
@@ -836,7 +895,8 @@ dialog::backdrop{background:rgba(7,21,39,.7);backdrop-filter:blur(4px)}
       <textarea id="punchoutText" rows="5" required placeholder="Describe the item that needs attention..."></textarea>
     </label>
     <label>Photo
-      <input id="punchoutPhoto" type="file" accept="image/*">
+      <input id="punchoutPhoto" type="file" accept="image/*" multiple>
+      <span class="muted">You can select multiple photos.</span>
     </label>
     <div class="actions">
       <button id="punchoutCancel" class="secondary" type="button">Cancel</button>
@@ -867,7 +927,7 @@ const $=id=>document.getElementById(id);
 const SB_URL='https://oztefiymckpyxiewgxtc.supabase.co';
 const SB_KEY='sb_publishable__ItoYGeHKEGTBFiE7JM74w_1F-qERVe';
 const db=window.supabase.createClient(SB_URL,SB_KEY);
-let subdivisions=[],lots=[],items=[],punchouts=[],currentSubdivision=null,currentLot=null;
+let subdivisions=[],lots=[],items=[],punchouts=[],punchoutPhotos=[],currentSubdivision=null,currentLot=null;
 let realtimeChannel=null;
 let presenceChannel=null;
 let currentUserProfile=null;
@@ -907,18 +967,20 @@ function scheduleRealtimeReload(){
     const keepLot=currentLot;
     const screen=currentScreen();
 
-    const [{data:s,error:se},{data:l,error:le},{data:i,error:ie},{data:p,error:pe}]=await Promise.all([
+    const [{data:s,error:se},{data:l,error:le},{data:i,error:ie},{data:p,error:pe},{data:pp,error:ppe}]=await Promise.all([
       db.from('subdivisions').select('*').order('name'),
       db.from('lots').select('*').eq('active',true).order('lot_name'),
       db.from('schedule_items').select('*').order('starts_at'),
-      db.from('punchout_items').select('*').order('created_at',{ascending:false})
+      db.from('punchout_items').select('*').order('created_at',{ascending:false}),
+      db.from('punchout_photos').select('*').order('created_at')
     ]);
-    if(se||le||ie||pe) return;
+    if(se||le||ie||pe||ppe) return;
 
     subdivisions=s||[];
     lots=l||[];
     items=i||[];
     punchouts=p||[];
+    punchoutPhotos=pp||[];
     currentSubdivision=keepSub;
     currentLot=keepLot;
 
@@ -935,6 +997,7 @@ function startRealtimeUpdates(){
     .on('postgres_changes',{event:'*',schema:'public',table:'lots'},scheduleRealtimeReload)
     .on('postgres_changes',{event:'*',schema:'public',table:'schedule_items'},scheduleRealtimeReload)
     .on('postgres_changes',{event:'*',schema:'public',table:'punchout_items'},scheduleRealtimeReload)
+    .on('postgres_changes',{event:'*',schema:'public',table:'punchout_photos'},scheduleRealtimeReload)
     .subscribe();
 }
 
@@ -998,14 +1061,15 @@ async function signIn(){
  if(error) alert(error.message);
 }
 async function load(){
- const [{data:s,error:se},{data:l,error:le},{data:i,error:ie},{data:p,error:pe}]=await Promise.all([
+ const [{data:s,error:se},{data:l,error:le},{data:i,error:ie},{data:p,error:pe},{data:pp,error:ppe}]=await Promise.all([
   db.from('subdivisions').select('*').order('name'),
   db.from('lots').select('*').eq('active',true).order('lot_name'),
   db.from('schedule_items').select('*').order('starts_at'),
-  db.from('punchout_items').select('*').order('created_at',{ascending:false})
+  db.from('punchout_items').select('*').order('created_at',{ascending:false}),
+  db.from('punchout_photos').select('*').order('created_at')
  ]);
- if(se||le||ie||pe){alert((se||le||ie||pe).message);return}
- subdivisions=s||[];lots=l||[];items=i||[];punchouts=p||[];showSubs();
+ if(se||le||ie||pe||ppe){alert((se||le||ie||pe||ppe).message);return}
+ subdivisions=s||[];lots=l||[];items=i||[];punchouts=p||[];punchoutPhotos=pp||[];showSubs();
 }
 function appOn(){ $('login').classList.add('hidden');$('app').classList.remove('hidden');}
 function showSubs(){
@@ -1148,6 +1212,7 @@ function wireLotSwipeDelete(){
 
 
 
+
 async function signedPunchoutUrl(path){
   if(!path) return '';
   const {data,error}=await db.storage.from('punchout-photos').createSignedUrl(path,3600);
@@ -1165,39 +1230,77 @@ async function renderPunchout(lotId){
   }
 
   root.innerHTML='<div class="card muted">Loading punchout items...</div>';
+
   const cards=await Promise.all(list.map(async p=>{
-    const photoUrl=await signedPunchoutUrl(p.photo_path);
+    const photoRows=punchoutPhotos.filter(ph=>ph.punchout_item_id===p.id);
+    const urls=await Promise.all(photoRows.map(async ph=>({
+      path:ph.storage_path,
+      url:await signedPunchoutUrl(ph.storage_path)
+    })));
     const created=p.created_at?new Date(p.created_at).toLocaleDateString():'';
-    return `<div class="punchout-card" data-punchout="${p.id}">
-      <div class="punchout-text">${esc(p.description)}</div>
-      ${photoUrl?`<img class="punchout-photo" src="${photoUrl}" alt="Punchout photo" data-punchout-photo="${photoUrl}">`:''}
+    const status=p.completed?'Completed':'Open';
+
+    return `<div class="punchout-card ${p.completed?'completed':''}" data-punchout="${p.id}">
+      <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap">
+        <div class="punchout-text">${esc(p.description)}</div>
+        <span class="punchout-status ${p.completed?'completed':''}">${status}</span>
+      </div>
+      ${urls.some(x=>x.url)?`<div class="punchout-gallery">${urls.filter(x=>x.url).map(x=>`<img class="punchout-photo" src="${x.url}" alt="Punchout photo" data-punchout-photo="${x.url}">`).join('')}</div>`:''}
       <div class="punchout-meta">
-        <span class="muted">${esc(created)}</span>
-        <button class="secondary danger" type="button" data-delete-punchout="${p.id}">Delete</button>
+        <span class="muted">${esc(created)}${p.completed_at?' · completed '+esc(new Date(p.completed_at).toLocaleDateString()):''}</span>
+        <div class="punchout-actions">
+          <button class="${p.completed?'reopen-btn':'complete-btn'}" type="button" data-toggle-punchout="${p.id}">${p.completed?'Reopen':'Mark Completed'}</button>
+          <button class="secondary danger" type="button" data-delete-punchout="${p.id}">Delete</button>
+        </div>
       </div>
     </div>`;
   }));
+
   root.innerHTML=cards.join('');
 
   root.querySelectorAll('[data-punchout-photo]').forEach(img=>{
     img.onclick=()=>window.open(img.dataset.punchoutPhoto,'_blank');
+  });
+  root.querySelectorAll('[data-toggle-punchout]').forEach(btn=>{
+    btn.onclick=()=>togglePunchoutComplete(btn.dataset.togglePunchout);
   });
   root.querySelectorAll('[data-delete-punchout]').forEach(btn=>{
     btn.onclick=()=>deletePunchoutItem(btn.dataset.deletePunchout);
   });
 }
 
+async function togglePunchoutComplete(id){
+  const item=punchouts.find(p=>p.id===id);
+  if(!item) return;
+  const next=!item.completed;
+  const {data:{user}}=await db.auth.getUser();
+  const payload={
+    completed:next,
+    completed_at:next?new Date().toISOString():null,
+    completed_by:next?(user?.id||null):null
+  };
+  const {error}=await db.from('punchout_items').update(payload).eq('id',id);
+  if(error){alert(error.message);return}
+  item.completed=next;
+  item.completed_at=payload.completed_at;
+  item.completed_by=payload.completed_by;
+  await renderPunchout(currentLot);
+}
+
 async function deletePunchoutItem(id){
   const item=punchouts.find(p=>p.id===id);
   if(!item) return;
-  if(!confirm('Delete this punchout item?')) return;
+  if(!confirm('Delete this punchout item and all of its photos?')) return;
 
-  if(item.photo_path){
-    await db.storage.from('punchout-photos').remove([item.photo_path]);
+  const paths=punchoutPhotos.filter(ph=>ph.punchout_item_id===id).map(ph=>ph.storage_path);
+  if(paths.length){
+    await db.storage.from('punchout-photos').remove(paths);
   }
   const {error}=await db.from('punchout_items').delete().eq('id',id);
   if(error){alert(error.message);return}
+
   punchouts=punchouts.filter(p=>p.id!==id);
+  punchoutPhotos=punchoutPhotos.filter(ph=>ph.punchout_item_id!==id);
   await renderPunchout(currentLot);
 }
 
@@ -1209,45 +1312,74 @@ function openPunchoutDialog(){
 async function savePunchout(e){
   e.preventDefault();
   const description=$('punchoutText').value.trim();
-  const photo=$('punchoutPhoto').files?.[0]||null;
+  const photos=[...($('punchoutPhoto').files||[])];
+
   if(!description){alert('Please enter a punchout item.');return}
   if(!currentLot){alert('No lot selected.');return}
+  if(photos.length>12){alert('Please upload no more than 12 photos per punchout item.');return}
+
+  const tooLarge=photos.find(f=>f.size>8*1024*1024);
+  if(tooLarge){alert(`"${tooLarge.name}" is too large. Please keep each photo under 8 MB.`);return}
 
   $('punchoutSave').disabled=true;
   $('punchoutSave').textContent='Saving...';
 
-  let photoPath=null;
-  if(photo){
+  const {data:{user}}=await db.auth.getUser();
+  const {data:item,error:itemError}=await db.from('punchout_items')
+    .insert({
+      lot_id:currentLot,
+      description,
+      created_by:user?.id||null,
+      completed:false
+    })
+    .select()
+    .single();
+
+  if(itemError){
+    $('punchoutSave').disabled=false;
+    $('punchoutSave').textContent='Save Punchout Item';
+    alert(itemError.message);
+    return;
+  }
+
+  const uploadedPaths=[];
+  for(const photo of photos){
     const ext=(photo.name.split('.').pop()||'jpg').toLowerCase().replace(/[^a-z0-9]/g,'')||'jpg';
     const fileId=(crypto.randomUUID?crypto.randomUUID():Date.now()+'-'+Math.random().toString(36).slice(2));
-    photoPath=`${currentLot}/${fileId}.${ext}`;
+    const photoPath=`${currentLot}/${item.id}/${fileId}.${ext}`;
+
     const {error:uploadError}=await db.storage.from('punchout-photos').upload(photoPath,photo,{
       cacheControl:'3600',
       upsert:false,
       contentType:photo.type||undefined
     });
+
     if(uploadError){
+      if(uploadedPaths.length) await db.storage.from('punchout-photos').remove(uploadedPaths);
+      await db.from('punchout_items').delete().eq('id',item.id);
       $('punchoutSave').disabled=false;
       $('punchoutSave').textContent='Save Punchout Item';
       alert(uploadError.message);
       return;
     }
+
+    uploadedPaths.push(photoPath);
   }
 
-  const {data:{user}}=await db.auth.getUser();
-  const {error}=await db.from('punchout_items').insert({
-    lot_id:currentLot,
-    description,
-    photo_path:photoPath,
-    created_by:user?.id||null
-  });
-
-  if(error){
-    if(photoPath) await db.storage.from('punchout-photos').remove([photoPath]);
-    $('punchoutSave').disabled=false;
-    $('punchoutSave').textContent='Save Punchout Item';
-    alert(error.message);
-    return;
+  if(uploadedPaths.length){
+    const rows=uploadedPaths.map(storage_path=>({
+      punchout_item_id:item.id,
+      storage_path
+    }));
+    const {error:photoError}=await db.from('punchout_photos').insert(rows);
+    if(photoError){
+      await db.storage.from('punchout-photos').remove(uploadedPaths);
+      await db.from('punchout_items').delete().eq('id',item.id);
+      $('punchoutSave').disabled=false;
+      $('punchoutSave').textContent='Save Punchout Item';
+      alert(photoError.message);
+      return;
+    }
   }
 
   $('punchoutSave').disabled=false;
