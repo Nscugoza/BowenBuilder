@@ -1026,7 +1026,7 @@ const $=id=>document.getElementById(id);
 const SB_URL='https://oztefiymckpyxiewgxtc.supabase.co';
 const SB_KEY='sb_publishable__ItoYGeHKEGTBFiE7JM74w_1F-qERVe';
 const db=window.supabase.createClient(SB_URL,SB_KEY);
-let subdivisions=[],lots=[],items=[],punchouts=[],punchoutPhotos=[],selectedPunchouts=new Set(),currentSubdivision=null,currentLot=null;
+let subdivisions=[],lots=[],items=[],punchouts=[],punchoutPhotos=[],profiles=[],selectedPunchouts=new Set(),currentSubdivision=null,currentLot=null;
 let realtimeChannel=null;
 let presenceChannel=null;
 let currentUserProfile=null;
@@ -1066,20 +1066,22 @@ function scheduleRealtimeReload(){
     const keepLot=currentLot;
     const screen=currentScreen();
 
-    const [{data:s,error:se},{data:l,error:le},{data:i,error:ie},{data:p,error:pe},{data:pp,error:ppe}]=await Promise.all([
+    const [{data:s,error:se},{data:l,error:le},{data:i,error:ie},{data:p,error:pe},{data:pp,error:ppe},{data:pr,error:pre}]=await Promise.all([
       db.from('subdivisions').select('*').order('name'),
       db.from('lots').select('*').eq('active',true).order('lot_name'),
       db.from('schedule_items').select('*').order('starts_at'),
       db.from('punchout_items').select('*').order('created_at',{ascending:false}),
-      db.from('punchout_photos').select('*').order('created_at')
+      db.from('punchout_photos').select('*').order('created_at'),
+      db.from('profiles').select('id,full_name')
     ]);
-    if(se||le||ie||pe||ppe) return;
+    if(se||le||ie||pe||ppe||pre) return;
 
     subdivisions=s||[];
     lots=l||[];
     items=i||[];
     punchouts=p||[];
     punchoutPhotos=pp||[];
+    profiles=pr||[];
     currentSubdivision=keepSub;
     currentLot=keepLot;
 
@@ -1160,15 +1162,16 @@ async function signIn(){
  if(error) alert(error.message);
 }
 async function load(){
- const [{data:s,error:se},{data:l,error:le},{data:i,error:ie},{data:p,error:pe},{data:pp,error:ppe}]=await Promise.all([
+ const [{data:s,error:se},{data:l,error:le},{data:i,error:ie},{data:p,error:pe},{data:pp,error:ppe},{data:pr,error:pre}]=await Promise.all([
   db.from('subdivisions').select('*').order('name'),
   db.from('lots').select('*').eq('active',true).order('lot_name'),
   db.from('schedule_items').select('*').order('starts_at'),
   db.from('punchout_items').select('*').order('created_at',{ascending:false}),
-  db.from('punchout_photos').select('*').order('created_at')
+  db.from('punchout_photos').select('*').order('created_at'),
+  db.from('profiles').select('id,full_name')
  ]);
- if(se||le||ie||pe||ppe){alert((se||le||ie||pe||ppe).message);return}
- subdivisions=s||[];lots=l||[];items=i||[];punchouts=p||[];punchoutPhotos=pp||[];showSubs();
+ if(se||le||ie||pe||ppe||pre){alert((se||le||ie||pe||ppe||pre).message);return}
+ subdivisions=s||[];lots=l||[];items=i||[];punchouts=p||[];punchoutPhotos=pp||[];profiles=pr||[];showSubs();
 }
 function appOn(){ $('login').classList.add('hidden');$('app').classList.remove('hidden');}
 function showSubs(){
@@ -1312,6 +1315,13 @@ function wireLotSwipeDelete(){
 
 
 
+
+function profileName(userId){
+  if(!userId) return 'Unknown user';
+  const p=profiles.find(x=>x.id===userId);
+  return p?.full_name||'Unknown user';
+}
+
 async function signedPunchoutUrl(path){
   if(!path) return '';
   const {data,error}=await db.storage.from('punchout-photos').createSignedUrl(path,3600);
@@ -1359,7 +1369,10 @@ async function renderPunchout(lotId){
         </div>
       </div>
       <div class="punchout-meta">
-        <span class="muted">${esc(created)}${p.completed_at?' · completed '+esc(new Date(p.completed_at).toLocaleDateString()):''}</span>
+        <span class="muted">
+          Added by <strong>${esc(profileName(p.created_by))}</strong>${created?' · '+esc(created):''}
+          ${p.completed?`<br>Completed by <strong>${esc(profileName(p.completed_by))}</strong>${p.completed_at?' · '+esc(new Date(p.completed_at).toLocaleDateString()):''}`:''}
+        </span>
         <div class="punchout-actions">
           <button class="share-btn" type="button" data-text-punchout="${p.id}">Text</button>
           <button class="share-btn" type="button" data-email-punchout="${p.id}">Email</button>
@@ -1414,7 +1427,9 @@ async function buildPunchoutShareText(ids){
 
     const lines=[
       p.description,
-      `Status: ${p.completed?'Completed':'Open'}`
+      `Status: ${p.completed?'Completed':'Open'}`,
+      `Added by: ${profileName(p.created_by)}`,
+      ...(p.completed?[`Completed by: ${profileName(p.completed_by)}`]:[])
     ];
 
     const photoRows=punchoutPhotos.filter(ph=>ph.punchout_item_id===id);
