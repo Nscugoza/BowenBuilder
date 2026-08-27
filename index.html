@@ -594,6 +594,51 @@ dialog::backdrop{background:rgba(7,21,39,.7);backdrop-filter:blur(4px)}
   }
 }
 
+
+.presence-row{
+  display:flex;
+  flex-wrap:wrap;
+  gap:7px;
+  align-items:center;
+  margin-top:9px;
+  min-height:26px;
+}
+.presence-label{
+  font-size:12px;
+  color:var(--muted);
+  font-weight:750;
+}
+.presence-chip{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  padding:5px 9px;
+  border-radius:999px;
+  background:#eef4fb;
+  border:1px solid #d8e4f0;
+  color:#244f7e;
+  font-size:12px;
+  font-weight:800;
+}
+.presence-dot{
+  width:7px;
+  height:7px;
+  border-radius:50%;
+  background:#2d8a5b;
+}
+.live-indicator{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  font-size:12px;
+  font-weight:800;
+  color:#2d6b4f;
+  background:#eef9f3;
+  border:1px solid #d5eadf;
+  padding:5px 9px;
+  border-radius:999px;
+}
+
 </style>
 </head>
 <body>
@@ -634,7 +679,11 @@ dialog::backdrop{background:rgba(7,21,39,.7);backdrop-filter:blur(4px)}
     <section id="lotView" class="hidden">
       <button id="backToLots" class="secondary back" type="button">← Lots</button>
       <div class="lot-header">
-        <div><h2 id="lotTitle" style="margin:0"></h2><div id="lotSubtitle" class="muted"></div></div>
+        <div>
+          <h2 id="lotTitle" style="margin:0"></h2>
+          <div id="lotSubtitle" class="muted"></div>
+          <div id="lotPresence" class="presence-row" aria-live="polite"></div>
+        </div>
         <div class="lot-actions">
           <button id="editLot" class="secondary" type="button">✎ Edit Lot</button>
           <button id="emailLot" class="secondary" type="button">✉ Email Lot</button>
@@ -725,9 +774,126 @@ const SB_URL='https://oztefiymckpyxiewgxtc.supabase.co';
 const SB_KEY='sb_publishable__ItoYGeHKEGTBFiE7JM74w_1F-qERVe';
 const db=window.supabase.createClient(SB_URL,SB_KEY);
 let subdivisions=[],lots=[],items=[],currentSubdivision=null,currentLot=null;
+let realtimeChannel=null;
+let presenceChannel=null;
+let currentUserProfile=null;
+let realtimeRefreshTimer=null;
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmt=v=>v?new Date(v).toLocaleString():'';
 const safe=u=>{try{let x=new URL(u);return /^https?:$/.test(x.protocol)?x.href:''}catch{return''}};
+
+
+async function loadCurrentProfile(){
+  const {data:{user}}=await db.auth.getUser();
+  if(!user) return null;
+  const {data}=await db.from('profiles').select('id,full_name,role').eq('id',user.id).maybeSingle();
+  currentUserProfile=data||{id:user.id,full_name:user.email||'User',role:'crew'};
+  return currentUserProfile;
+}
+
+function currentScreen(){
+  if(!$('lotView').classList.contains('hidden')) return 'lot';
+  if(!$('lotsView').classList.contains('hidden')) return 'lots';
+  if(!$('scheduleView').classList.contains('hidden')) return 'schedule';
+  return 'subdivisions';
+}
+
+function rerenderCurrentScreen(){
+  const screen=currentScreen();
+  if(screen==='lot' && currentLot && lots.some(l=>l.id===currentLot)) showLot();
+  else if(screen==='lots' && currentSubdivision) showLots();
+  else if(screen==='schedule' && currentSubdivision) showLots();
+  else showSubs();
+}
+
+function scheduleRealtimeReload(){
+  clearTimeout(realtimeRefreshTimer);
+  realtimeRefreshTimer=setTimeout(async()=>{
+    const keepSub=currentSubdivision;
+    const keepLot=currentLot;
+    const screen=currentScreen();
+
+    const [{data:s,error:se},{data:l,error:le},{data:i,error:ie}]=await Promise.all([
+      db.from('subdivisions').select('*').order('name'),
+      db.from('lots').select('*').eq('active',true).order('lot_name'),
+      db.from('schedule_items').select('*').order('starts_at')
+    ]);
+    if(se||le||ie) return;
+
+    subdivisions=s||[];
+    lots=l||[];
+    items=i||[];
+    currentSubdivision=keepSub;
+    currentLot=keepLot;
+
+    if(screen==='lot' && currentLot && lots.some(x=>x.id===currentLot)) showLot();
+    else if(screen==='lots' && currentSubdivision) showLots();
+    else if(screen==='subdivisions') showSubs();
+  },180);
+}
+
+function startRealtimeUpdates(){
+  if(realtimeChannel) db.removeChannel(realtimeChannel);
+  realtimeChannel=db.channel('bowenbuilder-db-live')
+    .on('postgres_changes',{event:'*',schema:'public',table:'subdivisions'},scheduleRealtimeReload)
+    .on('postgres_changes',{event:'*',schema:'public',table:'lots'},scheduleRealtimeReload)
+    .on('postgres_changes',{event:'*',schema:'public',table:'schedule_items'},scheduleRealtimeReload)
+    .subscribe();
+}
+
+function renderPresence(state){
+  const root=$('lotPresence');
+  if(!root) return;
+  const people=[];
+  Object.values(state||{}).forEach(entries=>{
+    (entries||[]).forEach(p=>{
+      if(p && p.user_id && !people.some(x=>x.user_id===p.user_id)) people.push(p);
+    });
+  });
+  if(!people.length){
+    root.innerHTML='<span class="live-indicator"><span class="presence-dot"></span>Live updates on</span>';
+    return;
+  }
+  root.innerHTML='<span class="presence-label">Viewing now:</span>'+
+    people.map(p=>`<span class="presence-chip"><span class="presence-dot"></span>${esc(p.name||'User')}</span>`).join('');
+}
+
+async function joinLotPresence(lotId){
+  if(presenceChannel && presenceChannel.topic===`realtime:lot:${lotId}`) return;
+  if(presenceChannel){
+    await db.removeChannel(presenceChannel);
+    presenceChannel=null;
+  }
+  if(!lotId || !currentUserProfile) return;
+
+  presenceChannel=db.channel(`lot:${lotId}`,{
+    config:{presence:{key:currentUserProfile.id}}
+  });
+
+  presenceChannel
+    .on('presence',{event:'sync'},()=>renderPresence(presenceChannel.presenceState()))
+    .on('presence',{event:'join'},()=>renderPresence(presenceChannel.presenceState()))
+    .on('presence',{event:'leave'},()=>renderPresence(presenceChannel.presenceState()))
+    .subscribe(async status=>{
+      if(status==='SUBSCRIBED'){
+        await presenceChannel.track({
+          user_id:currentUserProfile.id,
+          name:currentUserProfile.full_name||'User',
+          role:currentUserProfile.role||'crew',
+          lot_id:lotId,
+          online_at:new Date().toISOString()
+        });
+      }
+    });
+}
+
+async function leaveLotPresence(){
+  if(presenceChannel){
+    await db.removeChannel(presenceChannel);
+    presenceChannel=null;
+  }
+  if($('lotPresence')) $('lotPresence').innerHTML='';
+}
 
 async function signIn(){
  const redirectTo=location.origin+location.pathname;
@@ -745,6 +911,7 @@ async function load(){
 }
 function appOn(){ $('login').classList.add('hidden');$('app').classList.remove('hidden');}
 function showSubs(){
+ leaveLotPresence();
  currentSubdivision=null;currentLot=null;
  ['lotsView','lotView','scheduleView'].forEach(x=>$(x).classList.add('hidden'));
  $('subdivisionsView').classList.remove('hidden');$('heroTitle').textContent='Subdivisions';$('heroSub').textContent='Choose a subdivision to view its lots.';
@@ -752,6 +919,7 @@ function showSubs(){
  document.querySelectorAll('[data-sub]').forEach(b=>b.onclick=()=>{currentSubdivision=b.dataset.sub;showLots()});
 }
 function showLots(){
+ leaveLotPresence();
  $('subdivisionsView').classList.add('hidden');$('lotView').classList.add('hidden');$('scheduleView').classList.add('hidden');$('lotsView').classList.remove('hidden');
  const s=subdivisions.find(x=>x.id===currentSubdivision);$('heroTitle').textContent=s?.name||'Lots';$('heroSub').textContent='Lots and schedules in this subdivision.';$('subdivisionName').textContent=s?.name||'';
  const arr=lots.filter(l=>l.subdivision_id===currentSubdivision);
@@ -883,6 +1051,7 @@ function wireLotSwipeDelete(){
 
 function showLot(){
  const l=lots.find(x=>x.id===currentLot);if(!l)return;
+ joinLotPresence(currentLot);
  $('lotsView').classList.add('hidden');$('lotView').classList.remove('hidden');$('heroTitle').textContent=l.lot_name;$('heroSub').textContent='Live BowenBuilder lot information and schedule.';$('lotTitle').textContent=l.lot_name;$('lotSubtitle').textContent=[l.plan_name,l.county].filter(Boolean).join(' · ');
  const links=[['County Permit',l.permit_url],['Deco Sheet',l.deco_url],['HLP',l.hlp_url],['LGP',l.lgp_url]].filter(x=>safe(x[1]));
  $('lotInfo').innerHTML=`<div class="info-grid"><div class="info"><small>Address</small><strong>${esc(l.address||'Not added')}</strong></div><div class="info"><small>Permit Number</small><strong>${esc(l.permit_number||'Not added')}</strong></div><div class="info"><small>Plan</small><strong>${esc(l.plan_name||'Not added')}</strong></div><div class="info"><small>Included Options</small><strong>${esc(l.included_options||'None added')}</strong></div><div class="info"><small>County</small><strong>${esc(l.county||'Not added')}</strong></div></div>${links.length?`<div class="resource-row">${links.map(x=>`<a href="${safe(x[1])}" target="_blank">${x[0]} ↗</a>`).join('')}</div>`:''}${l.color_rendering_url?`<div class="card" style="margin-top:14px"><small class="muted">Color Rendering</small><div style="margin-top:8px"><img src="${l.color_rendering_url}" alt="${esc(l.lot_name)} color rendering" style="max-width:100%;max-height:320px;border-radius:14px;cursor:zoom-in" id="liveRendering"></div></div>`:''}`;
@@ -937,7 +1106,7 @@ async function saveSchedule(e){
 }
 $('msLogin').onclick=signIn;
 $('loginForm').onsubmit=e=>{e.preventDefault();signIn()};
-$('logout').onclick=async()=>{await db.auth.signOut();location.reload()};
+$('logout').onclick=async()=>{if(realtimeChannel)await db.removeChannel(realtimeChannel);if(presenceChannel)await db.removeChannel(presenceChannel);await db.auth.signOut();location.reload()};
 $('backToSubs').onclick=showSubs;$('backToLots').onclick=showLots;
 function dateInputValue(v){
  if(!v) return '';
@@ -1098,7 +1267,15 @@ $('emailLot').onclick=()=>{
 document.querySelectorAll('.lot-tab').forEach(b=>b.onclick=()=>{document.querySelectorAll('.lot-tab').forEach(x=>x.classList.toggle('active',x===b));$('overviewPanel').classList.toggle('hidden',b.dataset.lottab!=='overview');$('filesPanel').classList.toggle('hidden',b.dataset.lottab!=='files')});
 document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{if(b.dataset.view==='subdivisions')showSubs();else if(b.dataset.view==='schedule'){if(!currentSubdivision){alert('Open a subdivision first.');return}showLots();}});
 const {data:{session}}=await db.auth.getSession();
-if(session){appOn();await load()}else{$('login').classList.remove('hidden');$('app').classList.add('hidden')}
+if(session){
+  appOn();
+  await loadCurrentProfile();
+  startRealtimeUpdates();
+  await load();
+}else{
+  $('login').classList.remove('hidden');
+  $('app').classList.add('hidden');
+}
 
 $('deleteLotX').onclick=()=>{pendingDeleteLotId=null;$('deleteLotDialog').close();};
 $('deleteLotCancel').onclick=()=>{pendingDeleteLotId=null;$('deleteLotDialog').close();};
