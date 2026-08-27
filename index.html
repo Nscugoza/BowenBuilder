@@ -1,0 +1,614 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>BowenBuilder</title>
+<style>
+
+:root{
+  --navy:#0b2f57;
+  --navy-2:#123e6d;
+  --blue:#2f6fbc;
+  --blue-soft:#eaf2fb;
+  --bg:#f4f7fb;
+  --card:#ffffff;
+  --text:#142033;
+  --muted:#6b778c;
+  --border:#dfe7f0;
+  --success:#2d8a5b;
+  --danger:#b42318;
+  --shadow:0 12px 34px rgba(24,50,82,.08);
+}
+*{box-sizing:border-box}
+html{background:var(--bg)}
+body{
+  margin:0;
+  font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;
+  background:var(--bg);
+  color:var(--text);
+  letter-spacing:-.01em;
+}
+button,input,select,textarea{font:inherit}
+button{cursor:pointer}
+.hidden{display:none!important}
+
+.login{
+  min-height:100vh;
+  display:grid;
+  place-items:center;
+  padding:28px 18px;
+  position:relative;
+  overflow:hidden;
+  background:
+    radial-gradient(circle at 78% 15%,rgba(68,132,199,.25),transparent 28%),
+    radial-gradient(circle at 18% 90%,rgba(255,255,255,.08),transparent 25%),
+    linear-gradient(145deg,#081f3b 0%,#0d315a 52%,#174d80 100%);
+}
+.login:before{
+  content:"";
+  position:absolute;
+  inset:auto -80px -100px auto;
+  width:360px;
+  height:360px;
+  border:1px solid rgba(255,255,255,.08);
+  transform:rotate(24deg);
+  border-radius:40px;
+}
+.login-card{
+  position:relative;
+  z-index:1;
+  width:min(450px,100%);
+  background:rgba(255,255,255,.98);
+  border-radius:28px;
+  padding:30px;
+  box-shadow:0 34px 90px rgba(0,0,0,.28);
+  border:1px solid rgba(255,255,255,.75);
+}
+.brand{
+  display:flex;
+  align-items:center;
+  gap:14px;
+  margin-bottom:26px;
+}
+.brand-mark{
+  width:58px;
+  height:58px;
+  border-radius:18px;
+  background:linear-gradient(145deg,var(--navy),#174f86);
+  display:grid;
+  place-items:center;
+  color:#fff;
+  font-weight:900;
+  font-size:18px;
+  box-shadow:0 10px 24px rgba(13,49,90,.22);
+}
+.brand h1{margin:0;font-size:29px;color:var(--navy);font-weight:850}
+.brand p{margin:4px 0 0;color:var(--muted);font-size:14px}
+label{
+  display:grid;
+  gap:7px;
+  font-weight:750;
+  font-size:13px;
+  color:#334155;
+  margin-bottom:15px;
+}
+input,select,textarea{
+  width:100%;
+  border:1px solid #d7e0eb;
+  border-radius:14px;
+  padding:13px 14px;
+  background:#fff;
+  color:var(--text);
+  font-size:16px;
+  outline:none;
+  transition:border-color .15s,box-shadow .15s;
+}
+input:focus,select:focus,textarea:focus{
+  border-color:#6f9fd2;
+  box-shadow:0 0 0 4px rgba(47,111,188,.11);
+}
+textarea{resize:vertical}
+
+.primary{
+  background:linear-gradient(180deg,#174f86,#0d3967);
+  color:#fff;
+  border:0;
+  border-radius:13px;
+  padding:12px 16px;
+  font-weight:800;
+  box-shadow:0 8px 18px rgba(13,57,103,.16);
+}
+.primary:hover{filter:brightness(1.04)}
+.secondary{
+  background:#fff;
+  border:1px solid var(--border);
+  border-radius:13px;
+  padding:11px 14px;
+  font-weight:750;
+  color:#23334b;
+}
+.ms-btn{
+  width:100%;
+  margin-top:11px;
+  background:#fff;
+  color:#1f2937;
+  border:1px solid #d7e0eb;
+  border-radius:13px;
+  padding:12px;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  gap:10px;
+  font-weight:800;
+}
+
+.app{min-height:100vh}
+.topbar{
+  background:linear-gradient(135deg,#0a2a4e,#123f70);
+  color:#fff;
+  padding:18px 28px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:16px;
+  flex-wrap:wrap;
+  box-shadow:0 7px 26px rgba(9,42,78,.18);
+}
+.topbar h1{margin:0;font-size:24px;font-weight:850}
+.topbar small{opacity:.78}
+.top-actions{display:flex;gap:8px}
+.top-actions button{
+  background:rgba(255,255,255,.1);
+  color:#fff;
+  border:1px solid rgba(255,255,255,.22);
+  border-radius:12px;
+  padding:9px 12px;
+}
+.tabs{
+  background:rgba(255,255,255,.97);
+  border-bottom:1px solid var(--border);
+  display:flex;
+  gap:6px;
+  padding:11px 24px;
+  overflow:auto;
+  position:sticky;
+  top:0;
+  z-index:5;
+  backdrop-filter:blur(12px);
+}
+.tab{
+  border:0;
+  background:transparent;
+  border-radius:12px;
+  padding:10px 14px;
+  font-weight:800;
+  color:#728097;
+}
+.tab.active{
+  background:var(--blue-soft);
+  color:var(--navy);
+}
+
+main{max-width:1240px;margin:0 auto;padding:26px}
+.hero{
+  margin-bottom:20px;
+  padding:2px 2px 0;
+}
+.hero h2{margin:0 0 5px;font-size:31px;color:#10233c;font-weight:850}
+.hero p{margin:0;color:var(--muted);font-size:15px}
+.toolbar{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:12px;
+  flex-wrap:wrap;
+  margin-bottom:16px;
+}
+.grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(255px,1fr));
+  gap:17px;
+}
+.card{
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:21px;
+  padding:18px;
+  box-shadow:var(--shadow);
+}
+.click-card{
+  cursor:pointer;
+  text-align:left;
+  width:100%;
+  transition:transform .16s,border-color .16s,box-shadow .16s;
+}
+.click-card:hover{
+  transform:translateY(-2px);
+  border-color:#bdccdd;
+  box-shadow:0 17px 38px rgba(24,50,82,.11);
+}
+.card h3{margin:8px 0 7px;font-size:21px}
+.muted{color:var(--muted);font-size:14px}
+.pill{
+  display:inline-flex;
+  align-items:center;
+  gap:5px;
+  border-radius:999px;
+  padding:6px 10px;
+  background:#edf4fb;
+  color:#285b91;
+  font-size:12px;
+  font-weight:850;
+}
+.sub-card{
+  min-height:155px;
+  display:flex;
+  flex-direction:column;
+  justify-content:space-between;
+  position:relative;
+  overflow:hidden;
+}
+.sub-card:after{
+  content:"";
+  position:absolute;
+  width:95px;
+  height:95px;
+  right:-28px;
+  bottom:-32px;
+  border-radius:24px;
+  background:linear-gradient(145deg,#eaf2fb,#f7faff);
+  transform:rotate(18deg);
+}
+.add-card{
+  border:2px dashed #aebdcd;
+  background:linear-gradient(180deg,#fbfdff,#f7faff);
+  display:grid;
+  place-items:center;
+  min-height:155px;
+  font-weight:850;
+  color:var(--navy);
+  box-shadow:none;
+}
+.back{margin-bottom:15px}
+.lot-header{
+  display:flex;
+  justify-content:space-between;
+  gap:14px;
+  align-items:flex-start;
+  flex-wrap:wrap;
+  margin-bottom:16px;
+}
+.lot-actions{display:flex;gap:8px;flex-wrap:wrap}
+.info-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(190px,1fr));
+  gap:11px;
+}
+.info{
+  background:#fff;
+  border:1px solid var(--border);
+  border-radius:16px;
+  padding:15px;
+  box-shadow:0 8px 20px rgba(24,50,82,.05);
+}
+.info small{display:block;color:var(--muted);margin-bottom:5px}
+.resource-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:13px}
+.resource-row a{
+  padding:9px 12px;
+  border-radius:11px;
+  background:#eaf2fb;
+  color:#174f86;
+  text-decoration:none;
+  font-weight:800;
+  font-size:13px;
+}
+
+.lot-tabs{
+  display:flex;
+  gap:8px;
+  margin:20px 0 13px;
+}
+.lot-tab{
+  border:1px solid var(--border);
+  background:#fff;
+  border-radius:999px;
+  padding:9px 15px;
+  font-weight:800;
+  color:#59667b;
+}
+.lot-tab.active{
+  background:linear-gradient(180deg,#174f86,#0d3967);
+  color:#fff;
+  border-color:#174f86;
+}
+.schedule-list{display:grid;gap:11px}
+.schedule-card{
+  background:#fff;
+  border:1px solid var(--border);
+  border-radius:17px;
+  padding:15px;
+  display:grid;
+  grid-template-columns:1fr auto;
+  gap:14px;
+  align-items:start;
+  box-shadow:0 7px 22px rgba(24,50,82,.055);
+}
+.schedule-card h4{margin:6px 0 6px;font-size:17px}
+.schedule-meta{color:var(--muted);font-size:13px;line-height:1.55}
+.schedule-actions{display:flex;gap:6px}
+.iconbtn{
+  border:1px solid var(--border);
+  background:#fff;
+  border-radius:11px;
+  padding:8px 11px;
+  font-weight:700;
+}
+.files-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(225px,1fr));
+  gap:11px;
+}
+.file-card{
+  display:flex;
+  gap:11px;
+  align-items:center;
+  text-decoration:none;
+  color:var(--text);
+  background:#fff;
+  border:1px solid var(--border);
+  border-radius:16px;
+  padding:13px;
+  box-shadow:0 6px 18px rgba(24,50,82,.045);
+}
+.file-card:hover{border-color:#bdccdd}
+.file-icon{
+  width:42px;
+  height:42px;
+  border-radius:12px;
+  background:linear-gradient(145deg,#e7f0fa,#f5f9fd);
+  display:grid;
+  place-items:center;
+  font-size:19px;
+}
+
+dialog{
+  border:0;
+  border-radius:24px;
+  padding:0;
+  width:min(650px,calc(100% - 24px));
+  box-shadow:0 28px 84px rgba(0,0,0,.32);
+  overflow:hidden;
+}
+dialog::backdrop{background:rgba(7,21,39,.7);backdrop-filter:blur(4px)}
+.sheet{padding:22px;background:#fff}
+.dialog-head{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:16px;
+  padding-bottom:12px;
+  border-bottom:1px solid #edf1f6;
+}
+.dialog-head h2{margin:0;color:#10233c}
+.xbtn{
+  border:0;
+  background:#eef3f8;
+  color:#415069;
+  border-radius:12px;
+  width:42px;
+  height:42px;
+  font-size:25px;
+}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+.actions{
+  display:flex;
+  justify-content:flex-end;
+  gap:8px;
+  flex-wrap:wrap;
+  margin-top:16px;
+}
+.danger{color:var(--danger);border-color:#efc8c4}
+.notice{
+  padding:11px 13px;
+  border-radius:12px;
+  background:#edf9f2;
+  color:#18794e;
+  border:1px solid #cfead9;
+  margin-bottom:13px;
+  font-weight:750;
+}
+@media(max-width:700px){
+  main{padding:17px}
+  .topbar{padding:16px 17px}
+  .tabs{padding:9px 14px}
+  .two{grid-template-columns:1fr}
+  .schedule-card{grid-template-columns:1fr}
+  .hero h2{font-size:25px}
+  .login-card{padding:24px}
+}
+
+</style>
+</head>
+<body>
+<section id="login" class="login">
+  <form id="loginForm" class="login-card">
+    <div class="brand"><div class="brand-mark">BB</div><div><h1>BowenBuilder</h1><p>Bowen & Bowen Homebuilders</p></div></div>
+    
+    
+    
+    <button id="msLogin" class="ms-btn" type="button">▦  Sign in with Microsoft</button>
+  </form>
+</section>
+
+<section id="app" class="app hidden">
+  <header class="topbar">
+    <div><h1>BowenBuilder</h1><small>Bowen & Bowen Homebuilders</small></div>
+    <div class="top-actions"><button id="logout" type="button">Sign out</button></div>
+  </header>
+  <nav class="tabs">
+    <button class="tab active" data-view="subdivisions" type="button">Subdivisions</button>
+    <button class="tab" data-view="schedule" type="button">Schedule</button>
+  </nav>
+  <main>
+    <div class="hero"><h2 id="heroTitle">Subdivisions</h2><p id="heroSub">Choose a subdivision to view its lots.</p></div>
+
+    <section id="subdivisionsView">
+      <div class="toolbar"><div></div><button id="addSubdivision" class="primary" type="button">+ Add Subdivision</button></div>
+      <div id="subNotice" class="notice hidden"></div>
+      <div id="subdivisionGrid" class="grid"></div>
+    </section>
+
+    <section id="lotsView" class="hidden">
+      <button id="backToSubs" class="secondary back" type="button">← Subdivisions</button>
+      <div class="toolbar"><div><strong id="subdivisionName"></strong><div class="muted">Lots in this subdivision</div></div><button id="addLot" class="primary" type="button">+ Add Lot</button></div>
+      <div id="lotsGrid" class="grid"></div>
+    </section>
+
+    <section id="lotView" class="hidden">
+      <button id="backToLots" class="secondary back" type="button">← Lots</button>
+      <div class="lot-header">
+        <div><h2 id="lotTitle" style="margin:0"></h2><div id="lotSubtitle" class="muted"></div></div>
+        <div class="lot-actions">
+          <button id="editLot" class="secondary" type="button">✎ Edit Lot</button>
+          <button id="emailLot" class="secondary" type="button">✉ Email Lot</button>
+          <button id="addSchedule" class="primary" type="button">+ Add Schedule Item</button>
+        </div>
+      </div>
+      <div id="lotInfo"></div>
+      <div class="lot-tabs">
+        <button class="lot-tab active" data-lottab="overview" type="button">Overview</button>
+        <button class="lot-tab" data-lottab="files" type="button">Files</button>
+      </div>
+      <div id="overviewPanel"><div id="lotSchedule" class="schedule-list"></div></div>
+      <div id="filesPanel" class="hidden">
+        <div class="card" style="margin-bottom:12px"><strong>Microsoft 365 Files</strong><div class="muted">Demo view of Teams / SharePoint documents for this lot.</div></div>
+        <div class="files-grid" id="filesGrid"></div>
+      </div>
+    </section>
+
+    <section id="scheduleView" class="hidden">
+      <div id="scheduleScope" class="muted" style="margin-bottom:12px"></div>
+      <div id="allSchedule" class="schedule-list"></div>
+    </section>
+  </main>
+</section>
+
+<dialog id="subDialog"><form id="subForm" class="sheet">
+  <div class="dialog-head"><h2>Add Subdivision</h2><button class="xbtn" id="subX" type="button">×</button></div>
+  <label>Subdivision Name<input id="subName" required placeholder="e.g. GoldFinch Farms"></label>
+  <div class="actions"><button id="subCancel" class="secondary" type="button">Cancel</button><button class="primary" type="submit">Save Subdivision</button></div>
+</form></dialog>
+
+<dialog id="lotDialog"><form id="lotForm" class="sheet">
+  <div class="dialog-head"><h2 id="lotDialogTitle">Add Lot</h2><button id="lotX" class="xbtn" type="button">×</button></div>
+  <input id="editLotId" type="hidden">
+  <div class="two"><label>Lot Name<input id="lotName" required placeholder="Lot 81"></label><label>Permit Number<input id="permitNumber"></label></div>
+  <div class="two"><label>Plan Name<input id="planName"></label><label>County<input id="county" value="Barrow County, GA"></label></div>
+  <label>County Permit Link<input id="permitUrl" type="url" placeholder="https://..."></label>
+  <label>Color Rendering<input id="renderingFile" type="file" accept="image/*"></label>
+  <label>Deco Sheet Link<input id="decoUrl" type="url"></label>
+  <label>Included Options<textarea id="includedOptions" rows="4"></textarea></label>
+  <div class="two"><label>HLP Link<input id="hlpUrl" type="url"></label><label>LGP Link<input id="lgpUrl" type="url"></label></div>
+  <div class="actions"><button id="lotCancel" class="secondary" type="button">Cancel</button><button class="primary" type="submit">Save Lot</button></div>
+</form></dialog>
+
+<dialog id="scheduleDialog"><form id="scheduleForm" class="sheet">
+  <div class="dialog-head"><h2 id="scheduleDialogTitle">Add Schedule Item</h2><button id="scheduleX" class="xbtn" type="button">×</button></div>
+  <input id="scheduleId" type="hidden">
+  <label>Lot<select id="scheduleLot" required></select></label>
+  <div class="two"><label>Type<select id="scheduleType"><option>Job</option><option>Crew</option><option>Equipment</option><option>Inspection</option></select></label><label>Status<select id="scheduleStatus"><option>Scheduled</option><option>In Progress</option><option>Delayed</option><option>Complete</option></select></label></div>
+  <label>Schedule Item<input id="scheduleName" required placeholder="Framing, electrical rough, inspection..."></label>
+  <label>Crew / Assignee<input id="scheduleCrew"></label>
+  <div class="two"><label>Start<input id="scheduleStart" type="datetime-local" required></label><label>End<input id="scheduleEnd" type="datetime-local" required></label></div>
+  <label>Location<input id="scheduleLocation"></label>
+  <label>Inspection Status<select id="inspectionStatus"><option>Not linked</option><option>Check County</option><option>Requested</option><option>Scheduled</option><option>Passed</option><option>Failed</option><option>Cancelled</option></select></label>
+  <label>Notes<textarea id="scheduleNotes" rows="3"></textarea></label>
+  <div class="actions"><button id="deleteSchedule" class="secondary danger hidden" type="button">Delete</button><button id="scheduleCancel" class="secondary" type="button">Cancel</button><button class="primary" type="submit">Save Item</button></div>
+</form></dialog>
+
+<dialog id="emailDialog"><form id="emailForm" class="sheet">
+  <div class="dialog-head"><h2>Email Lot</h2><button id="emailX" class="xbtn" type="button">×</button></div>
+  <label>To<input id="emailTo" type="email" placeholder="name@company.com"></label>
+  <label>Subject<input id="emailSubject" required></label>
+  <label>Message<textarea id="emailBody" rows="12" required></textarea></label>
+  <div class="actions"><button id="emailCancel" class="secondary" type="button">Cancel</button><button class="primary" type="submit">Open Email App</button></div>
+</form></dialog>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+(async()=>{
+const $=id=>document.getElementById(id);
+const SB_URL='https://oztefiymckpyxiewgxtc.supabase.co';
+const SB_KEY='sb_publishable__ItoYGeHKEGTBFiE7JM74w_1F-qERVe';
+const db=window.supabase.createClient(SB_URL,SB_KEY);
+let subdivisions=[],lots=[],items=[],currentSubdivision=null,currentLot=null;
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt=v=>v?new Date(v).toLocaleString():'';
+const safe=u=>{try{let x=new URL(u);return /^https?:$/.test(x.protocol)?x.href:''}catch{return''}};
+
+async function signIn(){
+ const redirectTo=location.origin+location.pathname;
+ const {error}=await db.auth.signInWithOAuth({provider:'azure',options:{scopes:'openid email profile',redirectTo}});
+ if(error) alert(error.message);
+}
+async function load(){
+ const [{data:s,error:se},{data:l,error:le},{data:i,error:ie}]=await Promise.all([
+  db.from('subdivisions').select('*').order('name'),
+  db.from('lots').select('*').eq('active',true).order('lot_name'),
+  db.from('schedule_items').select('*').order('starts_at')
+ ]);
+ if(se||le||ie){alert((se||le||ie).message);return}
+ subdivisions=s||[];lots=l||[];items=i||[];showSubs();
+}
+function appOn(){ $('login').classList.add('hidden');$('app').classList.remove('hidden');}
+function showSubs(){
+ currentSubdivision=null;currentLot=null;
+ ['lotsView','lotView','scheduleView'].forEach(x=>$(x).classList.add('hidden'));
+ $('subdivisionsView').classList.remove('hidden');$('heroTitle').textContent='Subdivisions';$('heroSub').textContent='Choose a subdivision to view its lots.';
+ $('subdivisionGrid').innerHTML=subdivisions.map(s=>`<button class="card click-card sub-card" data-sub="${s.id}"><div><span class="pill">Subdivision</span><h3>${esc(s.name)}</h3></div><div class="muted">${lots.filter(l=>l.subdivision_id===s.id).length} lots</div></button>`).join('');
+ document.querySelectorAll('[data-sub]').forEach(b=>b.onclick=()=>{currentSubdivision=b.dataset.sub;showLots()});
+}
+function showLots(){
+ $('subdivisionsView').classList.add('hidden');$('lotView').classList.add('hidden');$('scheduleView').classList.add('hidden');$('lotsView').classList.remove('hidden');
+ const s=subdivisions.find(x=>x.id===currentSubdivision);$('heroTitle').textContent=s?.name||'Lots';$('heroSub').textContent='Lots and schedules in this subdivision.';$('subdivisionName').textContent=s?.name||'';
+ const arr=lots.filter(l=>l.subdivision_id===currentSubdivision);
+ $('lotsGrid').innerHTML=arr.map(l=>`<button class="card click-card" data-lot="${l.id}"><span class="pill">${esc(l.county||'Lot')}</span><h3>${esc(l.lot_name)}</h3><div class="muted">${esc(l.plan_name||'Plan not added')}</div><div class="muted" style="margin-top:10px">${items.filter(i=>i.lot_id===l.id).length} schedule items</div></button>`).join('');
+ document.querySelectorAll('[data-lot]').forEach(b=>b.onclick=()=>{currentLot=b.dataset.lot;showLot()});
+}
+function showLot(){
+ const l=lots.find(x=>x.id===currentLot);if(!l)return;
+ $('lotsView').classList.add('hidden');$('lotView').classList.remove('hidden');$('heroTitle').textContent=l.lot_name;$('heroSub').textContent='Live BowenBuilder lot information and schedule.';$('lotTitle').textContent=l.lot_name;$('lotSubtitle').textContent=[l.plan_name,l.county].filter(Boolean).join(' · ');
+ const links=[['County Permit',l.permit_url],['Deco Sheet',l.deco_url],['HLP',l.hlp_url],['LGP',l.lgp_url]].filter(x=>safe(x[1]));
+ $('lotInfo').innerHTML=`<div class="info-grid"><div class="info"><small>Permit Number</small><strong>${esc(l.permit_number||'Not added')}</strong></div><div class="info"><small>Plan</small><strong>${esc(l.plan_name||'Not added')}</strong></div><div class="info"><small>Included Options</small><strong>${esc(l.included_options||'None added')}</strong></div><div class="info"><small>County</small><strong>${esc(l.county||'Not added')}</strong></div></div>${links.length?`<div class="resource-row">${links.map(x=>`<a href="${safe(x[1])}" target="_blank">${x[0]} ↗</a>`).join('')}</div>`:''}`;
+ const li=items.filter(i=>i.lot_id===l.id);
+ $('lotSchedule').innerHTML=li.length?li.map(i=>`<div class="schedule-card"><div><span class="pill">${esc(i.status)}</span><h4>${esc(i.name)}</h4><div class="schedule-meta">${esc(i.item_type)}${i.crew?' · '+esc(i.crew):''}<br>${fmt(i.starts_at)} → ${fmt(i.ends_at)}</div></div></div>`).join(''):'<div class="card muted">No schedule items yet.</div>';
+}
+async function saveSchedule(e){
+ e.preventDefault();
+ const payload={lot_id:$('scheduleLot').value,item_type:$('scheduleType').value,name:$('scheduleName').value.trim(),status:$('scheduleStatus').value.toLowerCase().replaceAll(' ','_'),crew:$('scheduleCrew').value.trim(),starts_at:new Date($('scheduleStart').value).toISOString(),ends_at:new Date($('scheduleEnd').value).toISOString(),location:$('scheduleLocation').value.trim(),inspection_status:$('inspectionStatus').value.toLowerCase().replaceAll(' ','_'),notes:$('scheduleNotes').value.trim()};
+ const {error}=await db.from('schedule_items').insert(payload);if(error){alert(error.message);return}
+ $('scheduleDialog').close();await load();currentSubdivision=lots.find(l=>l.id===payload.lot_id)?.subdivision_id;currentLot=payload.lot_id;showLot();
+}
+$('msLogin').onclick=signIn;
+$('loginForm').onsubmit=e=>{e.preventDefault();signIn()};
+$('logout').onclick=async()=>{await db.auth.signOut();location.reload()};
+$('backToSubs').onclick=showSubs;$('backToLots').onclick=showLots;
+$('addSchedule').onclick=()=>{
+ $('scheduleForm').reset();$('scheduleLot').innerHTML=lots.filter(l=>l.subdivision_id===currentSubdivision).map(l=>`<option value="${l.id}">${esc(l.lot_name)}</option>`).join('');$('scheduleLot').value=currentLot;
+ let n=new Date(),e=new Date(n.getTime()+3600000),f=d=>{d=new Date(d-d.getTimezoneOffset()*60000);return d.toISOString().slice(0,16)};$('scheduleStart').value=f(n);$('scheduleEnd').value=f(e);$('scheduleDialog').showModal();
+};
+$('scheduleForm').onsubmit=saveSchedule;$('scheduleX').onclick=()=>$('scheduleDialog').close();$('scheduleCancel').onclick=()=>$('scheduleDialog').close();
+$('addSubdivision').onclick=()=>$('subDialog').showModal();$('subX').onclick=()=>$('subDialog').close();$('subCancel').onclick=()=>$('subDialog').close();
+$('subForm').onsubmit=async e=>{e.preventDefault();let name=$('subName').value.trim();let {error}=await db.from('subdivisions').insert({name});if(error){alert(error.message);return}$('subDialog').close();await load()};
+$('addLot').onclick=()=>alert('Live Add Lot is the next form to connect. Your existing GoldFinch lots are already live.');
+$('editLot').onclick=()=>alert('Live lot editing is the next form to connect.');
+$('emailLot').onclick=()=>{let l=lots.find(x=>x.id===currentLot);location.href=`mailto:?subject=${encodeURIComponent(l.lot_name+' - '+(l.plan_name||'Lot Information'))}&body=${encodeURIComponent(`Lot: ${l.lot_name}\nPermit Number: ${l.permit_number||'Not added'}\nPlan: ${l.plan_name||'Not added'}\n\nIncluded Options:\n${l.included_options||'None added'}`)}`};
+document.querySelectorAll('.lot-tab').forEach(b=>b.onclick=()=>{document.querySelectorAll('.lot-tab').forEach(x=>x.classList.toggle('active',x===b));$('overviewPanel').classList.toggle('hidden',b.dataset.lottab!=='overview');$('filesPanel').classList.toggle('hidden',b.dataset.lottab!=='files')});
+document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{if(b.dataset.view==='subdivisions')showSubs();else if(b.dataset.view==='schedule'){if(!currentSubdivision){alert('Open a subdivision first.');return}showLots();}});
+const {data:{session}}=await db.auth.getSession();
+if(session){appOn();await load()}else{$('login').classList.remove('hidden');$('app').classList.add('hidden')}
+})();
+</script>
+</body>
+</html>
