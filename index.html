@@ -508,6 +508,32 @@ dialog::backdrop{background:rgba(7,21,39,.7);backdrop-filter:blur(4px)}
   }
 }
 
+
+#scheduleDialog{
+  max-height:calc(100vh - 20px);
+  overflow:hidden;
+}
+#scheduleDialog .sheet{
+  max-height:calc(100vh - 20px);
+  overflow-y:auto;
+  -webkit-overflow-scrolling:touch;
+  padding-bottom:96px;
+}
+#scheduleDialog .dialog-head{
+  position:sticky;
+  top:0;
+  z-index:4;
+  background:#fff;
+}
+#scheduleDialog .actions{
+  position:sticky;
+  bottom:0;
+  z-index:4;
+  background:#fff;
+  padding:12px 0 max(12px, env(safe-area-inset-bottom));
+  border-top:1px solid #edf1f6;
+}
+
 </style>
 </head>
 <body>
@@ -600,7 +626,7 @@ dialog::backdrop{background:rgba(7,21,39,.7);backdrop-filter:blur(4px)}
   <div class="two"><label>Type<select id="scheduleType"><option>Job</option><option>Crew</option><option>Equipment</option><option>Inspection</option></select></label><label>Status<select id="scheduleStatus"><option>Scheduled</option><option>In Progress</option><option>Delayed</option><option>Complete</option></select></label></div>
   <label>Schedule Item<input id="scheduleName" required placeholder="Framing, electrical rough, inspection..."></label>
   <label>Crew / Assignee<input id="scheduleCrew"></label>
-  <div class="two"><label>Start<input id="scheduleStart" type="datetime-local" required></label><label>End<input id="scheduleEnd" type="datetime-local" required></label></div>
+  <div class="two"><label>Start Date<input id="scheduleStart" type="date" required></label><label>End Date<input id="scheduleEnd" type="date" required></label></div>
   <label>Location<input id="scheduleLocation"></label>
   <label>Inspection Status<select id="inspectionStatus"><option>Not linked</option><option>Check County</option><option>Requested</option><option>Scheduled</option><option>Passed</option><option>Failed</option><option>Cancelled</option></select></label>
   <label>Notes<textarea id="scheduleNotes" rows="3"></textarea></label>
@@ -666,22 +692,99 @@ function showLot(){
    liveRendering.onclick=()=>window.open(l.color_rendering_url,'_blank');
  }
  const li=items.filter(i=>i.lot_id===l.id);
- $('lotSchedule').innerHTML=li.length?li.map(i=>`<div class="schedule-card"><div><span class="pill">${esc(i.status)}</span><h4>${esc(i.name)}</h4><div class="schedule-meta">${esc(i.item_type)}${i.crew?' · '+esc(i.crew):''}<br>${fmt(i.starts_at)} → ${fmt(i.ends_at)}</div></div></div>`).join(''):'<div class="card muted">No schedule items yet.</div>';
+ $('lotSchedule').innerHTML=li.length?li.map(i=>{
+   const sd=i.starts_at?new Date(i.starts_at).toLocaleDateString():'';
+   const ed=i.ends_at?new Date(i.ends_at).toLocaleDateString():'';
+   return `<div class="schedule-card"><div><span class="pill">${esc(i.status)}</span><h4>${esc(i.name)}</h4><div class="schedule-meta">${esc(i.item_type)}${i.crew?' · '+esc(i.crew):''}<br>${sd}${ed&&ed!==sd?' → '+ed:''}</div></div><div class="schedule-actions"><button class="iconbtn" type="button" data-edit-schedule="${i.id}">Edit</button></div></div>`;
+ }).join(''):'<div class="card muted">No schedule items yet.</div>';
+ document.querySelectorAll('[data-edit-schedule]').forEach(btn=>{
+   btn.onclick=()=>openScheduleDialogLive(btn.dataset.editSchedule);
+ });
 }
 async function saveSchedule(e){
  e.preventDefault();
- const payload={lot_id:$('scheduleLot').value,item_type:$('scheduleType').value,name:$('scheduleName').value.trim(),status:$('scheduleStatus').value.toLowerCase().replaceAll(' ','_'),crew:$('scheduleCrew').value.trim(),starts_at:new Date($('scheduleStart').value).toISOString(),ends_at:new Date($('scheduleEnd').value).toISOString(),location:$('scheduleLocation').value.trim(),inspection_status:$('inspectionStatus').value.toLowerCase().replaceAll(' ','_'),notes:$('scheduleNotes').value.trim()};
- const {error}=await db.from('schedule_items').insert(payload);if(error){alert(error.message);return}
- $('scheduleDialog').close();await load();currentSubdivision=lots.find(l=>l.id===payload.lot_id)?.subdivision_id;currentLot=payload.lot_id;showLot();
+ const id=$('scheduleId').value;
+ const startDate=$('scheduleStart').value;
+ const endDate=$('scheduleEnd').value;
+ if(!startDate||!endDate){alert('Please enter a start and end date.');return}
+ if(endDate<startDate){alert('End date must be on or after start date.');return}
+
+ const payload={
+  lot_id:$('scheduleLot').value,
+  item_type:$('scheduleType').value,
+  name:$('scheduleName').value.trim(),
+  status:$('scheduleStatus').value.toLowerCase().replaceAll(' ','_'),
+  crew:$('scheduleCrew').value.trim(),
+  starts_at:startDate+'T12:00:00Z',
+  ends_at:endDate+'T12:00:00Z',
+  location:$('scheduleLocation').value.trim(),
+  inspection_status:$('inspectionStatus').value.toLowerCase().replaceAll(' ','_'),
+  notes:$('scheduleNotes').value.trim()
+ };
+ if(!payload.name){alert('Please enter a schedule item name.');return}
+
+ const q=id
+   ? db.from('schedule_items').update(payload).eq('id',id).select().single()
+   : db.from('schedule_items').insert(payload).select().single();
+
+ const {data,error}=await q;
+ if(error){alert(error.message);return}
+
+ $('scheduleDialog').close();
+ await load();
+ currentSubdivision=lots.find(l=>l.id===payload.lot_id)?.subdivision_id||currentSubdivision;
+ currentLot=payload.lot_id;
+ showLot();
 }
 $('msLogin').onclick=signIn;
 $('loginForm').onsubmit=e=>{e.preventDefault();signIn()};
 $('logout').onclick=async()=>{await db.auth.signOut();location.reload()};
 $('backToSubs').onclick=showSubs;$('backToLots').onclick=showLots;
-$('addSchedule').onclick=()=>{
- $('scheduleForm').reset();$('scheduleLot').innerHTML=lots.filter(l=>l.subdivision_id===currentSubdivision).map(l=>`<option value="${l.id}">${esc(l.lot_name)}</option>`).join('');$('scheduleLot').value=currentLot;
- let n=new Date(),e=new Date(n.getTime()+3600000),f=d=>{d=new Date(d-d.getTimezoneOffset()*60000);return d.toISOString().slice(0,16)};$('scheduleStart').value=f(n);$('scheduleEnd').value=f(e);$('scheduleDialog').showModal();
-};
+function dateInputValue(v){
+ if(!v) return '';
+ const d=new Date(v);
+ const y=d.getUTCFullYear();
+ const m=String(d.getUTCMonth()+1).padStart(2,'0');
+ const day=String(d.getUTCDate()).padStart(2,'0');
+ return `${y}-${m}-${day}`;
+}
+function todayInput(){
+ const d=new Date();
+ const y=d.getFullYear();
+ const m=String(d.getMonth()+1).padStart(2,'0');
+ const day=String(d.getDate()).padStart(2,'0');
+ return `${y}-${m}-${day}`;
+}
+function openScheduleDialogLive(id=''){
+ $('scheduleForm').reset();
+ $('scheduleId').value=id;
+ $('scheduleLot').innerHTML=lots.filter(l=>l.subdivision_id===currentSubdivision).map(l=>`<option value="${l.id}">${esc(l.lot_name)}</option>`).join('');
+ const existing=items.find(i=>i.id===id);
+
+ if(existing){
+   $('scheduleDialogTitle').textContent='Edit Schedule Item';
+   $('scheduleLot').value=existing.lot_id;
+   $('scheduleType').value=existing.item_type||'Job';
+   const statusMap={scheduled:'Scheduled',in_progress:'In Progress',delayed:'Delayed',complete:'Complete'};
+   $('scheduleStatus').value=statusMap[existing.status]||'Scheduled';
+   $('scheduleName').value=existing.name||'';
+   $('scheduleCrew').value=existing.crew||'';
+   $('scheduleStart').value=dateInputValue(existing.starts_at);
+   $('scheduleEnd').value=dateInputValue(existing.ends_at);
+   $('scheduleLocation').value=existing.location||'';
+   const inspMap={not_linked:'Not linked',check_county:'Check County',requested:'Requested',scheduled:'Scheduled',passed:'Passed',failed:'Failed',cancelled:'Cancelled'};
+   $('inspectionStatus').value=inspMap[existing.inspection_status]||'Not linked';
+   $('scheduleNotes').value=existing.notes||'';
+ }else{
+   $('scheduleDialogTitle').textContent='Add Schedule Item';
+   $('scheduleLot').value=currentLot||'';
+   const t=todayInput();
+   $('scheduleStart').value=t;
+   $('scheduleEnd').value=t;
+ }
+ $('scheduleDialog').showModal();
+}
+$('addSchedule').onclick=()=>openScheduleDialogLive();
 $('scheduleForm').onsubmit=saveSchedule;$('scheduleX').onclick=()=>$('scheduleDialog').close();$('scheduleCancel').onclick=()=>$('scheduleDialog').close();
 $('addSubdivision').onclick=()=>$('subDialog').showModal();$('subX').onclick=()=>$('subDialog').close();$('subCancel').onclick=()=>$('subDialog').close();
 $('subForm').onsubmit=async e=>{e.preventDefault();let name=$('subName').value.trim();let {error}=await db.from('subdivisions').insert({name});if(error){alert(error.message);return}$('subDialog').close();await load()};
