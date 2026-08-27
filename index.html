@@ -859,6 +859,20 @@ dialog::backdrop{background:rgba(7,21,39,.7);backdrop-filter:blur(4px)}
 .schedule-status-pill.in_progress{background:#fff7d6;border-color:#ead071;color:#765b00}
 .schedule-status-pill.delayed{background:#fdeceb;border-color:#efaaa4;color:#a1271d}
 .schedule-status-pill.complete{background:#edf9f2;border-color:#a9d9be;color:#1f704b}
+
+.ai-import-sheet{
+  max-height:calc(100vh - 20px);
+  overflow-y:auto;
+  -webkit-overflow-scrolling:touch;
+  padding-bottom:96px;
+}
+.ai-file-list{display:grid;gap:8px;margin-top:8px}
+.ai-file{padding:10px 12px;border:1px solid var(--border);border-radius:12px;background:#f8fafc;font-size:13px}
+.ai-review-banner{display:flex;flex-direction:column;gap:4px;padding:12px 14px;border-radius:14px;background:#eef4fb;border:1px solid #d8e4f0;color:#244f7e;margin-bottom:14px}
+.ai-review-banner span{font-size:13px;font-weight:500}
+.ai-detected{margin-top:12px;padding:12px;border:1px solid #e1e8f0;border-radius:14px;background:#fafcfe}
+.ai-detected .ai-file{margin-top:8px}
+
 </style>
 </head>
 <body>
@@ -892,7 +906,7 @@ dialog::backdrop{background:rgba(7,21,39,.7);backdrop-filter:blur(4px)}
 
     <section id="lotsView" class="hidden">
       <button id="backToSubs" class="secondary back" type="button">← Subdivisions</button>
-      <div class="toolbar"><div><strong id="subdivisionName"></strong><div class="muted">Lots in this subdivision</div></div><button id="addLot" class="primary" type="button">+ Add Lot</button></div>
+      <div class="toolbar"><div><strong id="subdivisionName"></strong><div class="muted">Lots in this subdivision</div></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button id="aiImportLot" class="secondary" type="button">✨ Import Lot with AI</button><button id="addLot" class="primary" type="button">+ Add Lot</button></div></div>
       <div id="lotsGrid" class="grid"></div>
     </section>
 
@@ -1025,6 +1039,58 @@ dialog::backdrop{background:rgba(7,21,39,.7);backdrop-filter:blur(4px)}
   </form>
 </dialog>
 
+
+<dialog id="aiImportDialog">
+  <div class="sheet ai-import-sheet">
+    <div class="dialog-head">
+      <h2>✨ Import Lot with AI</h2>
+      <button id="aiImportX" class="xbtn" type="button">×</button>
+    </div>
+
+    <div id="aiUploadStep">
+      <div class="notice">Upload text-based PDF, DOCX, or TXT files. BowenBuilder will read them and prepare a lot draft for review.</div>
+      <label>Documents
+        <input id="aiDocuments" type="file" accept=".pdf,.docx,.txt,text/plain,application/pdf" multiple>
+        <span class="muted">You can select multiple documents for the same lot.</span>
+      </label>
+      <div id="aiFileList" class="ai-file-list"></div>
+      <div id="aiAnalyzeStatus" class="muted" style="margin-top:10px"></div>
+      <div class="actions">
+        <button id="aiCancel" class="secondary" type="button">Cancel</button>
+        <button id="aiAnalyze" class="primary" type="button">Analyze Documents</button>
+      </div>
+    </div>
+
+    <div id="aiReviewStep" class="hidden">
+      <div class="ai-review-banner">
+        <strong>Review extracted lot information</strong>
+        <span>Nothing is saved until you use this draft and save the lot.</span>
+      </div>
+
+      <div class="two">
+        <label>Lot Number<input id="aiLotName" placeholder="Lot 81"></label>
+        <label>Address<input id="aiAddress" placeholder="Street address"></label>
+      </div>
+      <div class="two">
+        <label>Permit Number<input id="aiPermit" placeholder="Permit number"></label>
+        <label>Plan Name<input id="aiPlan" placeholder="Plan name"></label>
+      </div>
+      <label>Included Options<textarea id="aiOptions" rows="6" placeholder="Included options..."></textarea></label>
+
+      <div class="ai-detected">
+        <strong>Detected Documents</strong>
+        <div id="aiDetectedFiles"></div>
+      </div>
+
+      <div class="actions">
+        <button id="aiBack" class="secondary" type="button">Back</button>
+        <button id="aiUseDraft" class="primary" type="button">Use This Draft</button>
+      </div>
+    </div>
+  </div>
+</dialog>
+
+<script src="https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <dialog id="deleteLotDialog">
@@ -1961,6 +2027,203 @@ $('checkWindowPlans').onchange=e=>saveLotChecklistField('submit_plans_window_ord
 $('checkFramePackage').onchange=e=>saveLotChecklistField('setup_frame_package_completed',e.target.checked);
 
 $('scheduleStatus').addEventListener('change',updateScheduleStatusColor); updateScheduleStatusColor();
+
+function resetAiImport(){
+  $('aiUploadStep').classList.remove('hidden');
+  $('aiReviewStep').classList.add('hidden');
+  $('aiDocuments').value='';
+  $('aiFileList').innerHTML='';
+  $('aiAnalyzeStatus').textContent='';
+}
+
+function aiCleanText(t){
+  return String(t||'')
+    .replace(/\r/g,'')
+    .replace(/[ \t]+/g,' ')
+    .replace(/\n{3,}/g,'\n\n')
+    .trim();
+}
+
+function aiFirstMatch(text,patterns){
+  for(const re of patterns){
+    const m=text.match(re);
+    if(m && m[1]) return m[1].trim();
+  }
+  return '';
+}
+
+function aiExtractOptions(text){
+  const lines=text.split('\n').map(x=>x.trim()).filter(Boolean);
+  const start=lines.findIndex(x=>/^(included options|options included|selected options|options)\s*:?\s*$/i.test(x));
+  if(start<0) return '';
+
+  const result=[];
+  for(let i=start+1;i<lines.length;i++){
+    const line=lines[i];
+    if(/^(plan|permit|address|lot|construction plans|notes|county|builder|deco|hlp|lgp)\b/i.test(line)) break;
+    if(result.length>=20) break;
+    result.push(line.replace(/^[-•*]\s*/,''));
+  }
+  return result.join('\n');
+}
+
+function aiExtractFields(raw){
+  const text=aiCleanText(raw);
+
+  let lot=aiFirstMatch(text,[
+    /\bLOT(?:\s+NUMBER|\s+#)?\s*[:#-]\s*(Lot\s*\d+[A-Za-z]?|\d+[A-Za-z]?)/i,
+    /\b(Lot\s+\d+[A-Za-z]?)\b/i
+  ]);
+  if(/^\d/.test(lot)) lot='Lot '+lot;
+
+  const address=aiFirstMatch(text,[
+    /(?:PROPERTY\s+ADDRESS|SITE\s+ADDRESS|ADDRESS)\s*[:#-]\s*([^\n]+)/i,
+    /\b(\d{1,6}\s+[A-Za-z0-9 .'-]+\s(?:Street|St|Road|Rd|Drive|Dr|Lane|Ln|Court|Ct|Way|Avenue|Ave|Boulevard|Blvd|Trail|Trl|Place|Pl)\b[^\n]*)/i
+  ]);
+
+  const permit=aiFirstMatch(text,[
+    /(?:PERMIT\s+(?:NUMBER|NO\.?|#)|BUILDING\s+PERMIT)\s*[:#-]\s*([A-Za-z0-9-]+)/i,
+    /\b(BLD[- ]?\d{4}[- ]?\d+)\b/i
+  ]);
+
+  const plan=aiFirstMatch(text,[
+    /(?:PLAN\s+(?:NAME|MODEL|TYPE)|MODEL\s+NAME)\s*[:#-]\s*([^\n]+)/i,
+    /(?:PLAN)\s*[:#-]\s*([^\n]+)/i
+  ]);
+
+  return {
+    lot,
+    address,
+    permit,
+    plan,
+    options:aiExtractOptions(text)
+  };
+}
+
+async function aiReadPdf(file){
+  const pdfjs = await import('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.6.82/pdf.min.mjs');
+  pdfjs.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.6.82/pdf.worker.min.mjs';
+  const pdf=await pdfjs.getDocument({data:await file.arrayBuffer()}).promise;
+  let output='';
+  for(let p=1;p<=pdf.numPages;p++){
+    const page=await pdf.getPage(p);
+    const content=await page.getTextContent();
+    output += content.items.map(x=>x.str).join(' ')+'\n';
+  }
+  return output;
+}
+
+async function aiReadDocx(file){
+  if(!window.mammoth) return '';
+  const result=await window.mammoth.extractRawText({arrayBuffer:await file.arrayBuffer()});
+  return result.value||'';
+}
+
+async function aiReadFile(file){
+  const n=file.name.toLowerCase();
+  if(n.endsWith('.txt') || file.type.startsWith('text/')) return await file.text();
+  if(n.endsWith('.pdf')) return await aiReadPdf(file);
+  if(n.endsWith('.docx')) return await aiReadDocx(file);
+  return '';
+}
+
+function aiClassifyFile(name){
+  const n=name.toLowerCase();
+  if(n.includes('plan')) return 'Plans';
+  if(n.includes('deco')||n.includes('selection')) return 'Deco Sheet';
+  if(n.includes('hlp')) return 'HLP';
+  if(n.includes('lgp')) return 'LGP';
+  if(n.includes('permit')) return 'Permit / County Document';
+  return 'Other';
+}
+
+$('aiImportLot').onclick=()=>{
+  resetAiImport();
+  $('aiImportDialog').showModal();
+};
+$('aiImportX').onclick=()=>$('aiImportDialog').close();
+$('aiCancel').onclick=()=>$('aiImportDialog').close();
+
+$('aiDocuments').onchange=()=>{
+  const files=[...$('aiDocuments').files];
+  $('aiFileList').innerHTML=files.map(f=>`<div class="ai-file">📄 ${esc(f.name)} <span class="muted">· ${(f.size/1024/1024).toFixed(2)} MB</span></div>`).join('');
+};
+
+$('aiAnalyze').onclick=async()=>{
+  const files=[...$('aiDocuments').files];
+  if(!files.length){
+    alert('Choose at least one PDF, DOCX, or TXT document.');
+    return;
+  }
+
+  $('aiAnalyze').disabled=true;
+  $('aiAnalyze').textContent='Analyzing...';
+  $('aiAnalyzeStatus').textContent='Reading document text...';
+
+  try{
+    let combined='';
+    let readable=0;
+
+    for(const file of files){
+      $('aiAnalyzeStatus').textContent=`Reading ${file.name}...`;
+      try{
+        const t=await aiReadFile(file);
+        if(t.trim()){
+          readable++;
+          combined += '\n'+t;
+        }
+      }catch(err){
+        console.error('Document read error',file.name,err);
+      }
+    }
+
+    if(!readable || !combined.trim()){
+      alert('I could not extract text from those files. Try a text-based PDF, DOCX, or TXT document. Scanned/image-only documents will need the full AI/OCR version.');
+      return;
+    }
+
+    $('aiAnalyzeStatus').textContent='Finding lot information...';
+    const fields=aiExtractFields(combined);
+
+    $('aiLotName').value=fields.lot||'';
+    $('aiAddress').value=fields.address||'';
+    $('aiPermit').value=fields.permit||'';
+    $('aiPlan').value=fields.plan||'';
+    $('aiOptions').value=fields.options||'';
+
+    $('aiDetectedFiles').innerHTML=files.map(f=>`<div class="ai-file"><strong>${esc(aiClassifyFile(f.name))}</strong><br>${esc(f.name)}</div>`).join('');
+
+    $('aiUploadStep').classList.add('hidden');
+    $('aiReviewStep').classList.remove('hidden');
+    $('aiReviewStep').scrollIntoView({block:'start',behavior:'auto'});
+  }finally{
+    $('aiAnalyze').disabled=false;
+    $('aiAnalyze').textContent='Analyze Documents';
+  }
+};
+
+$('aiBack').onclick=()=>{
+  $('aiReviewStep').classList.add('hidden');
+  $('aiUploadStep').classList.remove('hidden');
+};
+
+$('aiUseDraft').onclick=()=>{
+  const lotName=$('aiLotName').value.trim();
+  const address=$('aiAddress').value.trim();
+  const permit=$('aiPermit').value.trim();
+  const plan=$('aiPlan').value.trim();
+  const options=$('aiOptions').value.trim();
+
+  $('aiImportDialog').close();
+  openLotDialogLive();
+
+  $('lotName').value=lotName;
+  $('lotAddress').value=address;
+  $('permitNumber').value=permit;
+  $('planName').value=plan;
+  $('includedOptions').value=options;
+};
+
 })();
 </script>
 </body>
