@@ -1217,6 +1217,7 @@ function showLots(){
     <h3>${esc(l.lot_name)}</h3>
     <div class="muted">${esc(l.address||l.plan_name||'Address not added')}</div>
     <div class="muted">${esc(l.plan_name||'Plan not added')}</div>
+    ${l.included_options?`<div class="muted" style="margin-top:8px"><strong>Included Options:</strong> ${esc(l.included_options)}</div>`:''}
     <div class="muted" style="margin-top:10px">${items.filter(i=>i.lot_id===l.id).length} schedule items</div>
   </button>
 </div>`).join('');
