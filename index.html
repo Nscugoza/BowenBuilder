@@ -764,6 +764,46 @@ dialog::backdrop{background:rgba(7,21,39,.7);backdrop-filter:blur(4px)}
   font-weight:800;
 }
 
+
+.punchout-share-bar{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:10px;
+  flex-wrap:wrap;
+  background:#eef4fb;
+  border:1px solid #d8e4f0;
+  border-radius:14px;
+  padding:10px 12px;
+  margin-bottom:12px;
+  font-weight:800;
+  color:#244f7e;
+}
+.punchout-select{
+  width:22px;
+  height:22px;
+  flex:0 0 auto;
+  margin:2px 0 0;
+  accent-color:#174f86;
+}
+.punchout-topline{
+  display:flex;
+  gap:10px;
+  align-items:flex-start;
+}
+.punchout-topline-main{
+  min-width:0;
+  flex:1;
+}
+.share-btn{
+  background:#fff;
+  color:#244f7e;
+  border:1px solid #d8e4f0;
+  border-radius:12px;
+  padding:9px 12px;
+  font-weight:800;
+}
+
 </style>
 </head>
 <body>
@@ -826,6 +866,14 @@ dialog::backdrop{background:rgba(7,21,39,.7);backdrop-filter:blur(4px)}
         <div class="toolbar">
           <div><strong>Punchout Items</strong><div class="muted">Track corrections, notes, and jobsite photos.</div></div>
           <button id="addPunchout" class="primary" type="button">+ Add Punchout Item</button>
+        </div>
+        <div id="punchoutShareBar" class="punchout-share-bar hidden">
+          <span id="punchoutSelectedCount">0 selected</span>
+          <div class="punchout-actions">
+            <button id="textSelectedPunchouts" class="secondary" type="button">Text Selected</button>
+            <button id="emailSelectedPunchouts" class="secondary" type="button">Email Selected</button>
+            <button id="clearSelectedPunchouts" class="secondary" type="button">Clear</button>
+          </div>
         </div>
         <div id="punchoutList" class="punchout-list"></div>
       </div>
@@ -927,7 +975,7 @@ const $=id=>document.getElementById(id);
 const SB_URL='https://oztefiymckpyxiewgxtc.supabase.co';
 const SB_KEY='sb_publishable__ItoYGeHKEGTBFiE7JM74w_1F-qERVe';
 const db=window.supabase.createClient(SB_URL,SB_KEY);
-let subdivisions=[],lots=[],items=[],punchouts=[],punchoutPhotos=[],currentSubdivision=null,currentLot=null;
+let subdivisions=[],lots=[],items=[],punchouts=[],punchoutPhotos=[],selectedPunchouts=new Set(),currentSubdivision=null,currentLot=null;
 let realtimeChannel=null;
 let presenceChannel=null;
 let currentUserProfile=null;
@@ -1224,8 +1272,11 @@ async function renderPunchout(lotId){
   const root=$('punchoutList');
   if(!root) return;
   const list=punchouts.filter(p=>p.lot_id===lotId);
+  selectedPunchouts=new Set([...selectedPunchouts].filter(id=>list.some(p=>p.id===id)));
+
   if(!list.length){
     root.innerHTML='<div class="card punchout-empty">No punchout items yet. Tap <strong>Add Punchout Item</strong> to create one.</div>';
+    updatePunchoutShareBar();
     return;
   }
 
@@ -1241,14 +1292,21 @@ async function renderPunchout(lotId){
     const status=p.completed?'Completed':'Open';
 
     return `<div class="punchout-card ${p.completed?'completed':''}" data-punchout="${p.id}">
-      <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap">
-        <div class="punchout-text">${esc(p.description)}</div>
-        <span class="punchout-status ${p.completed?'completed':''}">${status}</span>
+      <div class="punchout-topline">
+        <input class="punchout-select" type="checkbox" data-select-punchout="${p.id}" ${selectedPunchouts.has(p.id)?'checked':''} aria-label="Select punchout item">
+        <div class="punchout-topline-main">
+          <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap">
+            <div class="punchout-text">${esc(p.description)}</div>
+            <span class="punchout-status ${p.completed?'completed':''}">${status}</span>
+          </div>
+          ${urls.some(x=>x.url)?`<div class="punchout-gallery">${urls.filter(x=>x.url).map(x=>`<img class="punchout-photo" src="${x.url}" alt="Punchout photo" data-punchout-photo="${x.url}">`).join('')}</div>`:''}
+        </div>
       </div>
-      ${urls.some(x=>x.url)?`<div class="punchout-gallery">${urls.filter(x=>x.url).map(x=>`<img class="punchout-photo" src="${x.url}" alt="Punchout photo" data-punchout-photo="${x.url}">`).join('')}</div>`:''}
       <div class="punchout-meta">
         <span class="muted">${esc(created)}${p.completed_at?' · completed '+esc(new Date(p.completed_at).toLocaleDateString()):''}</span>
         <div class="punchout-actions">
+          <button class="share-btn" type="button" data-text-punchout="${p.id}">Text</button>
+          <button class="share-btn" type="button" data-email-punchout="${p.id}">Email</button>
           <button class="${p.completed?'reopen-btn':'complete-btn'}" type="button" data-toggle-punchout="${p.id}">${p.completed?'Reopen':'Mark Completed'}</button>
           <button class="secondary danger" type="button" data-delete-punchout="${p.id}">Delete</button>
         </div>
@@ -1261,12 +1319,78 @@ async function renderPunchout(lotId){
   root.querySelectorAll('[data-punchout-photo]').forEach(img=>{
     img.onclick=()=>window.open(img.dataset.punchoutPhoto,'_blank');
   });
+  root.querySelectorAll('[data-select-punchout]').forEach(cb=>{
+    cb.onchange=()=>{
+      if(cb.checked) selectedPunchouts.add(cb.dataset.selectPunchout);
+      else selectedPunchouts.delete(cb.dataset.selectPunchout);
+      updatePunchoutShareBar();
+    };
+  });
+  root.querySelectorAll('[data-text-punchout]').forEach(btn=>{
+    btn.onclick=()=>sharePunchouts([btn.dataset.textPunchout],'text');
+  });
+  root.querySelectorAll('[data-email-punchout]').forEach(btn=>{
+    btn.onclick=()=>sharePunchouts([btn.dataset.emailPunchout],'email');
+  });
   root.querySelectorAll('[data-toggle-punchout]').forEach(btn=>{
     btn.onclick=()=>togglePunchoutComplete(btn.dataset.togglePunchout);
   });
   root.querySelectorAll('[data-delete-punchout]').forEach(btn=>{
     btn.onclick=()=>deletePunchoutItem(btn.dataset.deletePunchout);
   });
+
+  updatePunchoutShareBar();
+}
+
+function updatePunchoutShareBar(){
+  const count=selectedPunchouts.size;
+  $('punchoutSelectedCount').textContent=`${count} selected`;
+  $('punchoutShareBar').classList.toggle('hidden',count===0);
+}
+
+async function buildPunchoutShareText(ids){
+  const lot=lots.find(l=>l.id===currentLot);
+  const chunks=[];
+
+  for(const id of ids){
+    const p=punchouts.find(x=>x.id===id);
+    if(!p) continue;
+
+    const lines=[
+      p.description,
+      `Status: ${p.completed?'Completed':'Open'}`
+    ];
+
+    const photoRows=punchoutPhotos.filter(ph=>ph.punchout_item_id===id);
+    if(photoRows.length){
+      const urls=await Promise.all(photoRows.map(ph=>signedPunchoutUrl(ph.storage_path)));
+      const valid=urls.filter(Boolean);
+      if(valid.length){
+        lines.push('Photos:');
+        valid.forEach((url,i)=>lines.push(`${i+1}. ${url}`));
+      }
+    }
+
+    chunks.push(lines.join('\n'));
+  }
+
+  const header=lot?`${lot.lot_name}${lot.address?' - '+lot.address:''}`:'Punchout Items';
+  return `${header}\n\n${chunks.join('\n\n--------------------\n\n')}`;
+}
+
+async function sharePunchouts(ids,mode){
+  if(!ids.length) return;
+  const body=await buildPunchoutShareText(ids);
+  const lot=lots.find(l=>l.id===currentLot);
+  const subject=ids.length===1
+    ? `${lot?.lot_name||'Lot'} Punchout Item`
+    : `${lot?.lot_name||'Lot'} Punchout Items (${ids.length})`;
+
+  if(mode==='email'){
+    location.href=`mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  }else{
+    location.href=`sms:?&body=${encodeURIComponent(body)}`;
+  }
 }
 
 async function togglePunchoutComplete(id){
@@ -1638,6 +1762,15 @@ $('punchoutCancel').onclick=()=>$('punchoutDialog').close();
 $('punchoutDialog').addEventListener('click',e=>{
   if(e.target===e.currentTarget) $('punchoutDialog').close();
 });
+
+
+$('textSelectedPunchouts').onclick=()=>sharePunchouts([...selectedPunchouts],'text');
+$('emailSelectedPunchouts').onclick=()=>sharePunchouts([...selectedPunchouts],'email');
+$('clearSelectedPunchouts').onclick=()=>{
+  selectedPunchouts.clear();
+  document.querySelectorAll('[data-select-punchout]').forEach(cb=>cb.checked=false);
+  updatePunchoutShareBar();
+};
 
 })();
 </script>
