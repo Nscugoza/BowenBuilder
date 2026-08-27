@@ -428,6 +428,46 @@ dialog::backdrop{background:rgba(7,21,39,.7);backdrop-filter:blur(4px)}
   .login-card{padding:24px}
 }
 
+
+/* Fix long Edit/Add Lot modal scrolling */
+#lotDialog{
+  max-height:calc(100vh - 24px);
+  overflow:hidden;
+}
+#lotDialog .sheet{
+  max-height:calc(100vh - 24px);
+  overflow-y:auto;
+  -webkit-overflow-scrolling:touch;
+  padding-bottom:96px;
+}
+#lotDialog .dialog-head{
+  position:sticky;
+  top:0;
+  z-index:3;
+  background:#fff;
+}
+#lotDialog .actions{
+  position:sticky;
+  bottom:0;
+  z-index:3;
+  background:#fff;
+  padding-top:12px;
+  padding-bottom:max(12px, env(safe-area-inset-bottom));
+  border-top:1px solid #edf1f6;
+  margin-top:18px;
+}
+@media(max-width:700px){
+  #lotDialog{
+    width:calc(100% - 12px);
+    max-height:calc(100vh - 12px);
+    border-radius:18px;
+  }
+  #lotDialog .sheet{
+    max-height:calc(100vh - 12px);
+    padding:16px 16px 96px;
+  }
+}
+
 </style>
 </head>
 <body>
