@@ -845,6 +845,20 @@ dialog::backdrop{background:rgba(7,21,39,.7);backdrop-filter:blur(4px)}
 #scheduleStatus.status-progress{background:#fff7d6;border-color:#ead071;color:#765b00}
 #scheduleStatus.status-delayed{background:#fdeceb;border-color:#efaaa4;color:#a1271d}
 #scheduleStatus.status-complete{background:#edf9f2;border-color:#a9d9be;color:#1f704b}
+
+.schedule-status-pill{
+  display:inline-flex;
+  align-items:center;
+  border-radius:999px;
+  padding:6px 10px;
+  font-size:12px;
+  font-weight:850;
+  border:1px solid transparent;
+}
+.schedule-status-pill.scheduled{background:#eaf2fb;border-color:#a9c9eb;color:#174f86}
+.schedule-status-pill.in_progress{background:#fff7d6;border-color:#ead071;color:#765b00}
+.schedule-status-pill.delayed{background:#fdeceb;border-color:#efaaa4;color:#a1271d}
+.schedule-status-pill.complete{background:#edf9f2;border-color:#a9d9be;color:#1f704b}
 </style>
 </head>
 <body>
@@ -1607,7 +1621,7 @@ function showLot(){
  $('lotSchedule').innerHTML=li.length?li.map(i=>{
    const sd=i.starts_at?new Date(i.starts_at).toLocaleDateString():'';
    const ed=i.ends_at?new Date(i.ends_at).toLocaleDateString():'';
-   return `<div class="schedule-card"><div><span class="pill">${esc(i.status)}</span><h4>${esc(i.name)}</h4><div class="schedule-meta">${esc(i.item_type)}${i.crew?' · '+esc(i.crew):''}<br>${sd}${ed&&ed!==sd?' → '+ed:''}</div></div><div class="schedule-actions"><button class="iconbtn" type="button" data-edit-schedule="${i.id}">Edit</button></div></div>`;
+   return `<div class="schedule-card"><div><span class="schedule-status-pill ${esc(i.status)}">${esc((i.status||'').replaceAll('_',' ').replace(/\b\w/g,c=>c.toUpperCase()))}</span><h4>${esc(i.name)}</h4><div class="schedule-meta">${esc(i.item_type)}${i.crew?' · '+esc(i.crew):''}<br>${sd}${ed&&ed!==sd?' → '+ed:''}</div></div><div class="schedule-actions"><button class="iconbtn" type="button" data-edit-schedule="${i.id}">Edit</button></div></div>`;
  }).join(''):'<div class="card muted">No schedule items yet.</div>';
  document.querySelectorAll('[data-edit-schedule]').forEach(btn=>{
    btn.onclick=()=>openScheduleDialogLive(btn.dataset.editSchedule);
