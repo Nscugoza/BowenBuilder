@@ -610,6 +610,7 @@ dialog::backdrop{background:rgba(7,21,39,.7);backdrop-filter:blur(4px)}
   <div class="dialog-head"><h2 id="lotDialogTitle">Add Lot</h2><button id="lotX" class="xbtn" type="button">×</button></div>
   <input id="editLotId" type="hidden">
   <div class="two"><label>Lot Name<input id="lotName" required placeholder="Lot 81"></label><label>Permit Number<input id="permitNumber"></label></div>
+  <label>Address<input id="lotAddress" placeholder="Street address"></label>
   <div class="two"><label>Plan Name<input id="planName"></label><label>County<input id="county" value="Barrow County, GA"></label></div>
   <label>County Permit Link<input id="permitUrl" type="url" placeholder="https://..."></label>
   <label>Color Rendering<input id="renderingFile" type="file" accept="image/*"></label>
@@ -679,14 +680,14 @@ function showLots(){
  $('subdivisionsView').classList.add('hidden');$('lotView').classList.add('hidden');$('scheduleView').classList.add('hidden');$('lotsView').classList.remove('hidden');
  const s=subdivisions.find(x=>x.id===currentSubdivision);$('heroTitle').textContent=s?.name||'Lots';$('heroSub').textContent='Lots and schedules in this subdivision.';$('subdivisionName').textContent=s?.name||'';
  const arr=lots.filter(l=>l.subdivision_id===currentSubdivision);
- $('lotsGrid').innerHTML=arr.map(l=>`<button class="card click-card" data-lot="${l.id}"><span class="pill">${esc(l.county||'Lot')}</span><h3>${esc(l.lot_name)}</h3><div class="muted">${esc(l.plan_name||'Plan not added')}</div><div class="muted" style="margin-top:10px">${items.filter(i=>i.lot_id===l.id).length} schedule items</div></button>`).join('');
+ $('lotsGrid').innerHTML=arr.map(l=>`<button class="card click-card" data-lot="${l.id}"><span class="pill">${esc(l.county||'Lot')}</span><h3>${esc(l.lot_name)}</h3><div class="muted">${esc(l.address||l.plan_name||'Address not added')}</div><div class="muted">${esc(l.plan_name||'Plan not added')}</div><div class="muted" style="margin-top:10px">${items.filter(i=>i.lot_id===l.id).length} schedule items</div></button>`).join('');
  document.querySelectorAll('[data-lot]').forEach(b=>b.onclick=()=>{currentLot=b.dataset.lot;showLot()});
 }
 function showLot(){
  const l=lots.find(x=>x.id===currentLot);if(!l)return;
  $('lotsView').classList.add('hidden');$('lotView').classList.remove('hidden');$('heroTitle').textContent=l.lot_name;$('heroSub').textContent='Live BowenBuilder lot information and schedule.';$('lotTitle').textContent=l.lot_name;$('lotSubtitle').textContent=[l.plan_name,l.county].filter(Boolean).join(' · ');
  const links=[['County Permit',l.permit_url],['Deco Sheet',l.deco_url],['HLP',l.hlp_url],['LGP',l.lgp_url]].filter(x=>safe(x[1]));
- $('lotInfo').innerHTML=`<div class="info-grid"><div class="info"><small>Permit Number</small><strong>${esc(l.permit_number||'Not added')}</strong></div><div class="info"><small>Plan</small><strong>${esc(l.plan_name||'Not added')}</strong></div><div class="info"><small>Included Options</small><strong>${esc(l.included_options||'None added')}</strong></div><div class="info"><small>County</small><strong>${esc(l.county||'Not added')}</strong></div></div>${links.length?`<div class="resource-row">${links.map(x=>`<a href="${safe(x[1])}" target="_blank">${x[0]} ↗</a>`).join('')}</div>`:''}${l.color_rendering_url?`<div class="card" style="margin-top:14px"><small class="muted">Color Rendering</small><div style="margin-top:8px"><img src="${l.color_rendering_url}" alt="${esc(l.lot_name)} color rendering" style="max-width:100%;max-height:320px;border-radius:14px;cursor:zoom-in" id="liveRendering"></div></div>`:''}`;
+ $('lotInfo').innerHTML=`<div class="info-grid"><div class="info"><small>Address</small><strong>${esc(l.address||'Not added')}</strong></div><div class="info"><small>Permit Number</small><strong>${esc(l.permit_number||'Not added')}</strong></div><div class="info"><small>Plan</small><strong>${esc(l.plan_name||'Not added')}</strong></div><div class="info"><small>Included Options</small><strong>${esc(l.included_options||'None added')}</strong></div><div class="info"><small>County</small><strong>${esc(l.county||'Not added')}</strong></div></div>${links.length?`<div class="resource-row">${links.map(x=>`<a href="${safe(x[1])}" target="_blank">${x[0]} ↗</a>`).join('')}</div>`:''}${l.color_rendering_url?`<div class="card" style="margin-top:14px"><small class="muted">Color Rendering</small><div style="margin-top:8px"><img src="${l.color_rendering_url}" alt="${esc(l.lot_name)} color rendering" style="max-width:100%;max-height:320px;border-radius:14px;cursor:zoom-in" id="liveRendering"></div></div>`:''}`;
  const liveRendering=$('liveRendering');
  if(liveRendering){
    liveRendering.onclick=()=>window.open(l.color_rendering_url,'_blank');
@@ -801,6 +802,7 @@ function openLotDialogLive(id=''){
 
   if(l){
     $('lotName').value=l.lot_name||'';
+    $('lotAddress').value=l.address||'';
     $('permitNumber').value=l.permit_number||'';
     $('planName').value=l.plan_name||'';
     $('county').value=l.county||'';
@@ -836,6 +838,7 @@ $('lotForm').onsubmit=async e=>{
   const payload={
     subdivision_id: currentSubdivision,
     lot_name:$('lotName').value.trim(),
+    address:$('lotAddress').value.trim()||null,
     permit_number:$('permitNumber').value.trim()||null,
     plan_name:$('planName').value.trim()||null,
     county:$('county').value.trim()||null,
