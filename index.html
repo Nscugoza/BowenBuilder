@@ -639,6 +639,72 @@ dialog::backdrop{background:rgba(7,21,39,.7);backdrop-filter:blur(4px)}
   border-radius:999px;
 }
 
+
+.punchout-list{
+  display:grid;
+  gap:12px;
+}
+.punchout-card{
+  background:#fff;
+  border:1px solid var(--border);
+  border-radius:17px;
+  padding:14px;
+  box-shadow:0 7px 22px rgba(24,50,82,.055);
+}
+.punchout-text{
+  white-space:pre-wrap;
+  line-height:1.5;
+  font-size:15px;
+}
+.punchout-photo{
+  display:block;
+  width:100%;
+  max-width:520px;
+  max-height:360px;
+  object-fit:cover;
+  border-radius:14px;
+  margin-top:12px;
+  border:1px solid #dfe7f0;
+  cursor:zoom-in;
+}
+.punchout-meta{
+  margin-top:10px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:10px;
+  flex-wrap:wrap;
+}
+.punchout-empty{
+  padding:24px;
+  text-align:center;
+  color:var(--muted);
+}
+#punchoutDialog{
+  max-height:calc(100vh - 20px);
+  overflow:hidden;
+}
+#punchoutDialog .sheet{
+  max-height:calc(100vh - 20px);
+  overflow-y:auto;
+  -webkit-overflow-scrolling:touch;
+  padding-bottom:96px;
+}
+#punchoutDialog .dialog-head{
+  position:sticky;
+  top:0;
+  z-index:4;
+  background:#fff;
+}
+#punchoutDialog .actions{
+  position:sticky;
+  bottom:0;
+  z-index:4;
+  background:#fff;
+  padding:12px 0 max(12px, env(safe-area-inset-bottom));
+  border-top:1px solid #edf1f6;
+}
+
 </style>
 </head>
 <body>
@@ -693,9 +759,17 @@ dialog::backdrop{background:rgba(7,21,39,.7);backdrop-filter:blur(4px)}
       <div id="lotInfo"></div>
       <div class="lot-tabs">
         <button class="lot-tab active" data-lottab="overview" type="button">Overview</button>
+        <button class="lot-tab" data-lottab="punchout" type="button">Punchout</button>
         <button class="lot-tab" data-lottab="files" type="button">Files</button>
       </div>
       <div id="overviewPanel"><div id="lotSchedule" class="schedule-list"></div></div>
+      <div id="punchoutPanel" class="hidden">
+        <div class="toolbar">
+          <div><strong>Punchout Items</strong><div class="muted">Track corrections, notes, and jobsite photos.</div></div>
+          <button id="addPunchout" class="primary" type="button">+ Add Punchout Item</button>
+        </div>
+        <div id="punchoutList" class="punchout-list"></div>
+      </div>
       <div id="filesPanel" class="hidden">
         <div class="card" style="margin-bottom:12px"><strong>Microsoft 365 Files</strong><div class="muted">Demo view of Teams / SharePoint documents for this lot.</div></div>
         <div class="files-grid" id="filesGrid"></div>
@@ -751,6 +825,26 @@ dialog::backdrop{background:rgba(7,21,39,.7);backdrop-filter:blur(4px)}
   <div class="actions"><button id="emailCancel" class="secondary" type="button">Cancel</button><button class="primary" type="submit">Open Email App</button></div>
 </form></dialog>
 
+
+<dialog id="punchoutDialog">
+  <form id="punchoutForm" class="sheet">
+    <div class="dialog-head">
+      <h2>Add Punchout Item</h2>
+      <button id="punchoutX" class="xbtn" type="button">×</button>
+    </div>
+    <label>Punchout Item
+      <textarea id="punchoutText" rows="5" required placeholder="Describe the item that needs attention..."></textarea>
+    </label>
+    <label>Photo
+      <input id="punchoutPhoto" type="file" accept="image/*">
+    </label>
+    <div class="actions">
+      <button id="punchoutCancel" class="secondary" type="button">Cancel</button>
+      <button id="punchoutSave" class="primary" type="submit">Save Punchout Item</button>
+    </div>
+  </form>
+</dialog>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <dialog id="deleteLotDialog">
@@ -773,7 +867,7 @@ const $=id=>document.getElementById(id);
 const SB_URL='https://oztefiymckpyxiewgxtc.supabase.co';
 const SB_KEY='sb_publishable__ItoYGeHKEGTBFiE7JM74w_1F-qERVe';
 const db=window.supabase.createClient(SB_URL,SB_KEY);
-let subdivisions=[],lots=[],items=[],currentSubdivision=null,currentLot=null;
+let subdivisions=[],lots=[],items=[],punchouts=[],currentSubdivision=null,currentLot=null;
 let realtimeChannel=null;
 let presenceChannel=null;
 let currentUserProfile=null;
@@ -813,16 +907,18 @@ function scheduleRealtimeReload(){
     const keepLot=currentLot;
     const screen=currentScreen();
 
-    const [{data:s,error:se},{data:l,error:le},{data:i,error:ie}]=await Promise.all([
+    const [{data:s,error:se},{data:l,error:le},{data:i,error:ie},{data:p,error:pe}]=await Promise.all([
       db.from('subdivisions').select('*').order('name'),
       db.from('lots').select('*').eq('active',true).order('lot_name'),
-      db.from('schedule_items').select('*').order('starts_at')
+      db.from('schedule_items').select('*').order('starts_at'),
+      db.from('punchout_items').select('*').order('created_at',{ascending:false})
     ]);
-    if(se||le||ie) return;
+    if(se||le||ie||pe) return;
 
     subdivisions=s||[];
     lots=l||[];
     items=i||[];
+    punchouts=p||[];
     currentSubdivision=keepSub;
     currentLot=keepLot;
 
@@ -838,6 +934,7 @@ function startRealtimeUpdates(){
     .on('postgres_changes',{event:'*',schema:'public',table:'subdivisions'},scheduleRealtimeReload)
     .on('postgres_changes',{event:'*',schema:'public',table:'lots'},scheduleRealtimeReload)
     .on('postgres_changes',{event:'*',schema:'public',table:'schedule_items'},scheduleRealtimeReload)
+    .on('postgres_changes',{event:'*',schema:'public',table:'punchout_items'},scheduleRealtimeReload)
     .subscribe();
 }
 
@@ -901,13 +998,14 @@ async function signIn(){
  if(error) alert(error.message);
 }
 async function load(){
- const [{data:s,error:se},{data:l,error:le},{data:i,error:ie}]=await Promise.all([
+ const [{data:s,error:se},{data:l,error:le},{data:i,error:ie},{data:p,error:pe}]=await Promise.all([
   db.from('subdivisions').select('*').order('name'),
   db.from('lots').select('*').eq('active',true).order('lot_name'),
-  db.from('schedule_items').select('*').order('starts_at')
+  db.from('schedule_items').select('*').order('starts_at'),
+  db.from('punchout_items').select('*').order('created_at',{ascending:false})
  ]);
- if(se||le||ie){alert((se||le||ie).message);return}
- subdivisions=s||[];lots=l||[];items=i||[];showSubs();
+ if(se||le||ie||pe){alert((se||le||ie||pe).message);return}
+ subdivisions=s||[];lots=l||[];items=i||[];punchouts=p||[];showSubs();
 }
 function appOn(){ $('login').classList.add('hidden');$('app').classList.remove('hidden');}
 function showSubs(){
@@ -1049,6 +1147,115 @@ function wireLotSwipeDelete(){
 }
 
 
+
+async function signedPunchoutUrl(path){
+  if(!path) return '';
+  const {data,error}=await db.storage.from('punchout-photos').createSignedUrl(path,3600);
+  if(error) return '';
+  return data?.signedUrl||'';
+}
+
+async function renderPunchout(lotId){
+  const root=$('punchoutList');
+  if(!root) return;
+  const list=punchouts.filter(p=>p.lot_id===lotId);
+  if(!list.length){
+    root.innerHTML='<div class="card punchout-empty">No punchout items yet. Tap <strong>Add Punchout Item</strong> to create one.</div>';
+    return;
+  }
+
+  root.innerHTML='<div class="card muted">Loading punchout items...</div>';
+  const cards=await Promise.all(list.map(async p=>{
+    const photoUrl=await signedPunchoutUrl(p.photo_path);
+    const created=p.created_at?new Date(p.created_at).toLocaleDateString():'';
+    return `<div class="punchout-card" data-punchout="${p.id}">
+      <div class="punchout-text">${esc(p.description)}</div>
+      ${photoUrl?`<img class="punchout-photo" src="${photoUrl}" alt="Punchout photo" data-punchout-photo="${photoUrl}">`:''}
+      <div class="punchout-meta">
+        <span class="muted">${esc(created)}</span>
+        <button class="secondary danger" type="button" data-delete-punchout="${p.id}">Delete</button>
+      </div>
+    </div>`;
+  }));
+  root.innerHTML=cards.join('');
+
+  root.querySelectorAll('[data-punchout-photo]').forEach(img=>{
+    img.onclick=()=>window.open(img.dataset.punchoutPhoto,'_blank');
+  });
+  root.querySelectorAll('[data-delete-punchout]').forEach(btn=>{
+    btn.onclick=()=>deletePunchoutItem(btn.dataset.deletePunchout);
+  });
+}
+
+async function deletePunchoutItem(id){
+  const item=punchouts.find(p=>p.id===id);
+  if(!item) return;
+  if(!confirm('Delete this punchout item?')) return;
+
+  if(item.photo_path){
+    await db.storage.from('punchout-photos').remove([item.photo_path]);
+  }
+  const {error}=await db.from('punchout_items').delete().eq('id',id);
+  if(error){alert(error.message);return}
+  punchouts=punchouts.filter(p=>p.id!==id);
+  await renderPunchout(currentLot);
+}
+
+function openPunchoutDialog(){
+  $('punchoutForm').reset();
+  $('punchoutDialog').showModal();
+}
+
+async function savePunchout(e){
+  e.preventDefault();
+  const description=$('punchoutText').value.trim();
+  const photo=$('punchoutPhoto').files?.[0]||null;
+  if(!description){alert('Please enter a punchout item.');return}
+  if(!currentLot){alert('No lot selected.');return}
+
+  $('punchoutSave').disabled=true;
+  $('punchoutSave').textContent='Saving...';
+
+  let photoPath=null;
+  if(photo){
+    const ext=(photo.name.split('.').pop()||'jpg').toLowerCase().replace(/[^a-z0-9]/g,'')||'jpg';
+    const fileId=(crypto.randomUUID?crypto.randomUUID():Date.now()+'-'+Math.random().toString(36).slice(2));
+    photoPath=`${currentLot}/${fileId}.${ext}`;
+    const {error:uploadError}=await db.storage.from('punchout-photos').upload(photoPath,photo,{
+      cacheControl:'3600',
+      upsert:false,
+      contentType:photo.type||undefined
+    });
+    if(uploadError){
+      $('punchoutSave').disabled=false;
+      $('punchoutSave').textContent='Save Punchout Item';
+      alert(uploadError.message);
+      return;
+    }
+  }
+
+  const {data:{user}}=await db.auth.getUser();
+  const {error}=await db.from('punchout_items').insert({
+    lot_id:currentLot,
+    description,
+    photo_path:photoPath,
+    created_by:user?.id||null
+  });
+
+  if(error){
+    if(photoPath) await db.storage.from('punchout-photos').remove([photoPath]);
+    $('punchoutSave').disabled=false;
+    $('punchoutSave').textContent='Save Punchout Item';
+    alert(error.message);
+    return;
+  }
+
+  $('punchoutSave').disabled=false;
+  $('punchoutSave').textContent='Save Punchout Item';
+  $('punchoutDialog').close();
+  scheduleRealtimeReload();
+}
+
 function showLot(){
  const l=lots.find(x=>x.id===currentLot);if(!l)return;
  joinLotPresence(currentLot);
@@ -1068,6 +1275,7 @@ function showLot(){
  document.querySelectorAll('[data-edit-schedule]').forEach(btn=>{
    btn.onclick=()=>openScheduleDialogLive(btn.dataset.editSchedule);
  });
+ renderPunchout(l.id);
 }
 async function saveSchedule(e){
  e.preventDefault();
@@ -1264,7 +1472,13 @@ $('emailLot').onclick=()=>{
   ].join('\n');
   location.href=`mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 };
-document.querySelectorAll('.lot-tab').forEach(b=>b.onclick=()=>{document.querySelectorAll('.lot-tab').forEach(x=>x.classList.toggle('active',x===b));$('overviewPanel').classList.toggle('hidden',b.dataset.lottab!=='overview');$('filesPanel').classList.toggle('hidden',b.dataset.lottab!=='files')});
+document.querySelectorAll('.lot-tab').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('.lot-tab').forEach(x=>x.classList.toggle('active',x===b));
+  $('overviewPanel').classList.toggle('hidden',b.dataset.lottab!=='overview');
+  $('punchoutPanel').classList.toggle('hidden',b.dataset.lottab!=='punchout');
+  $('filesPanel').classList.toggle('hidden',b.dataset.lottab!=='files');
+  if(b.dataset.lottab==='punchout' && currentLot) renderPunchout(currentLot);
+});
 document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{if(b.dataset.view==='subdivisions')showSubs();else if(b.dataset.view==='schedule'){if(!currentSubdivision){alert('Open a subdivision first.');return}showLots();}});
 const {data:{session}}=await db.auth.getSession();
 if(session){
@@ -1282,6 +1496,15 @@ $('deleteLotCancel').onclick=()=>{pendingDeleteLotId=null;$('deleteLotDialog').c
 $('deleteLotConfirm').onclick=confirmDeleteLot;
 $('deleteLotDialog').addEventListener('click',e=>{
   if(e.target===e.currentTarget){pendingDeleteLotId=null;$('deleteLotDialog').close();}
+});
+
+
+$('addPunchout').onclick=openPunchoutDialog;
+$('punchoutForm').onsubmit=savePunchout;
+$('punchoutX').onclick=()=>$('punchoutDialog').close();
+$('punchoutCancel').onclick=()=>$('punchoutDialog').close();
+$('punchoutDialog').addEventListener('click',e=>{
+  if(e.target===e.currentTarget) $('punchoutDialog').close();
 });
 
 })();
