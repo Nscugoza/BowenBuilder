@@ -534,6 +534,23 @@ dialog::backdrop{background:rgba(7,21,39,.7);backdrop-filter:blur(4px)}
   border-top:1px solid #edf1f6;
 }
 
+
+.lot-card-rendering{
+  width:100%;
+  aspect-ratio:16/9;
+  border-radius:14px;
+  overflow:hidden;
+  background:#eef3f8;
+  margin:10px 0 12px;
+  border:1px solid #e1e8f0;
+}
+.lot-card-rendering img{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  display:block;
+}
+
 </style>
 </head>
 <body>
@@ -680,7 +697,14 @@ function showLots(){
  $('subdivisionsView').classList.add('hidden');$('lotView').classList.add('hidden');$('scheduleView').classList.add('hidden');$('lotsView').classList.remove('hidden');
  const s=subdivisions.find(x=>x.id===currentSubdivision);$('heroTitle').textContent=s?.name||'Lots';$('heroSub').textContent='Lots and schedules in this subdivision.';$('subdivisionName').textContent=s?.name||'';
  const arr=lots.filter(l=>l.subdivision_id===currentSubdivision);
- $('lotsGrid').innerHTML=arr.map(l=>`<button class="card click-card" data-lot="${l.id}"><span class="pill">${esc(l.county||'Lot')}</span><h3>${esc(l.lot_name)}</h3><div class="muted">${esc(l.address||l.plan_name||'Address not added')}</div><div class="muted">${esc(l.plan_name||'Plan not added')}</div><div class="muted" style="margin-top:10px">${items.filter(i=>i.lot_id===l.id).length} schedule items</div></button>`).join('');
+ $('lotsGrid').innerHTML=arr.map(l=>`<button class="card click-card" data-lot="${l.id}">
+  <span class="pill">${esc(l.county||'Lot')}</span>
+  ${l.color_rendering_url?`<div class="lot-card-rendering"><img src="${l.color_rendering_url}" alt="${esc(l.lot_name)} color rendering"></div>`:''}
+  <h3>${esc(l.lot_name)}</h3>
+  <div class="muted">${esc(l.address||l.plan_name||'Address not added')}</div>
+  <div class="muted">${esc(l.plan_name||'Plan not added')}</div>
+  <div class="muted" style="margin-top:10px">${items.filter(i=>i.lot_id===l.id).length} schedule items</div>
+</button>`).join('');
  document.querySelectorAll('[data-lot]').forEach(b=>b.onclick=()=>{currentLot=b.dataset.lot;showLot()});
 }
 function showLot(){
