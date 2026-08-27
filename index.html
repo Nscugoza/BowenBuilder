@@ -575,7 +575,7 @@ dialog::backdrop{background:rgba(7,21,39,.7);backdrop-filter:blur(4px)}
   position:relative;
   z-index:2;
   transition:transform .2s ease;
-  touch-action:pan-y;
+  touch-action:pan-y pinch-zoom;
   background:#fff;
 }
 .lot-swipe-wrap.revealed .lot-swipe-card{
@@ -1272,35 +1272,78 @@ function wireLotSwipeDelete(){
   document.querySelectorAll('[data-lot-wrap]').forEach(wrap=>{
     const card=wrap.querySelector('[data-lot]');
     const del=wrap.querySelector('[data-delete-lot]');
-    let startX=0,startY=0,lastX=0,tracking=false,moved=false;
+
+    let startX=0,startY=0,lastX=0,lastY=0;
+    let tracking=false;
+    let moved=false;
+    let verticalScroll=false;
+    let startTime=0;
 
     const reveal=()=>wrap.classList.add('revealed');
     const close=()=>wrap.classList.remove('revealed');
 
     function begin(x,y){
       startX=lastX=x;
-      startY=y;
+      startY=lastY=y;
       tracking=true;
       moved=false;
+      verticalScroll=false;
+      startTime=Date.now();
     }
+
     function move(x,y){
       if(!tracking) return;
+
       lastX=x;
+      lastY=y;
+
       const dx=x-startX;
       const dy=y-startY;
-      if(Math.abs(dx)>8) moved=true;
-      if(Math.abs(dx)>Math.abs(dy)){
-        if(dx<-28) reveal();
-        else if(dx>22) close();
+      const ax=Math.abs(dx);
+      const ay=Math.abs(dy);
+
+      // Any meaningful finger movement means this is not a clean tap.
+      if(ax>7 || ay>7) moved=true;
+
+      // If the gesture is mostly vertical, treat it strictly as scrolling.
+      if(ay>10 && ay>ax*1.15){
+        verticalScroll=true;
+        return;
+      }
+
+      // Horizontal movement still controls swipe-to-delete.
+      if(ax>ay && !verticalScroll){
+        if(dx<-30) reveal();
+        else if(dx>25) close();
       }
     }
+
     function end(){
       if(!tracking) return;
+
       const dx=lastX-startX;
+      const dy=lastY-startY;
+      const ax=Math.abs(dx);
+      const ay=Math.abs(dy);
+      const elapsed=Date.now()-startTime;
+
       tracking=false;
-      if(dx<-42) reveal();
-      else if(dx>28) close();
-      else if(!moved && !wrap.classList.contains('revealed')){
+
+      // Finish horizontal swipe behavior.
+      if(!verticalScroll && ax>ay){
+        if(dx<-45) reveal();
+        else if(dx>30) close();
+      }
+
+      // Open only on a short, very clean tap with almost no movement.
+      const cleanTap =
+        !verticalScroll &&
+        ax<7 &&
+        ay<7 &&
+        elapsed<450 &&
+        !wrap.classList.contains('revealed');
+
+      if(cleanTap){
         currentLot=card.dataset.lot;
         showLot();
       }
@@ -1317,13 +1360,24 @@ function wireLotSwipeDelete(){
     },{passive:true});
 
     card.addEventListener('touchend',end,{passive:true});
+    card.addEventListener('touchcancel',()=>{
+      tracking=false;
+      moved=false;
+      verticalScroll=false;
+    },{passive:true});
 
+    // Desktop / mouse support.
     card.addEventListener('mousedown',e=>begin(e.clientX,e.clientY));
-    window.addEventListener('mousemove',e=>move(e.clientX,e.clientY));
-    window.addEventListener('mouseup',end);
+    window.addEventListener('mousemove',e=>{
+      if(tracking) move(e.clientX,e.clientY);
+    });
+    window.addEventListener('mouseup',()=>{
+      if(tracking) end();
+    });
 
+    // Prevent the browser click event from opening the lot independently.
     card.addEventListener('click',e=>{
-      if(moved || wrap.classList.contains('revealed')) e.preventDefault();
+      e.preventDefault();
     });
 
     del.addEventListener('click',e=>{
