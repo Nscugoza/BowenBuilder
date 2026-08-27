@@ -804,6 +804,41 @@ dialog::backdrop{background:rgba(7,21,39,.7);backdrop-filter:blur(4px)}
   font-weight:800;
 }
 
+
+.lot-checklist{
+  margin-top:14px;
+}
+.lot-checklist-head{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:10px;
+  margin-bottom:10px;
+}
+.check-row{
+  display:flex;
+  grid-template-columns:none;
+  flex-direction:row;
+  align-items:center;
+  gap:11px;
+  margin:0;
+  padding:12px 0;
+  font-size:15px;
+  font-weight:750;
+  border-top:1px solid #edf1f6;
+}
+.check-row input{
+  width:22px;
+  height:22px;
+  flex:0 0 auto;
+  padding:0;
+  margin:0;
+  accent-color:#174f86;
+}
+.check-row span{
+  min-width:0;
+}
+
 </style>
 </head>
 <body>
@@ -856,6 +891,22 @@ dialog::backdrop{background:rgba(7,21,39,.7);backdrop-filter:blur(4px)}
         </div>
       </div>
       <div id="lotInfo"></div>
+      <div id="lotChecklist" class="lot-checklist card">
+        <div class="lot-checklist-head">
+          <div>
+            <strong>Lot Checklist</strong>
+            <div class="muted">Quick completion items for this lot.</div>
+          </div>
+        </div>
+        <label class="check-row">
+          <input id="checkWindowPlans" type="checkbox">
+          <span>Submit Plans for window order</span>
+        </label>
+        <label class="check-row">
+          <input id="checkFramePackage" type="checkbox">
+          <span>Setup frame package</span>
+        </label>
+      </div>
       <div class="lot-tabs">
         <button class="lot-tab active" data-lottab="overview" type="button">Overview</button>
         <button class="lot-tab" data-lottab="punchout" type="button">Punchout</button>
@@ -1271,7 +1322,12 @@ async function signedPunchoutUrl(path){
 async function renderPunchout(lotId){
   const root=$('punchoutList');
   if(!root) return;
-  const list=punchouts.filter(p=>p.lot_id===lotId);
+  const list=punchouts
+    .filter(p=>p.lot_id===lotId)
+    .sort((a,b)=>{
+      if(!!a.completed!==!!b.completed) return a.completed?1:-1;
+      return new Date(b.created_at||0)-new Date(a.created_at||0);
+    });
   selectedPunchouts=new Set([...selectedPunchouts].filter(id=>list.some(p=>p.id===id)));
 
   if(!list.length){
@@ -1518,6 +1574,9 @@ function showLot(){
  $('lotsView').classList.add('hidden');$('lotView').classList.remove('hidden');$('heroTitle').textContent=l.lot_name;$('heroSub').textContent='Live BowenBuilder lot information and schedule.';$('lotTitle').textContent=l.lot_name;$('lotSubtitle').textContent=[l.plan_name,l.county].filter(Boolean).join(' · ');
  const links=[['County Permit',l.permit_url],['Deco Sheet',l.deco_url],['HLP',l.hlp_url],['LGP',l.lgp_url]].filter(x=>safe(x[1]));
  $('lotInfo').innerHTML=`<div class="info-grid"><div class="info"><small>Address</small><strong>${esc(l.address||'Not added')}</strong></div><div class="info"><small>Permit Number</small><strong>${esc(l.permit_number||'Not added')}</strong></div><div class="info"><small>Plan</small><strong>${esc(l.plan_name||'Not added')}</strong></div><div class="info"><small>Included Options</small><strong>${esc(l.included_options||'None added')}</strong></div><div class="info"><small>County</small><strong>${esc(l.county||'Not added')}</strong></div></div>${links.length?`<div class="resource-row">${links.map(x=>`<a href="${safe(x[1])}" target="_blank">${x[0]} ↗</a>`).join('')}</div>`:''}${l.color_rendering_url?`<div class="card" style="margin-top:14px"><small class="muted">Color Rendering</small><div style="margin-top:8px"><img src="${l.color_rendering_url}" alt="${esc(l.lot_name)} color rendering" style="max-width:100%;max-height:320px;border-radius:14px;cursor:zoom-in" id="liveRendering"></div></div>`:''}`;
+ $('checkWindowPlans').checked=!!l.submit_plans_window_order_completed;
+ $('checkFramePackage').checked=!!l.setup_frame_package_completed;
+
  const liveRendering=$('liveRendering');
  if(liveRendering){
    liveRendering.onclick=()=>window.open(l.color_rendering_url,'_blank');
@@ -1533,6 +1592,22 @@ function showLot(){
  });
  renderPunchout(l.id);
 }
+
+async function saveLotChecklistField(field,value){
+  if(!currentLot) return;
+  const lot=lots.find(l=>l.id===currentLot);
+  if(!lot) return;
+
+  const {error}=await db.from('lots').update({[field]:value}).eq('id',currentLot);
+  if(error){
+    alert(error.message);
+    if(field==='submit_plans_window_order_completed') $('checkWindowPlans').checked=!value;
+    if(field==='setup_frame_package_completed') $('checkFramePackage').checked=!value;
+    return;
+  }
+  lot[field]=value;
+}
+
 async function saveSchedule(e){
  e.preventDefault();
  const id=$('scheduleId').value;
@@ -1771,6 +1846,10 @@ $('clearSelectedPunchouts').onclick=()=>{
   document.querySelectorAll('[data-select-punchout]').forEach(cb=>cb.checked=false);
   updatePunchoutShareBar();
 };
+
+
+$('checkWindowPlans').onchange=e=>saveLotChecklistField('submit_plans_window_order_completed',e.target.checked);
+$('checkFramePackage').onchange=e=>saveLotChecklistField('setup_frame_package_completed',e.target.checked);
 
 })();
 </script>
