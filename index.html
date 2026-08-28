@@ -1147,6 +1147,13 @@ button.danger:hover{filter:brightness(.96)}
   }
 }
 
+
+.calendar-day-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+@media(max-width:640px){
+  .calendar-day-actions{width:100%}
+  .calendar-day-actions button{flex:1 1 auto}
+}
+
 </style>
 </head>
 <body>
@@ -1285,7 +1292,11 @@ button.danger:hover{filter:brightness(.96)}
               <strong id="calendarSelectedTitle">Select a day</strong>
               <div id="calendarSelectedCount" class="muted"></div>
             </div>
-            <button id="calendarAddSelected" class="primary" type="button">+ Add Item</button>
+            <div class="calendar-day-actions">
+              <button id="calendarEmailSelected" class="secondary" type="button">✉ Email Date</button>
+              <button id="calendarTextSelected" class="secondary" type="button">💬 Text Date</button>
+              <button id="calendarAddSelected" class="primary" type="button">+ Add Item</button>
+            </div>
           </div>
           <div id="calendarSelectedItems" class="bb-calendar-selected-items"></div>
         </div>
@@ -2379,6 +2390,64 @@ function bindCalendarSwipeRows(){
  },{once:true});
 }
 
+
+function selectedDateScheduleItems(){
+ if(!scheduleSelectedDate)return [];
+ return subdivisionScheduleItems().filter(x=>itemOccursOn(x,scheduleSelectedDate));
+}
+function activeLotInfo(){
+ return lots.find(l=>l.id===currentLot)||null;
+}
+function activeSubdivisionInfo(){
+ return subdivisions.find(s=>s.id===currentSubdivision)||null;
+}
+function selectedDateMessage(){
+ if(!scheduleSelectedDate)return null;
+ const d=dateFromKey(scheduleSelectedDate);
+ const lot=activeLotInfo();
+ const sub=activeSubdivisionInfo();
+ const arr=selectedDateScheduleItems();
+
+ const dateLabel=d?d.toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric',year:'numeric'}):scheduleSelectedDate;
+ const lines=[];
+ lines.push(`${lot?.lot_name||'Lot'} Schedule`);
+ if(lot?.address)lines.push(lot.address);
+ if(sub?.name)lines.push(sub.name);
+ if(lot?.plan_name)lines.push(`Plan: ${lot.plan_name}`);
+ lines.push(`Date: ${dateLabel}`);
+ lines.push('');
+ if(arr.length){
+   lines.push('Scheduled Work:');
+   arr.forEach(i=>{
+     const parts=[i.name||'Schedule Item',statusDisplay(i.status)];
+     if(i.crew)parts.push(i.crew);
+     lines.push(`- ${parts.join(' — ')}`);
+   });
+ }else{
+   lines.push('No schedule items are currently listed for this date.');
+ }
+ if(isCalledInDate(scheduleSelectedDate)){
+   lines.push('');
+   lines.push('Called In: Yes ✓');
+ }
+
+ const subject=`${lot?.lot_name||'Lot'} Schedule - ${dateLabel}`;
+ return {subject,body:lines.join('\n')};
+}
+function emailSelectedCalendarDate(){
+ const msg=selectedDateMessage();
+ if(!msg){alert('Select a calendar date first.');return}
+ const href=`mailto:?subject=${encodeURIComponent(msg.subject)}&body=${encodeURIComponent(msg.body)}`;
+ window.location.href=href;
+}
+function textSelectedCalendarDate(){
+ const msg=selectedDateMessage();
+ if(!msg){alert('Select a calendar date first.');return}
+ const combined=`${msg.subject}\n\n${msg.body}`;
+ const separator=/iPad|iPhone|iPod/.test(navigator.userAgent)?'&':'?';
+ window.location.href=`sms:${separator}body=${encodeURIComponent(combined)}`;
+}
+
 function renderSelectedScheduleDay(){
  const wrap=$('calendarSelectedItems');
  if(!scheduleSelectedDate){
@@ -2613,6 +2682,8 @@ $('calendarBackToLot').onclick=()=>{
  showLot();
 };
 $('schedulePageAdd').onclick=()=>openScheduleDialogLive('','schedule',scheduleSelectedDate||todayInput());
+$('calendarEmailSelected').onclick=emailSelectedCalendarDate;
+$('calendarTextSelected').onclick=textSelectedCalendarDate;
 $('calendarAddSelected').onclick=()=>openScheduleDialogLive('','schedule',scheduleSelectedDate||todayInput());
 $('scheduleCalendarMode').onclick=()=>setScheduleViewMode('calendar');
 $('scheduleListMode').onclick=()=>setScheduleViewMode('list');
