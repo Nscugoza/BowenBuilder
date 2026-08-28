@@ -2314,14 +2314,24 @@ function renderSelectedScheduleDay(){
    const label=item?.name||'this schedule item';
    if(!confirm(`Delete "${label}"? This cannot be undone.`))return;
 
+   const lotBeforeDelete=currentLot;
+   const subdivisionBeforeDelete=currentSubdivision;
+
    const {data,error}=await db.from('schedule_items').delete().eq('id',id).select('id');
    if(error){alert(error.message);return}
    if(!data || data.length===0){
      alert('The schedule item was not deleted. Your account may not have permission to delete this item.');
      return;
    }
+
    await load();
-   showScheduleView(scheduleViewMode);
+
+   currentLot=lotBeforeDelete;
+   currentSubdivision=subdivisionBeforeDelete;
+
+   if(currentLot && lots.some(l=>l.id===currentLot)){
+     showScheduleView(scheduleViewMode);
+   }
  });
 
  bindCalendarSwipeRows();
@@ -2365,6 +2375,10 @@ async function deleteScheduleItemLive(){
  const label=item?.name||'this schedule item';
  if(!confirm(`Delete "${label}"? This cannot be undone.`))return;
 
+ const lotBeforeDelete=currentLot;
+ const subdivisionBeforeDelete=currentSubdivision;
+ const returnToSchedule=scheduleContext==='schedule';
+
  const {data,error}=await db
    .from('schedule_items')
    .delete()
@@ -2382,11 +2396,14 @@ async function deleteScheduleItemLive(){
  }
 
  $('scheduleDialog').close();
- const returnToSchedule=scheduleContext==='schedule';
  await load();
- if(returnToSchedule){
+
+ currentLot=lotBeforeDelete;
+ currentSubdivision=subdivisionBeforeDelete;
+
+ if(returnToSchedule && currentLot && lots.some(l=>l.id===currentLot)){
    showScheduleView(scheduleViewMode);
- }else if(currentLot){
+ }else if(currentLot && lots.some(l=>l.id===currentLot)){
    showLot();
  }
 }
