@@ -2414,12 +2414,13 @@ function selectedDateMessage(){
  if(lot?.address)lines.push(lot.address);
  if(sub?.name)lines.push(sub.name);
  if(lot?.plan_name)lines.push(`Plan: ${lot.plan_name}`);
- lines.push(`Date: ${dateLabel}`);
+ if(lot?.permit_number)lines.push(`Permit Number: ${lot.permit_number}`);
+ lines.push(`Requested Schedule Date: ${dateLabel}`);
  lines.push('');
  if(arr.length){
    lines.push('Scheduled Work:');
    arr.forEach(i=>{
-     const parts=[i.name||'Schedule Item',statusDisplay(i.status)];
+     const parts=[i.name||'Schedule Item'];
      if(i.crew)parts.push(i.crew);
      lines.push(`- ${parts.join(' — ')}`);
    });
@@ -2431,7 +2432,7 @@ function selectedDateMessage(){
    lines.push('Called In: Yes ✓');
  }
 
- const subject=`${lot?.lot_name||'Lot'} Schedule - ${dateLabel}`;
+ const subject=`${lot?.lot_name||'Lot'} Schedule`;
  return {subject,body:lines.join('\n')};
 }
 function emailSelectedCalendarDate(){
