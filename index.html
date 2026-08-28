@@ -1060,14 +1060,13 @@ dialog::backdrop{background:rgba(7,21,39,.7);backdrop-filter:blur(4px)}
   <div class="two"><label>Lot Name<input id="lotName" required placeholder="Lot 81"></label><label>Permit Number<input id="permitNumber"></label></div>
   <label>Address<input id="lotAddress" placeholder="Street address"></label>
   <div class="two"><label>Plan Name<input id="planName"></label><label>County<input id="county" value="Barrow County, GA"></label></div>
-  <label>Plans Link<input id="plansUrl" type="url" placeholder="https://..."></label>
+  <input id="plansUrl" type="hidden"><input id="hlpUrl" type="hidden"><input id="lgpUrl" type="hidden">
 <label>Plans File<input id="plansFile" type="file" accept="application/pdf,image/*"><span class="muted">Upload PDF/image for in-app viewing.</span></label>
   <label>County Permit Link<input id="permitUrl" type="url" placeholder="https://..."></label>
   <label>Color Rendering<input id="renderingFile" type="file" accept="image/*"></label>
   <label>Deco Sheet Link<input id="decoUrl" type="url"></label>
   <label>Included Options<textarea id="includedOptions" rows="4"></textarea></label>
-  <div class="two"><label>HLP Link<input id="hlpUrl" type="url"></label><label>LGP Link<input id="lgpUrl" type="url"></label></div>
-<div class="two">
+  <div class="two">
 <label>HLP File<input id="hlpFile" type="file" accept="application/pdf,image/*"></label>
 <label>LGP File<input id="lgpFile" type="file" accept="application/pdf,image/*"></label>
 </div>
@@ -1841,7 +1840,7 @@ function showLot(){
  });
  joinLotPresence(currentLot);
  $('lotsView').classList.add('hidden');$('lotView').classList.remove('hidden');$('heroTitle').textContent=l.lot_name;$('heroSub').textContent='Live BowenBuilder lot information and schedule.';$('lotTitle').textContent=l.lot_name;$('lotSubtitle').textContent=[l.plan_name,l.county].filter(Boolean).join(' · ');
- const links=[['County Permit',l.permit_url],['Plans',l.plans_url],['Deco Sheet',l.deco_url],['HLP',l.hlp_url],['LGP',l.lgp_url]].filter(x=>safe(x[1]));
+ const links=[['County Permit',l.permit_url],['Deco Sheet',l.deco_url]].filter(x=>safe(x[1]));
  const storedDocs=[['Plans',l.plans_file_path],['HLP',l.hlp_file_path],['LGP',l.lgp_file_path]].filter(x=>x[1]);
  $('lotInfo').innerHTML=`<div class="info-grid"><div class="info"><small>Address</small><strong>${esc(l.address||'Not added')}</strong></div><div class="info"><small>Permit Number</small><strong>${esc(l.permit_number||'Not added')}</strong></div><div class="info"><small>Plan</small><strong>${esc(l.plan_name||'Not added')}</strong></div><div class="info"><small>Included Options</small><strong>${esc(l.included_options||'None added')}</strong></div><div class="info"><small>County</small><strong>${esc(l.county||'Not added')}</strong></div></div>${(links.length||storedDocs.length)?`<div class="resource-row">${storedDocs.map(x=>`<button type="button" class="document-resource" data-lot-document="${esc(x[1])}" data-document-title="${esc(x[0])}">${esc(x[0])} ▣</button>`).join('')}${links.filter(x=>!storedDocs.some(d=>d[0]===x[0])).map(x=>`<a href="${safe(x[1])}" target="_blank">${x[0]} ↗</a>`).join('')}</div>`:''}${l.color_rendering_url?`<div class="card" style="margin-top:14px"><small class="muted">Color Rendering</small><div style="margin-top:8px"><img src="${l.color_rendering_url}" alt="${esc(l.lot_name)} color rendering" style="max-width:100%;max-height:320px;border-radius:14px;cursor:zoom-in" id="liveRendering"></div></div>`:''}`;
  $('checkWindowPlans').checked=!!l.submit_plans_window_order_completed;
