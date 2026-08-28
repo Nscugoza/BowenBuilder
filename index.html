@@ -1052,6 +1052,21 @@ dialog::backdrop{background:rgba(7,21,39,.7);backdrop-filter:blur(4px)}
 @media(max-width:640px){
   .calendar-back-btn{width:100%;text-align:left}
 }
+
+.calendar-live-status{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--muted);margin-top:5px}
+.calendar-live-dot{width:8px;height:8px;border-radius:50%;background:#2d9b57;display:inline-block}
+
+
+.schedule-dialog-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.schedule-dialog-spacer{flex:1 1 auto}
+button.danger{background:#b93434;color:#fff;border:1px solid #b93434}
+button.danger:hover{filter:brightness(.96)}
+@media(max-width:640px){
+  .schedule-dialog-actions{align-items:stretch}
+  .schedule-dialog-spacer{display:none}
+  #scheduleDelete{order:3;width:100%;margin-top:4px}
+}
+
 </style>
 </head>
 <body>
@@ -1156,6 +1171,7 @@ dialog::backdrop{background:rgba(7,21,39,.7);backdrop-filter:blur(4px)}
           <button id="calendarBackToLot" class="secondary calendar-back-btn" type="button">← Back to Lot</button>
           <h2 style="margin:10px 0 0">Schedule</h2>
           <div id="scheduleScope" class="muted"></div>
+          <div class="calendar-live-status"><span class="calendar-live-dot"></span> Live calendar updates on</div>
         </div>
         <button id="schedulePageAdd" class="primary" type="button">+ Add Schedule Item</button>
       </div>
@@ -1238,7 +1254,7 @@ dialog::backdrop{background:rgba(7,21,39,.7);backdrop-filter:blur(4px)}
   <label>Location<input id="scheduleLocation"></label>
   <label>Inspection Status<select id="inspectionStatus"><option>Not linked</option><option>Check County</option><option>Requested</option><option>Scheduled</option><option>Passed</option><option>Failed</option><option>Cancelled</option></select></label>
   <label>Notes<textarea id="scheduleNotes" rows="3"></textarea></label>
-  <div class="actions"><button id="deleteSchedule" class="secondary danger hidden" type="button">Delete</button><button id="scheduleCancel" class="secondary" type="button">Cancel</button><button class="primary" type="submit">Save Item</button></div>
+  <div class="actions"><button id="deleteSchedule" class="secondary danger hidden" type="button">Delete</button><button id="scheduleDelete" class="danger hidden" type="button">Delete Item</button><div class="schedule-dialog-spacer"></div><button id="scheduleCancel" class="secondary" type="button">Cancel</button><button class="primary" type="submit">Save Item</button></div>
 </form></dialog>
 
 <dialog id="emailDialog"><form id="emailForm" class="sheet">
@@ -1380,7 +1396,7 @@ function rerenderCurrentScreen(){
   const screen=currentScreen();
   if(screen==='lot' && currentLot && lots.some(l=>l.id===currentLot)) showLot();
   else if(screen==='lots' && currentSubdivision) showLots();
-  else if(screen==='schedule' && currentSubdivision) showLots();
+  else if(screen==='schedule' && currentLot && lots.some(l=>l.id===currentLot)) showScheduleView(scheduleViewMode);
   else showSubs();
 }
 
@@ -1412,6 +1428,7 @@ function scheduleRealtimeReload(){
 
     if(screen==='lot' && currentLot && lots.some(x=>x.id===currentLot)) showLot();
     else if(screen==='lots' && currentSubdivision) showLots();
+    else if(screen==='schedule' && currentLot && lots.some(x=>x.id===currentLot)) showScheduleView(scheduleViewMode);
     else if(screen==='subdivisions') showSubs();
   },180);
 }
@@ -2209,6 +2226,27 @@ function showScheduleView(mode=scheduleViewMode){
  window.scrollTo({top:0,left:0,behavior:'auto'});
 }
 
+
+async function deleteScheduleItemLive(){
+ const id=$('scheduleId')?.value;
+ if(!id)return;
+ const item=items.find(x=>String(x.id)===String(id));
+ const label=item?.name||'this schedule item';
+ if(!confirm(`Delete "${label}"? This cannot be undone.`))return;
+
+ const {error}=await sb.from('schedule_items').delete().eq('id',id);
+ if(error){alert(error.message);return}
+
+ $('scheduleDialog').close();
+ const returnToSchedule=scheduleContext==='schedule';
+ await load();
+ if(returnToSchedule){
+   showScheduleView(scheduleViewMode);
+ }else if(currentLot){
+   showLot();
+ }
+}
+
 async function saveSchedule(e){
  e.preventDefault();
  const id=$('scheduleId').value;
@@ -2273,6 +2311,8 @@ function todayInput(){
  return `${y}-${m}-${day}`;
 }
 function openScheduleDialogLive(id='',context='lot',prefillDate=''){
+ const deleteBtn=$('scheduleDelete');
+ if(deleteBtn)deleteBtn.classList.toggle('hidden',!id);
  scheduleContext=context;
  $('scheduleForm').reset(); updateScheduleStatusColor();
  $('scheduleId').value=id;
@@ -2317,7 +2357,8 @@ $('calendarToday').onclick=()=>{const n=new Date();scheduleSelectedDate=localDat
 ensureLotCalendarVisible();
 $('lotCalendarBtn').onclick=()=>showScheduleView('calendar');
 $('addSchedule').onclick=()=>openScheduleDialogLive();
-$('scheduleForm').onsubmit=saveSchedule;$('scheduleX').onclick=()=>$('scheduleDialog').close();$('scheduleCancel').onclick=()=>$('scheduleDialog').close();
+$('scheduleForm').onsubmit=saveSchedule;$('scheduleX').onclick=()=>$('scheduleDialog').close();$('scheduleDelete').onclick=deleteScheduleItemLive;
+$('scheduleCancel').onclick=()=>$('scheduleDialog').close();
 $('addSubdivision').onclick=()=>$('subDialog').showModal();$('subX').onclick=()=>$('subDialog').close();$('subCancel').onclick=()=>$('subDialog').close();
 $('subForm').onsubmit=async e=>{e.preventDefault();let name=$('subName').value.trim();let {error}=await db.from('subdivisions').insert({name});if(error){alert(error.message);return}$('subDialog').close();await load()};
 
