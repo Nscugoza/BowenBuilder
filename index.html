@@ -1403,6 +1403,17 @@ button.danger:hover{filter:brightness(.96)}
 .included-options-detail{font-weight:700}
 .included-options-detail .included-options-list{margin-bottom:0}
 
+
+.overview-schedule-actions{
+  flex-wrap:wrap;
+  justify-content:flex-end;
+}
+@media(max-width:700px){
+  .overview-schedule-actions{
+    justify-content:flex-start;
+  }
+}
+
 </style>
 </head>
 <body>
@@ -2673,8 +2684,14 @@ function showLot(preserveScroll=false){
  $('lotSchedule').innerHTML=li.length?li.map(i=>{
    const sd=i.starts_at?new Date(i.starts_at).toLocaleDateString():'';
    const ed=i.ends_at?new Date(i.ends_at).toLocaleDateString():'';
-   return `<div class="schedule-card"><div><span class="schedule-status-pill ${esc(i.status)}">${esc((i.status||'').replaceAll('_',' ').replace(/\b\w/g,c=>c.toUpperCase()))}</span><h4>${esc(i.name)}</h4><div class="schedule-meta">${esc(i.item_type)}${i.crew?' · '+esc(i.crew):''}<br>${sd}${ed&&ed!==sd?' → '+ed:''}</div></div><div class="schedule-actions"><button class="iconbtn" type="button" data-edit-schedule="${i.id}">Edit</button></div></div>`;
+   return `<div class="schedule-card"><div><span class="schedule-status-pill ${esc(i.status)}">${esc((i.status||'').replaceAll('_',' ').replace(/\b\w/g,c=>c.toUpperCase()))}</span><h4>${esc(i.name)}</h4><div class="schedule-meta">${esc(i.item_type)}${i.crew?' · '+esc(i.crew):''}<br>${sd}${ed&&ed!==sd?' → '+ed:''}</div></div><div class="schedule-actions overview-schedule-actions"><button class="iconbtn" type="button" data-overview-email="${i.id}">Email</button><button class="iconbtn" type="button" data-overview-text="${i.id}">Text</button><button class="iconbtn" type="button" data-edit-schedule="${i.id}">Edit</button></div></div>`;
  }).join(''):'<div class="card muted">No schedule items yet.</div>';
+ document.querySelectorAll('[data-overview-email]').forEach(btn=>{
+   btn.onclick=()=>emailOverviewScheduleItem(btn.dataset.overviewEmail);
+ });
+ document.querySelectorAll('[data-overview-text]').forEach(btn=>{
+   btn.onclick=()=>textOverviewScheduleItem(btn.dataset.overviewText);
+ });
  document.querySelectorAll('[data-edit-schedule]').forEach(btn=>{
    btn.onclick=()=>openScheduleDialogLive(btn.dataset.editSchedule);
  });
@@ -3540,6 +3557,99 @@ async function saveAdminScheduleContact(scheduleItem){
   await loadScheduleContacts();
 }
 
+
+
+function scheduleContactForItemName(name){
+  return scheduleContacts.find(r=>r.schedule_item===String(name||'').trim())||null;
+}
+function overviewScheduleItemMessage(item,planUrl='',includePlans=false,renderingUrl='',includeRendering=false){
+  if(!item)return null;
+  const lot=lots.find(l=>l.id===item.lot_id)||activeLotInfo();
+  const sub=subdivisions.find(s=>s.id===lot?.subdivision_id)||activeSubdivisionInfo();
+  const dateKey=dateInputValue(item.starts_at);
+  const d=dateKey?dateFromKey(dateKey):null;
+  const dateLabel=d?d.toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric',year:'numeric'}):dateKey;
+  const work=item.name||'Schedule Item';
+
+  const detailLines=[
+    `${lot?.lot_name||'Lot'} Schedule`
+  ];
+  if(lot?.address)detailLines.push(lot.address);
+  if(sub?.name)detailLines.push(sub.name);
+  if(lot?.plan_name)detailLines.push(`Plan: ${lot.plan_name}`);
+  if(lot?.permit_number)detailLines.push(`Permit Number: ${lot.permit_number}`);
+  if(dateLabel)detailLines.push(`Requested Schedule Date: ${dateLabel}`);
+  detailLines.push('');
+  detailLines.push('Scheduled Work:');
+  detailLines.push(`- ${work}${item.crew?' — '+item.crew:''}`);
+
+  const textLines=[
+    `${lot?.lot_name||'Lot'} Schedule`,
+    `Scheduled Work: ${work}`
+  ];
+  if(lot?.address)textLines.push(lot.address);
+  if(sub?.name)textLines.push(sub.name);
+  if(lot?.plan_name)textLines.push(`Plan: ${lot.plan_name}`);
+  if(lot?.permit_number)textLines.push(`Permit Number: ${lot.permit_number}`);
+  if(dateLabel)textLines.push(`Requested Schedule Date: ${dateLabel}`);
+
+  if(includePlans && planUrl){
+    detailLines.push('',`Plans: ${planUrl}`);
+    textLines.push(`Plans: ${planUrl}`);
+  }
+  if(includeRendering && renderingUrl){
+    detailLines.push('',`Color Rendering: ${renderingUrl}`);
+    textLines.push(`Color Rendering: ${renderingUrl}`);
+  }
+
+  return {
+    subject:`${lot?.lot_name||'Lot'} - ${work}`,
+    body:detailLines.join('\n'),
+    textBody:textLines.join('\n'),
+    dateKey
+  };
+}
+async function emailOverviewScheduleItem(itemId){
+  const item=items.find(i=>i.id===itemId);
+  if(!item)return;
+  await loadScheduleContacts();
+  const contact=scheduleContactForItemName(item.name);
+  const includePlans=!!contact?.include_plans_email;
+  const includeRendering=!!contact?.include_rendering_email;
+  const [planUrl,renderingUrl]=await Promise.all([
+    includePlans ? currentLotPlansShareUrl() : Promise.resolve(''),
+    includeRendering ? currentLotRenderingShareUrl() : Promise.resolve('')
+  ]);
+  const msg=overviewScheduleItemMessage(item,planUrl,includePlans,renderingUrl,includeRendering);
+  const recipients=mappedRecipientsForWork([item.name]);
+  if(msg?.dateKey){
+    const marked=await markCalendarCommunication('email',msg.dateKey);
+    if(!marked)return;
+  }
+  const to=recipients.map(x=>encodeURIComponent(x)).join(',');
+  window.location.href=`mailto:${to}?subject=${encodeURIComponent(msg.subject)}&body=${encodeURIComponent(msg.body)}`;
+}
+async function textOverviewScheduleItem(itemId){
+  const item=items.find(i=>i.id===itemId);
+  if(!item)return;
+  await loadScheduleContacts();
+  const contact=scheduleContactForItemName(item.name);
+  const includePlans=!!contact?.include_plans_text;
+  const includeRendering=!!contact?.include_rendering_text;
+  const [planUrl,renderingUrl]=await Promise.all([
+    includePlans ? currentLotPlansShareUrl() : Promise.resolve(''),
+    includeRendering ? currentLotRenderingShareUrl() : Promise.resolve('')
+  ]);
+  const msg=overviewScheduleItemMessage(item,planUrl,includePlans,renderingUrl,includeRendering);
+  const phones=mappedPhonesForWork([item.name]);
+  if(msg?.dateKey){
+    const marked=await markCalendarCommunication('text',msg.dateKey);
+    if(!marked)return;
+  }
+  const recipient=phones.join(',');
+  const separator=/iPad|iPhone|iPod/.test(navigator.userAgent)?'&':'?';
+  window.location.href=`sms:${recipient}${separator}body=${encodeURIComponent(msg.textBody)}`;
+}
 
 function selectedDateScheduleItems(){
  if(!scheduleSelectedDate)return [];
