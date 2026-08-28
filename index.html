@@ -3976,40 +3976,57 @@ function selectedDateMessage(planUrl='',includePlans=false,renderingUrl='',inclu
  }
  return {subject,body:detailLines.join('\n'),textBody:textLines.join('\n')};
 }
-async function emailSelectedCalendarDate(){
+function emailSelectedCalendarDate(){
  if(!scheduleSelectedDate){alert('Select a calendar date first.');return}
- await loadScheduleContacts();
+
+ // Everything used below is already cached while the lot is open.
+ // Do not await before mailto: on iPhone or Safari may block the launch.
  const includePlans=shouldIncludePlansForSelectedDate('email');
  const includeRendering=shouldIncludeRenderingForSelectedDate('email');
- const [planUrl,renderingUrl]=await Promise.all([
-   includePlans ? currentLotPlansShareUrl() : Promise.resolve(''),
-   includeRendering ? currentLotRenderingShareUrl() : Promise.resolve('')
- ]);
+ const sameLotCache=overviewShareCache.lotId===currentLot;
+ const planUrl=(includePlans && sameLotCache)?overviewShareCache.plansUrl:'';
+ const renderingUrl=(includeRendering && sameLotCache)?overviewShareCache.renderingUrl:'';
+
  const msg=selectedDateMessage(planUrl,includePlans,renderingUrl,includeRendering);
+ if(!msg)return;
+
  const recipients=mappedRecipientsForWork(selectedWorkNames());
- const marked=await markCalendarCommunication('email');
- if(!marked)return;
  const to=recipients.map(x=>encodeURIComponent(x)).join(',');
  const href=`mailto:${to}?subject=${encodeURIComponent(msg.subject)}&body=${encodeURIComponent(msg.body)}`;
+
+ // Launch Mail immediately from the user's tap.
  window.location.href=href;
+
+ // Record E on the selected calendar date after Mail has been launched.
+ void markCalendarCommunicationSilent('email',scheduleSelectedDate,currentLot);
 }
-async function textSelectedCalendarDate(){
+
+function textSelectedCalendarDate(){
  if(!scheduleSelectedDate){alert('Select a calendar date first.');return}
- await loadScheduleContacts();
+
+ // Everything used below is already cached while the lot is open.
+ // Do not await before sms: on iPhone or Safari may block the launch.
  const includePlans=shouldIncludePlansForSelectedDate('text');
  const includeRendering=shouldIncludeRenderingForSelectedDate('text');
- const [planUrl,renderingUrl]=await Promise.all([
-   includePlans ? currentLotPlansShareUrl() : Promise.resolve(''),
-   includeRendering ? currentLotRenderingShareUrl() : Promise.resolve('')
- ]);
+ const sameLotCache=overviewShareCache.lotId===currentLot;
+ const planUrl=(includePlans && sameLotCache)?overviewShareCache.plansUrl:'';
+ const renderingUrl=(includeRendering && sameLotCache)?overviewShareCache.renderingUrl:'';
+
  const msg=selectedDateMessage(planUrl,includePlans,renderingUrl,includeRendering);
+ if(!msg)return;
+
  const phones=mappedPhonesForWork(selectedWorkNames());
- const marked=await markCalendarCommunication('text');
- if(!marked)return;
  const recipient=phones.join(',');
  const separator=/iPad|iPhone|iPod/.test(navigator.userAgent)?'&':'?';
- window.location.href=`sms:${recipient}${separator}body=${encodeURIComponent(msg.textBody)}`;
+ const href=`sms:${recipient}${separator}body=${encodeURIComponent(msg.textBody)}`;
+
+ // Launch Messages immediately from the user's tap.
+ window.location.href=href;
+
+ // Record T on the selected calendar date after Messages has been launched.
+ void markCalendarCommunicationSilent('text',scheduleSelectedDate,currentLot);
 }
+
 function renderSelectedScheduleDay(){
  const wrap=$('calendarSelectedItems');
  if(!scheduleSelectedDate){
