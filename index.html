@@ -1067,6 +1067,44 @@ button.danger:hover{filter:brightness(.96)}
   #scheduleDelete{order:3;width:100%;margin-top:4px}
 }
 
+
+.bb-swipe-row{
+  position:relative;
+  overflow:hidden;
+  border-radius:12px;
+}
+.bb-swipe-delete{
+  position:absolute;
+  top:0;
+  right:0;
+  bottom:0;
+  width:96px;
+  border:0;
+  border-radius:0 12px 12px 0;
+  background:#b93434;
+  color:#fff;
+  font-weight:800;
+  font-size:14px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  z-index:1;
+}
+.bb-swipe-content{
+  position:relative;
+  z-index:2;
+  background:#fafcfe;
+  transition:transform .18s ease;
+  touch-action:pan-y;
+  will-change:transform;
+}
+.bb-swipe-row.swiped .bb-swipe-content{
+  transform:translateX(-96px);
+}
+@media(prefers-reduced-motion:reduce){
+  .bb-swipe-content{transition:none}
+}
+
 </style>
 </head>
 <body>
@@ -2173,6 +2211,70 @@ function renderScheduleCalendar(){
  }
  renderSelectedScheduleDay();
 }
+
+function bindCalendarSwipeRows(){
+ document.querySelectorAll('.bb-swipe-row').forEach(row=>{
+   const content=row.querySelector('.bb-swipe-content');
+   if(!content || content.dataset.swipeBound==='1')return;
+   content.dataset.swipeBound='1';
+
+   let startX=0,startY=0,lastX=0,tracking=false,horizontal=false;
+
+   content.addEventListener('pointerdown',e=>{
+     if(e.pointerType==='mouse' && e.button!==0)return;
+     startX=lastX=e.clientX;
+     startY=e.clientY;
+     tracking=true;
+     horizontal=false;
+   });
+
+   content.addEventListener('pointermove',e=>{
+     if(!tracking)return;
+     lastX=e.clientX;
+     const dx=lastX-startX;
+     const dy=e.clientY-startY;
+
+     if(!horizontal){
+       if(Math.abs(dy)>Math.abs(dx) && Math.abs(dy)>8){
+         tracking=false;
+         return;
+       }
+       if(Math.abs(dx)>10)horizontal=true;
+     }
+     if(horizontal && dx<0){
+       const amount=Math.max(-96,dx);
+       content.style.transition='none';
+       content.style.transform=`translateX(${amount}px)`;
+     }else if(horizontal && row.classList.contains('swiped') && dx>0){
+       const amount=Math.min(0,-96+dx);
+       content.style.transition='none';
+       content.style.transform=`translateX(${amount}px)`;
+     }
+   });
+
+   const finish=()=>{
+     if(!tracking && !horizontal)return;
+     const dx=lastX-startX;
+     content.style.transition='';
+     content.style.transform='';
+     if(horizontal){
+       if(dx<-42)row.classList.add('swiped');
+       else if(dx>35)row.classList.remove('swiped');
+     }
+     tracking=false;
+     horizontal=false;
+   };
+   content.addEventListener('pointerup',finish);
+   content.addEventListener('pointercancel',finish);
+ });
+
+ document.addEventListener('pointerdown',e=>{
+   document.querySelectorAll('.bb-swipe-row.swiped').forEach(row=>{
+     if(!row.contains(e.target))row.classList.remove('swiped');
+   });
+ },{once:true});
+}
+
 function renderSelectedScheduleDay(){
  const wrap=$('calendarSelectedItems');
  if(!scheduleSelectedDate){
@@ -2186,14 +2288,43 @@ function renderSelectedScheduleDay(){
  $('calendarSelectedTitle').textContent=d.toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'});
  $('calendarSelectedCount').textContent=`${arr.length} schedule item${arr.length===1?'':'s'}`;
  wrap.innerHTML=arr.length?arr.map(i=>`
-   <div class="bb-calendar-selected-item">
-     <div class="bb-calendar-selected-main">
-       <div class="bb-calendar-selected-title">${esc(scheduleLotName(i))} · ${esc(i.name)}</div>
-       <div class="bb-calendar-selected-meta">${esc(statusDisplay(i.status))}${i.crew?' · '+esc(i.crew):''}</div>
+   <div class="bb-swipe-row" data-swipe-row="${i.id}">
+     <button class="bb-swipe-delete" type="button" data-swipe-delete="${i.id}" aria-label="Delete ${esc(i.name)}">Delete</button>
+     <div class="bb-calendar-selected-item bb-swipe-content" data-swipe-content="${i.id}">
+       <div class="bb-calendar-selected-main">
+         <div class="bb-calendar-selected-title">${esc(scheduleLotName(i))} · ${esc(i.name)}</div>
+         <div class="bb-calendar-selected-meta">${esc(statusDisplay(i.status))}${i.crew?' · '+esc(i.crew):''}</div>
+       </div>
+       <button class="secondary" type="button" data-calendar-edit="${i.id}">Edit</button>
      </div>
-     <button class="secondary" type="button" data-calendar-edit="${i.id}">Edit</button>
    </div>`).join(''):'<div class="muted">Nothing scheduled for this day.</div>';
- document.querySelectorAll('[data-calendar-edit]').forEach(b=>b.onclick=()=>openScheduleDialogLive(b.dataset.calendarEdit,'schedule'));
+
+ document.querySelectorAll('[data-calendar-edit]').forEach(b=>b.onclick=()=>{
+   const row=b.closest('.bb-swipe-row');
+   if(row?.classList.contains('swiped')){
+     row.classList.remove('swiped');
+     return;
+   }
+   openScheduleDialogLive(b.dataset.calendarEdit,'schedule');
+ });
+
+ document.querySelectorAll('[data-swipe-delete]').forEach(b=>b.onclick=async()=>{
+   const id=b.dataset.swipeDelete;
+   const item=items.find(x=>String(x.id)===String(id));
+   const label=item?.name||'this schedule item';
+   if(!confirm(`Delete "${label}"? This cannot be undone.`))return;
+
+   const {data,error}=await db.from('schedule_items').delete().eq('id',id).select('id');
+   if(error){alert(error.message);return}
+   if(!data || data.length===0){
+     alert('The schedule item was not deleted. Your account may not have permission to delete this item.');
+     return;
+   }
+   await load();
+   showScheduleView(scheduleViewMode);
+ });
+
+ bindCalendarSwipeRows();
 }
 function setScheduleViewMode(mode){
  scheduleViewMode=mode==='list'?'list':'calendar';
