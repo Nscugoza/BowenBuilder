@@ -1833,6 +1833,14 @@ async function openLotDocument(title,path){
 }
 function wireLotDocumentButtons(){document.querySelectorAll('[data-lot-document]').forEach(b=>b.onclick=()=>openLotDocument(b.dataset.documentTitle||'Document',b.dataset.lotDocument))}
 function showLot(){
+  // Always isolate the lot detail screen from previous navigation views.
+  ['subdivisionsView','subdivisionView','lotsView','scheduleView'].forEach(id=>{
+    const el=$(id);
+    if(el) el.classList.add('hidden');
+  });
+  const lotViewEl=$('lotView');
+  if(lotViewEl) lotViewEl.classList.remove('hidden');
+
  const l=lots.find(x=>x.id===currentLot);if(!l)return;
  requestAnimationFrame(()=>{
    window.scrollTo({top:0,left:0,behavior:'auto'});
