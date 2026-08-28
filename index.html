@@ -1854,7 +1854,7 @@ function rerenderCurrentScreen(){
   const screen=currentScreen();
   if(screen==='lot' && currentLot && lots.some(l=>l.id===currentLot)) showLot();
   else if(screen==='lots' && currentSubdivision) showLots();
-  else if(screen==='schedule' && currentLot && lots.some(l=>l.id===currentLot)) showScheduleView(scheduleViewMode);
+  else if(screen==='schedule' && currentLot && lots.some(l=>l.id===currentLot)) showScheduleView(scheduleViewMode,true);
   else if(screen==='admin' && isBowenBuilderAdmin()) showAdminView();
   else showSubs();
 }
@@ -1887,7 +1887,7 @@ function scheduleRealtimeReload(){
 
     if(screen==='lot' && currentLot && lots.some(x=>x.id===currentLot)) showLot();
     else if(screen==='lots' && currentSubdivision) showLots();
-    else if(screen==='schedule' && currentLot && lots.some(x=>x.id===currentLot)) showScheduleView(scheduleViewMode);
+    else if(screen==='schedule' && currentLot && lots.some(x=>x.id===currentLot)) showScheduleView(scheduleViewMode,true);
     else if(screen==='subdivisions') showSubs();
   },180);
 }
@@ -1965,32 +1965,29 @@ async function signIn(){
 }
 
 function captureCalendarViewState(){
-  const calendarVisible=$('calendarView') && !$('calendarView').classList.contains('hidden');
+  const calendarVisible=$('scheduleView') && !$('scheduleView').classList.contains('hidden') && scheduleViewMode==='calendar';
   return {
     subdivisionId:currentSubdivision||null,
     lotId:currentLot||null,
     selectedDate:scheduleSelectedDate||null,
-    month:scheduleCalendarMonth||null,
+    cursorTime:scheduleCalendarCursor instanceof Date ? scheduleCalendarCursor.getTime() : null,
     scrollY:window.scrollY||0,
     calendarVisible
   };
 }
-function restoreCalendarViewState(state){
+async function restoreCalendarViewState(state){
   if(!state || !state.calendarVisible || !state.lotId)return;
   currentSubdivision=state.subdivisionId;
   currentLot=state.lotId;
   if(state.selectedDate)scheduleSelectedDate=state.selectedDate;
-  if(state.month)scheduleCalendarMonth=state.month;
-  showLot(currentLot);
-  showLotCalendar();
-  requestAnimationFrame(()=>{
-    requestAnimationFrame(()=>window.scrollTo(0,state.scrollY||0));
-  });
+  if(state.cursorTime!==null)scheduleCalendarCursor=new Date(state.cursorTime);
+  await showScheduleView('calendar',true);
+  requestAnimationFrame(()=>window.scrollTo({top:state.scrollY||0,left:0,behavior:'auto'}));
 }
 async function refreshPreservingCalendar(){
   const state=captureCalendarViewState();
   await load();
-  restoreCalendarViewState(state);
+  await restoreCalendarViewState(state);
 }
 
 async function load(){
@@ -2604,6 +2601,50 @@ function itemEndKey(item){return dateInputValue(item.ends_at||item.starts_at)}
 function itemOccursOn(item,key){
  const s=itemStartKey(item),e=itemEndKey(item);
  return !!s && key>=s && key<=e;
+}
+
+function itemDateKeys(item){
+ const start=dateFromKey(itemStartKey(item));
+ const end=dateFromKey(itemEndKey(item));
+ if(!start||!end)return [];
+ const out=[];
+ const d=new Date(start.getFullYear(),start.getMonth(),start.getDate());
+ const last=new Date(end.getFullYear(),end.getMonth(),end.getDate());
+ while(d<=last){
+   out.push(localDateKey(d));
+   d.setDate(d.getDate()+1);
+ }
+ return out;
+}
+async function cleanupCalendarMarksForDeletedItem(deletedItem){
+ if(!deletedItem?.lot_id || !calledInTableAvailable)return;
+ const affected=itemDateKeys(deletedItem);
+ if(!affected.length)return;
+
+ // Read the remaining schedule directly from Supabase so cleanup is based on
+ // the committed post-delete state, including multi-day schedule items.
+ const {data:remaining,error}=await db
+   .from('schedule_items')
+   .select('id,lot_id,starts_at,ends_at')
+   .eq('lot_id',deletedItem.lot_id);
+ if(error)return;
+
+ const emptyDates=affected.filter(key=>!(remaining||[]).some(i=>itemOccursOn(i,key)));
+ if(!emptyDates.length)return;
+
+ const {error:markError}=await db
+   .from('lot_calendar_marks')
+   .delete()
+   .eq('lot_id',deletedItem.lot_id)
+   .in('calendar_date',emptyDates);
+ if(markError){
+   console.warn('Calendar mark cleanup failed:',markError.message);
+   return;
+ }
+
+ calendarCalledInMarks=calendarCalledInMarks.filter(
+   m=>m.lot_id!==deletedItem.lot_id || !emptyDates.includes(m.calendar_date)
+ );
 }
 
 async function loadCalendarCalledInMarks(){
@@ -3362,14 +3403,11 @@ function renderSelectedScheduleDay(){
      return;
    }
 
+   await cleanupCalendarMarksForDeletedItem(item);
    await refreshPreservingCalendar();
 
    currentLot=lotBeforeDelete;
    currentSubdivision=subdivisionBeforeDelete;
-
-   if(currentLot && lots.some(l=>l.id===currentLot)){
-     showScheduleView(scheduleViewMode);
-   }
  });
 
  bindCalendarSwipeRows();
@@ -3383,7 +3421,8 @@ function setScheduleViewMode(mode){
  if(scheduleViewMode==='calendar')renderScheduleCalendar();
  else renderScheduleListView();
 }
-async function showScheduleView(mode=scheduleViewMode){
+async function showScheduleView(mode=scheduleViewMode,preserveScroll=false){
+ const preservedScrollY=preserveScroll?(window.scrollY||0):0;
  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.view==='schedule'));
  if(!currentLot){alert('Open a lot first to view its calendar.');return}
  const activeLot=lots.find(l=>l.id===currentLot);
@@ -3404,7 +3443,11 @@ async function showScheduleView(mode=scheduleViewMode){
  if(selected)scheduleCalendarCursor=new Date(selected.getFullYear(),selected.getMonth(),1);
  await loadCalendarCalledInMarks();
  setScheduleViewMode(mode);
- window.scrollTo({top:0,left:0,behavior:'auto'});
+ if(preserveScroll){
+   requestAnimationFrame(()=>window.scrollTo({top:preservedScrollY,left:0,behavior:'auto'}));
+ }else{
+   window.scrollTo({top:0,left:0,behavior:'auto'});
+ }
 }
 
 
@@ -3438,15 +3481,17 @@ async function deleteScheduleItemLive(){
  }
 
  $('scheduleDialog').close();
- await refreshPreservingCalendar();
+ await cleanupCalendarMarksForDeletedItem(item);
 
- currentLot=lotBeforeDelete;
- currentSubdivision=subdivisionBeforeDelete;
-
- if(returnToSchedule && currentLot && lots.some(l=>l.id===currentLot)){
-   showScheduleView(scheduleViewMode);
- }else if(currentLot && lots.some(l=>l.id===currentLot)){
-   showLot();
+ if(returnToSchedule){
+   await refreshPreservingCalendar();
+   currentLot=lotBeforeDelete;
+   currentSubdivision=subdivisionBeforeDelete;
+ }else{
+   await load();
+   currentLot=lotBeforeDelete;
+   currentSubdivision=subdivisionBeforeDelete;
+   if(currentLot && lots.some(l=>l.id===currentLot))showLot();
  }
 }
 
@@ -3482,15 +3527,15 @@ async function saveSchedule(e){
  $('scheduleDialog').close();
  const returnToSchedule=scheduleContext==='schedule';
  const returnSubdivision=currentSubdivision;
- await refreshPreservingCalendar();
- currentSubdivision=lots.find(l=>l.id===payload.lot_id)?.subdivision_id||returnSubdivision;
- currentLot=payload.lot_id;
+
  if(returnToSchedule){
-   scheduleSelectedDate=startDate;
-   const d=dateFromKey(startDate);
-   if(d)scheduleCalendarCursor=new Date(d.getFullYear(),d.getMonth(),1);
-   showScheduleView(scheduleViewMode);
+   // Keep the calendar exactly where the user was. We deliberately do not
+   // change selected day/month to the edited item's date here.
+   await refreshPreservingCalendar();
  }else{
+   await load();
+   currentSubdivision=lots.find(l=>l.id===payload.lot_id)?.subdivision_id||returnSubdivision;
+   currentLot=payload.lot_id;
    showLot();
  }
 }
