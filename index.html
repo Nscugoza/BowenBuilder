@@ -4008,38 +4008,51 @@ function selectedDateMessage(planUrl='',includePlans=false,renderingUrl='',inclu
 }
 async function emailSelectedCalendarDate(){
  if(!scheduleSelectedDate){alert('Select a calendar date first.');return}
- await loadScheduleContacts();
+
+ const workNames=selectedWorkNames();
+ const recipients=mappedRecipientsForWork(workNames);
  const includePlans=shouldIncludePlansForSelectedDate('email');
  const includeRendering=shouldIncludeRenderingForSelectedDate('email');
- const [planUrl,renderingUrl]=await Promise.all([
-   includePlans ? currentLotPlansShareUrl() : Promise.resolve(''),
-   includeRendering ? currentLotRenderingShareUrl() : Promise.resolve('')
- ]);
+
+ // Use URLs already warmed while the lot is open. This keeps the tap synchronous on iPhone.
+ const planUrl=includePlans && overviewShareCache?.lotId===currentLot ? overviewShareCache.plansUrl||'' : '';
+ const renderingUrl=includeRendering && overviewShareCache?.lotId===currentLot ? overviewShareCache.renderingUrl||'' : '';
  const msg=selectedDateMessage(planUrl,includePlans,renderingUrl,includeRendering);
- const recipients=mappedRecipientsForWork(selectedWorkNames());
- const marked=await markCalendarCommunication('email');
- if(!marked)return;
+
  const to=recipients.map(x=>encodeURIComponent(x)).join(',');
  const href=`mailto:${to}?subject=${encodeURIComponent(msg.subject)}&body=${encodeURIComponent(msg.body)}`;
+
+ // Launch Mail first so iOS still treats this as a direct tap.
  window.location.href=href;
+
+ // Save E for the selected calendar date in the background.
+ void markCalendarCommunicationSilent('email',scheduleSelectedDate,currentLot);
 }
-async function textSelectedCalendarDate(){
+
+function textSelectedCalendarDate(){
  if(!scheduleSelectedDate){alert('Select a calendar date first.');return}
- await loadScheduleContacts();
+
+ const workNames=selectedWorkNames();
+ const phones=mappedPhonesForWork(workNames);
  const includePlans=shouldIncludePlansForSelectedDate('text');
  const includeRendering=shouldIncludeRenderingForSelectedDate('text');
- const [planUrl,renderingUrl]=await Promise.all([
-   includePlans ? currentLotPlansShareUrl() : Promise.resolve(''),
-   includeRendering ? currentLotRenderingShareUrl() : Promise.resolve('')
- ]);
+
+ // Use URLs already warmed while the lot is open. This keeps the tap synchronous on iPhone.
+ const planUrl=includePlans && overviewShareCache?.lotId===currentLot ? overviewShareCache.plansUrl||'' : '';
+ const renderingUrl=includeRendering && overviewShareCache?.lotId===currentLot ? overviewShareCache.renderingUrl||'' : '';
  const msg=selectedDateMessage(planUrl,includePlans,renderingUrl,includeRendering);
- const phones=mappedPhonesForWork(selectedWorkNames());
- const marked=await markCalendarCommunication('text');
- if(!marked)return;
+
  const recipient=phones.join(',');
  const separator=/iPad|iPhone|iPod/.test(navigator.userAgent)?'&':'?';
- window.location.href=`sms:${recipient}${separator}body=${encodeURIComponent(msg.textBody)}`;
+ const href=`sms:${recipient}${separator}body=${encodeURIComponent(msg.textBody)}`;
+
+ // Launch Messages first so iOS still treats this as a direct tap.
+ window.location.href=href;
+
+ // Save T for the selected calendar date in the background.
+ void markCalendarCommunicationSilent('text',scheduleSelectedDate,currentLot);
 }
+
 function renderSelectedScheduleDay(){
  const wrap=$('calendarSelectedItems');
  if(!scheduleSelectedDate){
