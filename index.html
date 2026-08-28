@@ -873,6 +873,13 @@ dialog::backdrop{background:rgba(7,21,39,.7);backdrop-filter:blur(4px)}
 .ai-detected{margin-top:12px;padding:12px;border:1px solid #e1e8f0;border-radius:14px;background:#fafcfe}
 .ai-detected .ai-file{margin-top:8px}
 
+.document-viewer-dialog{width:min(1050px,calc(100% - 14px));height:min(92vh,900px);max-width:none;max-height:none}
+.document-viewer-sheet{height:100%;display:flex;flex-direction:column;padding:16px;background:#fff}
+.document-viewer-body{flex:1;min-height:0;overflow:auto;background:#eef3f8;border:1px solid var(--border);border-radius:15px;display:flex;align-items:center;justify-content:center}
+.document-viewer-body iframe{width:100%;height:100%;min-height:60vh;border:0;background:#fff}
+.document-viewer-body img{max-width:100%;max-height:100%;object-fit:contain}
+.document-resource{border:0;cursor:pointer;padding:9px 12px;border-radius:11px;background:#eaf2fb;color:#174f86;font-weight:800;font-size:13px}
+@media(max-width:700px){.document-viewer-dialog{width:calc(100% - 8px);height:calc(100vh - 8px);border-radius:16px}.document-viewer-sheet{padding:12px}.document-viewer-body iframe{min-height:68vh}}
 </style>
 </head>
 <body>
@@ -988,11 +995,16 @@ dialog::backdrop{background:rgba(7,21,39,.7);backdrop-filter:blur(4px)}
   <label>Address<input id="lotAddress" placeholder="Street address"></label>
   <div class="two"><label>Plan Name<input id="planName"></label><label>County<input id="county" value="Barrow County, GA"></label></div>
   <label>Plans Link<input id="plansUrl" type="url" placeholder="https://..."></label>
+<label>Plans File<input id="plansFile" type="file" accept="application/pdf,image/*"><span class="muted">Upload PDF/image for in-app viewing.</span></label>
   <label>County Permit Link<input id="permitUrl" type="url" placeholder="https://..."></label>
   <label>Color Rendering<input id="renderingFile" type="file" accept="image/*"></label>
   <label>Deco Sheet Link<input id="decoUrl" type="url"></label>
   <label>Included Options<textarea id="includedOptions" rows="4"></textarea></label>
   <div class="two"><label>HLP Link<input id="hlpUrl" type="url"></label><label>LGP Link<input id="lgpUrl" type="url"></label></div>
+<div class="two">
+<label>HLP File<input id="hlpFile" type="file" accept="application/pdf,image/*"></label>
+<label>LGP File<input id="lgpFile" type="file" accept="application/pdf,image/*"></label>
+</div>
   <div class="actions"><button id="lotCancel" class="secondary" type="button">Cancel</button><button class="primary" type="submit">Save Lot</button></div>
 </form></dialog>
 
@@ -1091,6 +1103,13 @@ dialog::backdrop{background:rgba(7,21,39,.7);backdrop-filter:blur(4px)}
 </dialog>
 
 <script src="https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js"></script>
+<dialog id="documentViewerDialog" class="document-viewer-dialog">
+<div class="document-viewer-sheet">
+<div class="dialog-head"><div><h2 id="documentViewerTitle">Document</h2><div id="documentViewerMeta" class="muted"></div></div><button id="documentViewerX" class="xbtn" type="button">×</button></div>
+<div id="documentViewerBody" class="document-viewer-body"></div>
+<div class="actions"><a id="documentViewerOpen" class="secondary" href="#" target="_blank" rel="noopener">Open Full Screen</a><button id="documentViewerClose" class="primary" type="button">Close</button></div>
+</div>
+</dialog>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <dialog id="deleteLotDialog">
@@ -1725,6 +1744,28 @@ async function savePunchout(e){
   scheduleRealtimeReload();
 }
 
+function fileExtension(name){const p=String(name||'').split('.').pop()||'bin';return p.toLowerCase().replace(/[^a-z0-9]/g,'')||'bin'}
+async function uploadLotDocument(lotId,kind,file,oldPath=''){
+ if(!file)return oldPath||null;
+ const ext=fileExtension(file.name);
+ const id=crypto.randomUUID?crypto.randomUUID():Date.now()+'-'+Math.random().toString(36).slice(2);
+ const path=`${lotId}/${kind}/${id}.${ext}`;
+ const {error}=await db.storage.from('lot-documents').upload(path,file,{cacheControl:'3600',upsert:false,contentType:file.type||undefined});
+ if(error)throw error;
+ if(oldPath&&oldPath!==path)await db.storage.from('lot-documents').remove([oldPath]);
+ return path;
+}
+async function lotDocumentSignedUrl(path){const {data,error}=await db.storage.from('lot-documents').createSignedUrl(path,3600);if(error){alert(error.message);return''}return data?.signedUrl||''}
+async function openLotDocument(title,path){
+ const url=await lotDocumentSignedUrl(path);if(!url)return;
+ $('documentViewerTitle').textContent=title;$('documentViewerMeta').textContent='Stored securely in BowenBuilder';$('documentViewerOpen').href=url;
+ const ext=fileExtension(path);
+ if(['jpg','jpeg','png','gif','webp','heic'].includes(ext))$('documentViewerBody').innerHTML=`<img src="${url}" alt="${esc(title)}">`;
+ else if(ext==='pdf')$('documentViewerBody').innerHTML=`<iframe src="${url}#view=FitH" title="${esc(title)}"></iframe>`;
+ else $('documentViewerBody').innerHTML='<div class="card" style="margin:18px"><strong>Preview not available.</strong><div class="muted">Use Open Full Screen.</div></div>';
+ $('documentViewerDialog').showModal();
+}
+function wireLotDocumentButtons(){document.querySelectorAll('[data-lot-document]').forEach(b=>b.onclick=()=>openLotDocument(b.dataset.documentTitle||'Document',b.dataset.lotDocument))}
 function showLot(){
  const l=lots.find(x=>x.id===currentLot);if(!l)return;
  requestAnimationFrame(()=>{
@@ -1735,10 +1776,12 @@ function showLot(){
  joinLotPresence(currentLot);
  $('lotsView').classList.add('hidden');$('lotView').classList.remove('hidden');$('heroTitle').textContent=l.lot_name;$('heroSub').textContent='Live BowenBuilder lot information and schedule.';$('lotTitle').textContent=l.lot_name;$('lotSubtitle').textContent=[l.plan_name,l.county].filter(Boolean).join(' · ');
  const links=[['County Permit',l.permit_url],['Plans',l.plans_url],['Deco Sheet',l.deco_url],['HLP',l.hlp_url],['LGP',l.lgp_url]].filter(x=>safe(x[1]));
- $('lotInfo').innerHTML=`<div class="info-grid"><div class="info"><small>Address</small><strong>${esc(l.address||'Not added')}</strong></div><div class="info"><small>Permit Number</small><strong>${esc(l.permit_number||'Not added')}</strong></div><div class="info"><small>Plan</small><strong>${esc(l.plan_name||'Not added')}</strong></div><div class="info"><small>Included Options</small><strong>${esc(l.included_options||'None added')}</strong></div><div class="info"><small>County</small><strong>${esc(l.county||'Not added')}</strong></div></div>${links.length?`<div class="resource-row">${links.map(x=>`<a href="${safe(x[1])}" target="_blank">${x[0]} ↗</a>`).join('')}</div>`:''}${l.color_rendering_url?`<div class="card" style="margin-top:14px"><small class="muted">Color Rendering</small><div style="margin-top:8px"><img src="${l.color_rendering_url}" alt="${esc(l.lot_name)} color rendering" style="max-width:100%;max-height:320px;border-radius:14px;cursor:zoom-in" id="liveRendering"></div></div>`:''}`;
+ const storedDocs=[['Plans',l.plans_file_path],['HLP',l.hlp_file_path],['LGP',l.lgp_file_path]].filter(x=>x[1]);
+ $('lotInfo').innerHTML=`<div class="info-grid"><div class="info"><small>Address</small><strong>${esc(l.address||'Not added')}</strong></div><div class="info"><small>Permit Number</small><strong>${esc(l.permit_number||'Not added')}</strong></div><div class="info"><small>Plan</small><strong>${esc(l.plan_name||'Not added')}</strong></div><div class="info"><small>Included Options</small><strong>${esc(l.included_options||'None added')}</strong></div><div class="info"><small>County</small><strong>${esc(l.county||'Not added')}</strong></div></div>${(links.length||storedDocs.length)?`<div class="resource-row">${storedDocs.map(x=>`<button type="button" class="document-resource" data-lot-document="${esc(x[1])}" data-document-title="${esc(x[0])}">${esc(x[0])} ▣</button>`).join('')}${links.filter(x=>!storedDocs.some(d=>d[0]===x[0])).map(x=>`<a href="${safe(x[1])}" target="_blank">${x[0]} ↗</a>`).join('')}</div>`:''}${l.color_rendering_url?`<div class="card" style="margin-top:14px"><small class="muted">Color Rendering</small><div style="margin-top:8px"><img src="${l.color_rendering_url}" alt="${esc(l.lot_name)} color rendering" style="max-width:100%;max-height:320px;border-radius:14px;cursor:zoom-in" id="liveRendering"></div></div>`:''}`;
  $('checkWindowPlans').checked=!!l.submit_plans_window_order_completed;
  $('checkFramePackage').checked=!!l.setup_frame_package_completed;
 
+ wireLotDocumentButtons();
  const liveRendering=$('liveRendering');
  if(liveRendering){
    liveRendering.onclick=()=>window.open(l.color_rendering_url,'_blank');
@@ -1915,6 +1958,10 @@ $('lotForm').onsubmit=async e=>{
   e.preventDefault();
 
   const editId=$('editLotId').value;
+  const existingLot=editId?lots.find(x=>x.id===editId):null;
+  const plansUpload=$('plansFile').files?.[0]||null;
+  const hlpUpload=$('hlpFile').files?.[0]||null;
+  const lgpUpload=$('lgpFile').files?.[0]||null;
   const payload={
     subdivision_id: currentSubdivision,
     lot_name:$('lotName').value.trim(),
@@ -1950,6 +1997,21 @@ $('lotForm').onsubmit=async e=>{
   if(result.error){
     alert(result.error.message);
     return;
+  }
+
+  try{
+    const lotId=result.data.id;
+    const patch={};
+    if(plansUpload)patch.plans_file_path=await uploadLotDocument(lotId,'plans',plansUpload,existingLot?.plans_file_path||'');
+    if(hlpUpload)patch.hlp_file_path=await uploadLotDocument(lotId,'hlp',hlpUpload,existingLot?.hlp_file_path||'');
+    if(lgpUpload)patch.lgp_file_path=await uploadLotDocument(lotId,'lgp',lgpUpload,existingLot?.lgp_file_path||'');
+    if(Object.keys(patch).length){
+      const {data:updated,error:docErr}=await db.from('lots').update(patch).eq('id',lotId).select().single();
+      if(docErr)throw docErr;
+      result.data=updated;
+    }
+  }catch(err){
+    alert(`Lot saved, but a document upload failed: ${err?.message||err}`);
   }
 
   $('lotDialog').close();
@@ -2223,6 +2285,10 @@ $('aiUseDraft').onclick=()=>{
   $('planName').value=plan;
   $('includedOptions').value=options;
 };
+
+$('documentViewerX').onclick=()=>$('documentViewerDialog').close();
+$('documentViewerClose').onclick=()=>$('documentViewerDialog').close();
+$('documentViewerDialog').addEventListener('click',e=>{if(e.target===e.currentTarget)$('documentViewerDialog').close()});
 
 })();
 </script>
