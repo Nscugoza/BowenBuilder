@@ -2720,8 +2720,8 @@ function showLot(preserveScroll=false){
    const comm=overviewCommunicationMarks(i);
    return `<div class="schedule-card overview-schedule-card">
      <div class="overview-comm-badges">
-       <span class="overview-comm-badge ${comm.email?'active':''}" data-overview-email-badge="${i.id}">E</span>
-       <span class="overview-comm-badge ${comm.text?'active':''}" data-overview-text-badge="${i.id}">T</span>
+       <span class="overview-comm-badge ${comm?.email?'active':''}" data-overview-email-badge="${i.id}">E</span>
+       <span class="overview-comm-badge ${comm?.text?'active':''}" data-overview-text-badge="${i.id}">T</span>
      </div>
      <div><span class="schedule-status-pill ${esc(i.status)}">${esc((i.status||'').replaceAll('_',' ').replace(/\b\w/g,c=>c.toUpperCase()))}</span><h4>${esc(i.name)}</h4><div class="schedule-meta">${esc(i.item_type)}${i.crew?' · '+esc(i.crew):''}<br>${sd}${ed&&ed!==sd?' → '+ed:''}</div></div><div class="schedule-actions overview-schedule-actions"><button class="iconbtn" type="button" data-overview-email="${i.id}">Email</button><button class="iconbtn" type="button" data-overview-text="${i.id}">Text</button><button class="iconbtn" type="button" data-edit-schedule="${i.id}">Edit</button></div></div>`;
  }).join(''):'<div class="card muted">No schedule items yet.</div>';
@@ -3723,7 +3723,8 @@ function overviewCommunicationMarks(item){
   if(!item)return {email:false,text:false};
   const dateKey=dateInputValue(item.starts_at);
   if(!dateKey)return {email:false,text:false};
-  const mark=calendarMarks.find(
+  const marks=Array.isArray(calendarMarks)?calendarMarks:[];
+  const mark=marks.find(
     x=>x.lot_id===item.lot_id && x.calendar_date===dateKey
   );
   return {
