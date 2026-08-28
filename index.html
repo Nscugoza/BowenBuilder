@@ -1414,6 +1414,38 @@ button.danger:hover{filter:brightness(.96)}
   }
 }
 
+
+.overview-schedule-card{
+  position:relative;
+  padding-top:42px;
+}
+.overview-comm-badges{
+  position:absolute;
+  top:14px;
+  right:14px;
+  display:flex;
+  gap:6px;
+  z-index:2;
+}
+.overview-comm-badge{
+  width:28px;
+  height:28px;
+  border-radius:999px;
+  border:1px solid #c7d0db;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:13px;
+  font-weight:900;
+  color:#8a96a3;
+  background:#f6f8fa;
+}
+.overview-comm-badge.active{
+  color:#fff;
+  background:#0b5fa5;
+  border-color:#0b5fa5;
+}
+
 </style>
 </head>
 <body>
@@ -2685,7 +2717,13 @@ function showLot(preserveScroll=false){
  $('lotSchedule').innerHTML=li.length?li.map(i=>{
    const sd=i.starts_at?new Date(i.starts_at).toLocaleDateString():'';
    const ed=i.ends_at?new Date(i.ends_at).toLocaleDateString():'';
-   return `<div class="schedule-card"><div><span class="schedule-status-pill ${esc(i.status)}">${esc((i.status||'').replaceAll('_',' ').replace(/\b\w/g,c=>c.toUpperCase()))}</span><h4>${esc(i.name)}</h4><div class="schedule-meta">${esc(i.item_type)}${i.crew?' · '+esc(i.crew):''}<br>${sd}${ed&&ed!==sd?' → '+ed:''}</div></div><div class="schedule-actions overview-schedule-actions"><button class="iconbtn" type="button" data-overview-email="${i.id}">Email</button><button class="iconbtn" type="button" data-overview-text="${i.id}">Text</button><button class="iconbtn" type="button" data-edit-schedule="${i.id}">Edit</button></div></div>`;
+   const comm=overviewCommunicationMarks(i);
+   return `<div class="schedule-card overview-schedule-card">
+     <div class="overview-comm-badges">
+       <span class="overview-comm-badge ${comm.email?'active':''}" data-overview-email-badge="${i.id}">E</span>
+       <span class="overview-comm-badge ${comm.text?'active':''}" data-overview-text-badge="${i.id}">T</span>
+     </div>
+     <div><span class="schedule-status-pill ${esc(i.status)}">${esc((i.status||'').replaceAll('_',' ').replace(/\b\w/g,c=>c.toUpperCase()))}</span><h4>${esc(i.name)}</h4><div class="schedule-meta">${esc(i.item_type)}${i.crew?' · '+esc(i.crew):''}<br>${sd}${ed&&ed!==sd?' → '+ed:''}</div></div><div class="schedule-actions overview-schedule-actions"><button class="iconbtn" type="button" data-overview-email="${i.id}">Email</button><button class="iconbtn" type="button" data-overview-text="${i.id}">Text</button><button class="iconbtn" type="button" data-edit-schedule="${i.id}">Edit</button></div></div>`;
  }).join(''):'<div class="card muted">No schedule items yet.</div>';
  document.querySelectorAll('[data-overview-email]').forEach(btn=>{
    btn.onclick=()=>emailOverviewScheduleItem(btn.dataset.overviewEmail);
@@ -3662,6 +3700,15 @@ async function markCalendarCommunicationSilent(kind,dateKey,lotId=currentLot){
     );
     if(idx>=0){
       calendarMarks[idx]={...calendarMarks[idx],...patch};
+    }else{
+      calendarMarks.push({
+        lot_id:lotId,
+        calendar_date:dateKey,
+        called_in:false,
+        email_sent:kind==='email',
+        text_sent:kind==='text',
+        ...patch
+      });
     }
   }catch(err){
     console.warn('Calendar communication mark could not be saved:',err);
@@ -3671,6 +3718,36 @@ async function markCalendarCommunicationSilent(kind,dateKey,lotId=currentLot){
 function scheduleContactForItemName(name){
   return scheduleContacts.find(r=>r.schedule_item===String(name||'').trim())||null;
 }
+
+function overviewCommunicationMarks(item){
+  if(!item)return {email:false,text:false};
+  const dateKey=dateInputValue(item.starts_at);
+  if(!dateKey)return {email:false,text:false};
+  const mark=calendarMarks.find(
+    x=>x.lot_id===item.lot_id && x.calendar_date===dateKey
+  );
+  return {
+    email:!!mark?.email_sent,
+    text:!!mark?.text_sent
+  };
+}
+
+function refreshOverviewCommunicationBadges(itemId){
+  const item=items.find(i=>i.id===itemId);
+  if(!item)return;
+  const marks=overviewCommunicationMarks(item);
+
+  const emailBadge=document.querySelector(
+    `[data-overview-email-badge="${itemId}"]`
+  );
+  const textBadge=document.querySelector(
+    `[data-overview-text-badge="${itemId}"]`
+  );
+
+  if(emailBadge)emailBadge.classList.toggle('active',marks.email);
+  if(textBadge)textBadge.classList.toggle('active',marks.text);
+}
+
 function overviewScheduleItemMessage(item,planUrl='',includePlans=false,renderingUrl='',includeRendering=false){
   if(!item)return null;
   const lot=lots.find(l=>l.id===item.lot_id)||activeLotInfo();
@@ -3743,11 +3820,28 @@ function emailOverviewScheduleItem(itemId){
   const href=`mailto:${to}?subject=${encodeURIComponent(msg.subject)}&body=${encodeURIComponent(msg.body)}`;
 
   // IMPORTANT for iPhone: launch Mail directly inside the original tap handler.
+  // Show E immediately on the Overview card.
+  const markDate=msg.dateKey;
+  if(markDate){
+    const idx=calendarMarks.findIndex(
+      x=>x.lot_id===item.lot_id && x.calendar_date===markDate
+    );
+    if(idx>=0)calendarMarks[idx]={...calendarMarks[idx],email_sent:true};
+    else calendarMarks.push({
+      lot_id:item.lot_id,
+      calendar_date:markDate,
+      called_in:false,
+      email_sent:true,
+      text_sent:false
+    });
+    refreshOverviewCommunicationBadges(item.id);
+  }
+
   window.location.href=href;
 
   // Record E afterward without blocking the app launch or rerendering the page.
-  if(msg.dateKey){
-    void markCalendarCommunicationSilent('email',msg.dateKey,item.lot_id);
+  if(markDate){
+    void markCalendarCommunicationSilent('email',markDate,item.lot_id);
   }
 }
 
@@ -3777,11 +3871,28 @@ function textOverviewScheduleItem(itemId){
   const href=`sms:${recipient}${separator}body=${encodeURIComponent(msg.textBody)}`;
 
   // IMPORTANT for iPhone: launch Messages directly inside the original tap handler.
+  // Show T immediately on the Overview card.
+  const markDate=msg.dateKey;
+  if(markDate){
+    const idx=calendarMarks.findIndex(
+      x=>x.lot_id===item.lot_id && x.calendar_date===markDate
+    );
+    if(idx>=0)calendarMarks[idx]={...calendarMarks[idx],text_sent:true};
+    else calendarMarks.push({
+      lot_id:item.lot_id,
+      calendar_date:markDate,
+      called_in:false,
+      email_sent:false,
+      text_sent:true
+    });
+    refreshOverviewCommunicationBadges(item.id);
+  }
+
   window.location.href=href;
 
   // Record T afterward without blocking the app launch or rerendering the page.
-  if(msg.dateKey){
-    void markCalendarCommunicationSilent('text',msg.dateKey,item.lot_id);
+  if(markDate){
+    void markCalendarCommunicationSilent('text',markDate,item.lot_id);
   }
 }
 
