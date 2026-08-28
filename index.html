@@ -1047,6 +1047,11 @@ dialog::backdrop{background:rgba(7,21,39,.7);backdrop-filter:blur(4px)}
   }
 }
 
+
+.calendar-back-btn{min-height:44px}
+@media(max-width:640px){
+  .calendar-back-btn{width:100%;text-align:left}
+}
 </style>
 </head>
 <body>
@@ -1148,7 +1153,8 @@ dialog::backdrop{background:rgba(7,21,39,.7);backdrop-filter:blur(4px)}
     <section id="scheduleView" class="hidden">
       <div class="schedule-page-head">
         <div>
-          <h2 style="margin:0">Schedule</h2>
+          <button id="calendarBackToLot" class="secondary calendar-back-btn" type="button">← Back to Lot</button>
+          <h2 style="margin:10px 0 0">Schedule</h2>
           <div id="scheduleScope" class="muted"></div>
         </div>
         <button id="schedulePageAdd" class="primary" type="button">+ Add Schedule Item</button>
@@ -2284,6 +2290,10 @@ function openScheduleDialogLive(id='',context='lot',prefillDate=''){
  }
  $('scheduleDialog').showModal();
 }
+$('calendarBackToLot').onclick=()=>{
+ if(!currentLot){showLots();return}
+ showLot();
+};
 $('schedulePageAdd').onclick=()=>openScheduleDialogLive('','schedule',scheduleSelectedDate||todayInput());
 $('calendarAddSelected').onclick=()=>openScheduleDialogLive('','schedule',scheduleSelectedDate||todayInput());
 $('scheduleCalendarMode').onclick=()=>setScheduleViewMode('calendar');
