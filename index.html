@@ -1820,6 +1820,22 @@ const DEFAULT_LOT_CHECKLIST_ITEMS=[
 ];
 
 let realtimeRefreshTimer=null;
+
+let suppressLocalLotRealtimeId=null;
+let suppressLocalLotRealtimeUntil=0;
+
+function handleLotsRealtime(payload){
+  const changedLot=payload?.new?.id||payload?.old?.id||null;
+  if(
+    changedLot &&
+    changedLot===suppressLocalLotRealtimeId &&
+    Date.now()<suppressLocalLotRealtimeUntil
+  ){
+    return;
+  }
+  scheduleRealtimeReload();
+}
+
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmt=v=>v?new Date(v).toLocaleString():'';
 const safe=u=>{try{let x=new URL(u);return /^https?:$/.test(x.protocol)?x.href:''}catch{return''}};
@@ -1869,7 +1885,7 @@ function currentScreen(){
 
 function rerenderCurrentScreen(){
   const screen=currentScreen();
-  if(screen==='lot' && currentLot && lots.some(l=>l.id===currentLot)) showLot();
+  if(screen==='lot' && currentLot && lots.some(l=>l.id===currentLot)) showLot(true);
   else if(screen==='lots' && currentSubdivision) showLots();
   else if(screen==='schedule' && currentLot && lots.some(l=>l.id===currentLot)) showScheduleView(scheduleViewMode,true);
   else if(screen==='admin' && isBowenBuilderAdmin()) showAdminView();
@@ -1902,7 +1918,7 @@ function scheduleRealtimeReload(){
     currentSubdivision=keepSub;
     currentLot=keepLot;
 
-    if(screen==='lot' && currentLot && lots.some(x=>x.id===currentLot)) showLot();
+    if(screen==='lot' && currentLot && lots.some(x=>x.id===currentLot)) showLot(true);
     else if(screen==='lots' && currentSubdivision) showLots();
     else if(screen==='schedule' && currentLot && lots.some(x=>x.id===currentLot)) showScheduleView(scheduleViewMode,true);
     else if(screen==='subdivisions') showSubs();
@@ -1913,7 +1929,7 @@ function startRealtimeUpdates(){
   if(realtimeChannel) db.removeChannel(realtimeChannel);
   realtimeChannel=db.channel('bowenbuilder-db-live')
     .on('postgres_changes',{event:'*',schema:'public',table:'subdivisions'},scheduleRealtimeReload)
-    .on('postgres_changes',{event:'*',schema:'public',table:'lots'},scheduleRealtimeReload)
+    .on('postgres_changes',{event:'*',schema:'public',table:'lots'},handleLotsRealtime)
     .on('postgres_changes',{event:'*',schema:'public',table:'schedule_items'},scheduleRealtimeReload)
       .on('postgres_changes',{event:'*',schema:'public',table:'lot_calendar_marks'},scheduleRealtimeReload)
     .on('postgres_changes',{event:'*',schema:'public',table:'punchout_items'},scheduleRealtimeReload)
@@ -2521,7 +2537,10 @@ function ensureLotCalendarVisible(){
  }
 }
 
-function showLot(){
+function showLot(preserveScroll=false){
+ const savedWindowY=window.scrollY||0;
+ const mainScrollEl=document.querySelector('main');
+ const savedMainY=mainScrollEl?mainScrollEl.scrollTop:0;
  ensureLotCalendarVisible();
  setTimeout(ensureLotCalendarVisible,0);
   // Always isolate the lot detail screen from previous navigation views.
@@ -2534,9 +2553,18 @@ function showLot(){
 
  const l=lots.find(x=>x.id===currentLot);if(!l)return;
  requestAnimationFrame(()=>{
-   window.scrollTo({top:0,left:0,behavior:'auto'});
    const mainEl=document.querySelector('main');
-   if(mainEl) mainEl.scrollTop=0;
+   if(preserveScroll){
+     window.scrollTo({top:savedWindowY,left:0,behavior:'auto'});
+     if(mainEl)mainEl.scrollTop=savedMainY;
+     requestAnimationFrame(()=>{
+       window.scrollTo({top:savedWindowY,left:0,behavior:'auto'});
+       if(mainEl)mainEl.scrollTop=savedMainY;
+     });
+   }else{
+     window.scrollTo({top:0,left:0,behavior:'auto'});
+     if(mainEl)mainEl.scrollTop=0;
+   }
  });
  joinLotPresence(currentLot);
  $('lotsView').classList.add('hidden');$('lotView').classList.remove('hidden');$('heroTitle').textContent=l.lot_name;$('heroSub').textContent='Live BowenBuilder lot information and schedule.';$('lotTitle').textContent=l.lot_name;$('lotSubtitle').textContent=[l.plan_name,l.county].filter(Boolean).join(' · ');
@@ -2615,7 +2643,6 @@ function renderLotChecklist(){
 
   host.querySelectorAll('[data-checklist-index]').forEach(box=>{
     box.onchange=async()=>{
-      const scrollY=window.scrollY||0;
       const current=lotChecklistData(lot);
       const index=Number(box.dataset.checklistIndex);
       if(!current[index])return;
@@ -2623,7 +2650,11 @@ function renderLotChecklist(){
       const previous=!box.checked;
       current[index]={...current[index],complete:box.checked};
 
-      // Update Supabase directly without reloading/reopening the lot view.
+      // Update locally and save without allowing our own Realtime echo
+      // to rebuild the entire lot page.
+      suppressLocalLotRealtimeId=currentLot;
+      suppressLocalLotRealtimeUntil=Date.now()+1500;
+
       const {error}=await db.from('lots')
         .update({checklist_items:current})
         .eq('id',currentLot);
@@ -2636,12 +2667,7 @@ function renderLotChecklist(){
 
       lot.checklist_items=current;
 
-      // A Realtime lots event can arrive immediately after the update.
-      // Restore the exact checklist scroll position after that render cycle too.
-      requestAnimationFrame(()=>{
-        window.scrollTo({top:scrollY,left:0,behavior:'auto'});
-        requestAnimationFrame(()=>window.scrollTo({top:scrollY,left:0,behavior:'auto'}));
-      });
+
     };
   });
 
