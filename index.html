@@ -2615,11 +2615,33 @@ function renderLotChecklist(){
 
   host.querySelectorAll('[data-checklist-index]').forEach(box=>{
     box.onchange=async()=>{
+      const scrollY=window.scrollY||0;
       const current=lotChecklistData(lot);
       const index=Number(box.dataset.checklistIndex);
       if(!current[index])return;
+
+      const previous=!box.checked;
       current[index]={...current[index],complete:box.checked};
-      if(!(await saveLotChecklist(current)))box.checked=!box.checked;
+
+      // Update Supabase directly without reloading/reopening the lot view.
+      const {error}=await db.from('lots')
+        .update({checklist_items:current})
+        .eq('id',currentLot);
+
+      if(error){
+        box.checked=previous;
+        alert(error.message);
+        return;
+      }
+
+      lot.checklist_items=current;
+
+      // A Realtime lots event can arrive immediately after the update.
+      // Restore the exact checklist scroll position after that render cycle too.
+      requestAnimationFrame(()=>{
+        window.scrollTo({top:scrollY,left:0,behavior:'auto'});
+        requestAnimationFrame(()=>window.scrollTo({top:scrollY,left:0,behavior:'auto'}));
+      });
     };
   });
 
