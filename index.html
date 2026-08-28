@@ -3788,6 +3788,21 @@ function refreshOverviewCommunicationBadges(itemId){
   if(textBadge)textBadge.classList.toggle('active',marks.text);
 }
 
+
+function includedOptionsLinesForMessage(lot){
+  const raw=String(lot?.options||lot?.included_options||'').trim();
+  if(!raw)return [];
+  return raw
+    .split(/\r?\n|;|,/)
+    .map(x=>x.replace(/^[\s•\-*]+/,'').trim())
+    .filter(Boolean);
+}
+
+function scheduleWorkNeedsIncludedOptions(names){
+  const arr=Array.isArray(names)?names:[names];
+  return arr.some(name=>/\bplumb/i.test(String(name||'')));
+}
+
 function overviewScheduleItemMessage(item,planUrl='',includePlans=false,renderingUrl='',includeRendering=false){
   if(!item)return null;
   const lot=lots.find(l=>l.id===item.lot_id)||activeLotInfo();
@@ -3796,6 +3811,7 @@ function overviewScheduleItemMessage(item,planUrl='',includePlans=false,renderin
   const d=dateKey?dateFromKey(dateKey):null;
   const dateLabel=d?d.toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric',year:'numeric'}):dateKey;
   const work=item.name||'Schedule Item';
+  const optionLines=scheduleWorkNeedsIncludedOptions(work)?includedOptionsLinesForMessage(lot):[];
 
   const detailLines=[
     `${lot?.lot_name||'Lot'} Schedule`
@@ -3809,6 +3825,12 @@ function overviewScheduleItemMessage(item,planUrl='',includePlans=false,renderin
   detailLines.push('Scheduled Work:');
   detailLines.push(`- ${work}${item.crew?' — '+item.crew:''}`);
 
+  if(optionLines.length){
+    detailLines.push('');
+    detailLines.push('Included Options:');
+    optionLines.forEach(x=>detailLines.push(`- ${x}`));
+  }
+
   const textLines=[
     `${lot?.lot_name||'Lot'} Schedule`,
     `Scheduled Work: ${work}`
@@ -3818,6 +3840,11 @@ function overviewScheduleItemMessage(item,planUrl='',includePlans=false,renderin
   if(lot?.plan_name)textLines.push(`Plan: ${lot.plan_name}`);
   if(lot?.permit_number)textLines.push(`Permit Number: ${lot.permit_number}`);
   if(dateLabel)textLines.push(`Requested Schedule Date: ${dateLabel}`);
+
+  if(optionLines.length){
+    textLines.push('Included Options:');
+    optionLines.forEach(x=>textLines.push(`- ${x}`));
+  }
 
   if(includePlans && planUrl){
     detailLines.push('',`Plans: ${planUrl}`);
@@ -3835,6 +3862,7 @@ function overviewScheduleItemMessage(item,planUrl='',includePlans=false,renderin
     dateKey
   };
 }
+
 function emailOverviewScheduleItem(itemId){
   const item=items.find(i=>i.id===itemId);
   if(!item)return;
@@ -3956,6 +3984,7 @@ function selectedDateMessage(planUrl='',includePlans=false,renderingUrl='',inclu
  const dateLabel=d?d.toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric',year:'numeric'}):scheduleSelectedDate;
  const workNames=arr.map(i=>i.name||'Schedule Item');
  const workSubject=workNames.length?workNames.join(', '):dateLabel;
+ const optionLines=scheduleWorkNeedsIncludedOptions(workNames)?includedOptionsLinesForMessage(lot):[];
 
  const detailLines=[];
  detailLines.push(`${lot?.lot_name||'Lot'} Schedule`);
@@ -3975,15 +4004,20 @@ function selectedDateMessage(planUrl='',includePlans=false,renderingUrl='',inclu
  }else{
    detailLines.push('No schedule items are currently listed for this date.');
  }
+
+ if(optionLines.length){
+   detailLines.push('');
+   detailLines.push('Included Options:');
+   optionLines.forEach(x=>detailLines.push(`- ${x}`));
+ }
+
  if(isCalledInDate(scheduleSelectedDate)){
    detailLines.push('');
    detailLines.push('Called In: Yes ✓');
  }
 
- // Email subject: lot number + requested work only. No "Scheduled Work:" phrase.
  const subject=`${lot?.lot_name||'Lot'} - ${workSubject}`;
 
- // Text: scheduled work is the second line.
  const textLines=[];
  textLines.push(`${lot?.lot_name||'Lot'} Schedule`);
  textLines.push(`Scheduled Work: ${workNames.length?workNames.join(', '):'None listed'}`);
@@ -3992,6 +4026,12 @@ function selectedDateMessage(planUrl='',includePlans=false,renderingUrl='',inclu
  if(lot?.plan_name)textLines.push(`Plan: ${lot.plan_name}`);
  if(lot?.permit_number)textLines.push(`Permit Number: ${lot.permit_number}`);
  textLines.push(`Requested Schedule Date: ${dateLabel}`);
+
+ if(optionLines.length){
+   textLines.push('Included Options:');
+   optionLines.forEach(x=>textLines.push(`- ${x}`));
+ }
+
  if(isCalledInDate(scheduleSelectedDate))textLines.push('Called In: Yes ✓');
 
  if(includePlans && planUrl){
@@ -4004,29 +4044,12 @@ function selectedDateMessage(planUrl='',includePlans=false,renderingUrl='',inclu
    detailLines.push(`Color Rendering: ${renderingUrl}`);
    textLines.push(`Color Rendering: ${renderingUrl}`);
  }
- return {subject,body:detailLines.join('\n'),textBody:textLines.join('\n')};
-}
-async function emailSelectedCalendarDate(){
- if(!scheduleSelectedDate){alert('Select a calendar date first.');return}
 
- const workNames=selectedWorkNames();
- const recipients=mappedRecipientsForWork(workNames);
- const includePlans=shouldIncludePlansForSelectedDate('email');
- const includeRendering=shouldIncludeRenderingForSelectedDate('email');
-
- // Use URLs already warmed while the lot is open. This keeps the tap synchronous on iPhone.
- const planUrl=includePlans && overviewShareCache?.lotId===currentLot ? overviewShareCache.plansUrl||'' : '';
- const renderingUrl=includeRendering && overviewShareCache?.lotId===currentLot ? overviewShareCache.renderingUrl||'' : '';
- const msg=selectedDateMessage(planUrl,includePlans,renderingUrl,includeRendering);
-
- const to=recipients.map(x=>encodeURIComponent(x)).join(',');
- const href=`mailto:${to}?subject=${encodeURIComponent(msg.subject)}&body=${encodeURIComponent(msg.body)}`;
-
- // Launch Mail first so iOS still treats this as a direct tap.
- window.location.href=href;
-
- // Save E for the selected calendar date in the background.
- void markCalendarCommunicationSilent('email',scheduleSelectedDate,currentLot);
+ return {
+   subject,
+   body:detailLines.join('\n'),
+   textBody:textLines.join('\n')
+ };
 }
 
 function textSelectedCalendarDate(){
