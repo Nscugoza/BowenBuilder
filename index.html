@@ -2984,36 +2984,48 @@ async function toggleCalledInDate(key){
  await loadCalendarCalledInMarks();
  renderScheduleCalendar();
 }
-async function markCalendarCommunication(kind,key=scheduleSelectedDate){
- if(!currentLot || !key)return false;
- if(!calledInTableAvailable){
-   alert('Email/Text calendar tracking needs the Supabase setup SQL to be run first.');
-   return false;
- }
- const existing=calendarMarkForDate(key);
- const now=new Date().toISOString();
- const patch=kind==='email'
-   ? {email_sent:true,email_sent_at:now,updated_at:now}
-   : {text_sent:true,text_sent_at:now,updated_at:now};
+async function markCalendarCommunication(kind,dateKey){
+  if(!currentLot || !dateKey)return false;
 
- let error=null;
- if(existing){
-   ({error}=await db.from('lot_calendar_marks').update(patch).eq('id',existing.id));
- }else{
-   ({error}=await db.from('lot_calendar_marks').insert({
-     lot_id:currentLot,
-     calendar_date:key,
-     called_in:false,
-     ...patch
-   }));
- }
- if(error){
-   alert(error.message);
-   return false;
- }
- await loadCalendarCalledInMarks();
- renderScheduleCalendar();
- return true;
+  const field=kind==='email'?'email_sent':'text_sent';
+  const timeField=kind==='email'?'email_sent_at':'text_sent_at';
+  const now=new Date().toISOString();
+
+  // Use UPSERT on the same (lot_id, calendar_date) unique key so this works
+  // whether the date already has Called In ✓, Email E, Text T, or no mark yet.
+  const payload={
+    lot_id:currentLot,
+    calendar_date:dateKey,
+    [field]:true,
+    [timeField]:now
+  };
+
+  const {data,error}=await db
+    .from('lot_calendar_marks')
+    .upsert(payload,{onConflict:'lot_id,calendar_date'})
+    .select()
+    .single();
+
+  if(error){
+    alert(error.message);
+    return false;
+  }
+
+  const existingIndex=calendarMarks.findIndex(
+    x=>x.lot_id===currentLot && x.calendar_date===dateKey
+  );
+  if(existingIndex>=0){
+    calendarMarks[existingIndex]={...calendarMarks[existingIndex],...data};
+  }else{
+    calendarMarks.push(data);
+  }
+
+  // Refresh calendar UI in place if it is visible, without moving the page.
+  if(currentScreen()==='schedule' && scheduleViewMode==='calendar'){
+    try{showScheduleView('calendar',true)}catch(_){}
+  }
+
+  return true;
 }
 
 function subdivisionScheduleItems(){
