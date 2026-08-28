@@ -2948,6 +2948,25 @@ function mappedRecipientsForWork(workNames){
 function selectedWorkNames(){
   return selectedDateScheduleItems().map(i=>i.name||'').filter(Boolean);
 }
+
+function selectedDateHasPlumbingWork(){
+  return selectedWorkNames().some(name=>String(name).toLowerCase().includes('plumb'));
+}
+function currentLotIncludedOptionsText(){
+  const lot=activeLotInfo();
+  if(!lot)return '';
+  const raw=lot.options ?? lot.included_options ?? '';
+  if(Array.isArray(raw)) return raw.filter(Boolean).join(', ');
+  if(typeof raw==='object' && raw!==null){
+    try{
+      return Object.entries(raw)
+        .filter(([,v])=>v!==false && v!==null && v!=='')
+        .map(([k,v])=>v===true?k:`${k}: ${v}`)
+        .join(', ');
+    }catch(e){return ''}
+  }
+  return String(raw||'').trim();
+}
 function shouldIncludePlansForSelectedDate(channel){
   const workNames=new Set(selectedWorkNames());
   return scheduleContacts.some(row=>
@@ -3260,7 +3279,7 @@ function activeLotInfo(){
 function activeSubdivisionInfo(){
  return subdivisions.find(s=>s.id===currentSubdivision)||null;
 }
-function selectedDateMessage(planUrl='',includePlans=false,renderingUrl='',includeRendering=false){
+function selectedDateMessage(planUrl='',includePlans=false,renderingUrl='',includeRendering=false,includedOptions=''){
  if(!scheduleSelectedDate)return null;
  const d=dateFromKey(scheduleSelectedDate);
  const lot=activeLotInfo();
@@ -3308,6 +3327,11 @@ function selectedDateMessage(planUrl='',includePlans=false,renderingUrl='',inclu
  textLines.push(`Requested Schedule Date: ${dateLabel}`);
  if(isCalledInDate(scheduleSelectedDate))textLines.push('Called In: Yes ✓');
 
+ if(includedOptions){
+   detailLines.push('');
+   detailLines.push(`Included Options: ${includedOptions}`);
+   textLines.push(`Included Options: ${includedOptions}`);
+ }
  if(includePlans && planUrl){
    detailLines.push('');
    detailLines.push(`Plans: ${planUrl}`);
@@ -3329,7 +3353,8 @@ async function emailSelectedCalendarDate(){
    includePlans ? currentLotPlansShareUrl() : Promise.resolve(''),
    includeRendering ? currentLotRenderingShareUrl() : Promise.resolve('')
  ]);
- const msg=selectedDateMessage(planUrl,includePlans,renderingUrl,includeRendering);
+ const includedOptions=selectedDateHasPlumbingWork()?currentLotIncludedOptionsText():'';
+ const msg=selectedDateMessage(planUrl,includePlans,renderingUrl,includeRendering,includedOptions);
  const recipients=mappedRecipientsForWork(selectedWorkNames());
  const marked=await markCalendarCommunication('email');
  if(!marked)return;
@@ -3346,7 +3371,8 @@ async function textSelectedCalendarDate(){
    includePlans ? currentLotPlansShareUrl() : Promise.resolve(''),
    includeRendering ? currentLotRenderingShareUrl() : Promise.resolve('')
  ]);
- const msg=selectedDateMessage(planUrl,includePlans,renderingUrl,includeRendering);
+ const includedOptions=selectedDateHasPlumbingWork()?currentLotIncludedOptionsText():'';
+ const msg=selectedDateMessage(planUrl,includePlans,renderingUrl,includeRendering,includedOptions);
  const phones=mappedPhonesForWork(selectedWorkNames());
  const marked=await markCalendarCommunication('text');
  if(!marked)return;
