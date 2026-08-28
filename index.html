@@ -1162,20 +1162,68 @@ button.danger:hover{filter:brightness(.96)}
 
 
 .bb-calendar-comm-marks{
-  position:absolute;right:5px;top:5px;display:flex;gap:3px;z-index:2
+  position:absolute;
+  right:5px;
+  bottom:5px;
+  display:flex;
+  gap:3px;
+  z-index:3;
+  pointer-events:none;
 }
 .bb-calendar-comm-mark{
-  width:18px;height:18px;border-radius:999px;display:inline-flex;
-  align-items:center;justify-content:center;font-size:10px;font-weight:800;
-  line-height:1;background:#fff;border:1px solid rgba(15,23,42,.18);
-  box-shadow:0 1px 2px rgba(15,23,42,.08)
+  width:18px;
+  height:18px;
+  border-radius:999px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  font-size:10px;
+  font-weight:800;
+  line-height:1;
+  background:#fff;
+  border:1px solid rgba(15,23,42,.18);
+  box-shadow:0 1px 2px rgba(15,23,42,.08);
 }
 .bb-calendar-comm-mark.email{color:#175cd3}
 .bb-calendar-comm-mark.text{color:#067647}
 .bb-calendar-day{position:relative}
+
+/* Keep the Called In check separated from the E/T badges. */
+.bb-calendar-called-in,
+.bb-calendar-calledin,
+.called-in-mark,
+.calendar-called-in{
+  top:4px !important;
+  right:4px !important;
+  bottom:auto !important;
+  left:auto !important;
+  z-index:4 !important;
+}
+
 @media(max-width:640px){
-  .bb-calendar-comm-marks{right:3px;top:3px;gap:2px}
-  .bb-calendar-comm-mark{width:16px;height:16px;font-size:9px}
+  .bb-calendar-comm-marks{
+    right:3px;
+    bottom:3px;
+    gap:2px;
+  }
+  .bb-calendar-comm-mark{
+    width:16px;
+    height:16px;
+    font-size:9px;
+  }
+  .bb-calendar-called-in,
+  .bb-calendar-calledin,
+  .called-in-mark,
+  .calendar-called-in{
+    top:3px !important;
+    right:3px !important;
+  }
+}
+
+
+.bb-calendar-events{padding-bottom:22px}
+@media(max-width:640px){
+  .bb-calendar-events{padding-bottom:19px}
 }
 
 </style>
