@@ -1230,7 +1230,7 @@ button.danger:hover{filter:brightness(.96)}
 .admin-contact-list{display:grid;gap:10px}
 .admin-contact-card{
   display:grid;
-  grid-template-columns:minmax(180px,1fr) minmax(240px,1.4fr) auto;
+  grid-template-columns:minmax(180px,1fr) minmax(220px,1.2fr) minmax(180px,1fr) auto;
   gap:10px;
   align-items:end;
   padding:12px;
@@ -1409,12 +1409,12 @@ button.danger:hover{filter:brightness(.96)}
       <div class="toolbar">
         <div>
           <h2 style="margin:0">Schedule Contacts</h2>
-          <div class="muted">Assign the default email recipient for each schedule dropdown item.</div>
+          <div class="muted">Assign the default email recipient and phone number for each schedule dropdown item.</div>
         </div>
       </div>
       <div class="card admin-note">
         <strong>Administrator access</strong>
-        <div class="muted" style="margin-top:5px">Only nick@bowenhomes.com can change these mappings. Separate multiple recipients with commas.</div>
+        <div class="muted" style="margin-top:5px">Only nick@bowenhomes.com can change these mappings. Separate multiple email addresses or phone numbers with commas.</div>
       </div>
       <label class="admin-search">Find Schedule Item
         <input id="adminContactSearch" type="search" placeholder="Search schedule items...">
@@ -2678,7 +2678,7 @@ function normalizeEmailList(value){
 async function loadScheduleContacts(){
   const {data,error}=await db
     .from('schedule_item_contacts')
-    .select('schedule_item,email_addresses,updated_at')
+    .select('schedule_item,email_addresses,phone_numbers,updated_at')
     .order('schedule_item');
   if(error){
     scheduleContacts=[];
@@ -2687,6 +2687,27 @@ async function loadScheduleContacts(){
   scheduleContacts=data||[];
   return {data:scheduleContacts};
 }
+
+function normalizePhoneList(value){
+  return String(value||'')
+    .split(/[,;\n]+/)
+    .map(x=>x.trim())
+    .filter(Boolean);
+}
+function mappedPhonesForWork(workNames){
+  const wanted=new Set((workNames||[]).map(x=>String(x||'').trim()));
+  const phones=[];
+  scheduleContacts.forEach(row=>{
+    if(wanted.has(row.schedule_item)){
+      normalizePhoneList(row.phone_numbers).forEach(phone=>{
+        const key=phone.replace(/\D/g,'');
+        if(!phones.some(x=>x.replace(/\D/g,'')===key)) phones.push(phone);
+      });
+    }
+  });
+  return phones;
+}
+
 function mappedRecipientsForWork(workNames){
   const wanted=new Set((workNames||[]).map(x=>String(x||'').trim()));
   const emails=[];
@@ -2704,6 +2725,12 @@ async function recipientsForSelectedDate(){
   // Refresh on every email launch so all users get the latest Admin mapping.
   await loadScheduleContacts();
   return mappedRecipientsForWork(workNames);
+}
+async function phonesForSelectedDate(){
+  const workNames=selectedDateScheduleItems().map(i=>i.name||'').filter(Boolean);
+  // Refresh on every text launch so all users get the latest Admin mapping.
+  await loadScheduleContacts();
+  return mappedPhonesForWork(workNames);
 }
 async function showAdminView(){
   if(!isBowenBuilderAdmin()){
@@ -2743,6 +2770,9 @@ async function renderAdminContacts(){
       <div class="admin-contact-name">${esc(name)}</div>
       <label>Default Email Address(es)
         <input type="text" data-admin-contact-email="${esc(name)}" value="${esc(row?.email_addresses||'')}" placeholder="vendor@company.com, second@company.com">
+      </label>
+      <label>Default Phone Number(s)
+        <input type="tel" data-admin-contact-phone="${esc(name)}" value="${esc(row?.phone_numbers||'')}" placeholder="770-555-1212">
         <div class="admin-contact-status muted" data-admin-contact-status="${esc(name)}"></div>
       </label>
       <button class="primary admin-contact-save" type="button" data-admin-contact-save="${esc(name)}">Save</button>
@@ -2757,14 +2787,22 @@ async function saveAdminScheduleContact(scheduleItem){
   if(!isBowenBuilderAdmin())return;
   const input=[...document.querySelectorAll('[data-admin-contact-email]')]
     .find(x=>x.dataset.adminContactEmail===scheduleItem);
+  const phoneInput=[...document.querySelectorAll('[data-admin-contact-phone]')]
+    .find(x=>x.dataset.adminContactPhone===scheduleItem);
   const status=[...document.querySelectorAll('[data-admin-contact-status]')]
     .find(x=>x.dataset.adminContactStatus===scheduleItem);
-  if(!input)return;
+  if(!input || !phoneInput)return;
 
   const emails=normalizeEmailList(input.value);
+  const phones=normalizePhoneList(phoneInput.value);
   const invalid=emails.find(x=>!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(x));
   if(invalid){
     if(status){status.textContent=`Check email address: ${invalid}`;status.style.color='#b42318';}
+    return;
+  }
+  const invalidPhone=phones.find(x=>x.replace(/\D/g,'').length<7);
+  if(invalidPhone){
+    if(status){status.textContent=`Check phone number: ${invalidPhone}`;status.style.color='#b42318';}
     return;
   }
 
@@ -2773,12 +2811,13 @@ async function saveAdminScheduleContact(scheduleItem){
 
   const {data:{user}}=await db.auth.getUser();
   let error=null;
-  if(!emails.length){
+  if(!emails.length && !phones.length){
     ({error}=await db.from('schedule_item_contacts').delete().eq('schedule_item',scheduleItem));
   }else{
     ({error}=await db.from('schedule_item_contacts').upsert({
       schedule_item:scheduleItem,
       email_addresses:emails.join(', '),
+      phone_numbers:phones.join(', '),
       updated_at:new Date().toISOString(),
       updated_by:user?.id||null
     },{onConflict:'schedule_item'}));
@@ -2788,7 +2827,7 @@ async function saveAdminScheduleContact(scheduleItem){
     if(status){status.textContent=error.message;status.style.color='#b42318';}
     return;
   }
-  if(status){status.textContent=emails.length?'Saved ✓':'Mapping cleared ✓';status.style.color='#067647';}
+  if(status){status.textContent=(emails.length||phones.length)?'Saved ✓':'Mapping cleared ✓';status.style.color='#067647';}
   await loadScheduleContacts();
 }
 
@@ -2866,10 +2905,12 @@ async function emailSelectedCalendarDate(){
 async function textSelectedCalendarDate(){
  const msg=selectedDateMessage();
  if(!msg){alert('Select a calendar date first.');return}
+ const phones=await phonesForSelectedDate();
  const marked=await markCalendarCommunication('text');
  if(!marked)return;
+ const recipient=phones.join(',');
  const separator=/iPad|iPhone|iPod/.test(navigator.userAgent)?'&':'?';
- window.location.href=`sms:${separator}body=${encodeURIComponent(msg.textBody)}`;
+ window.location.href=`sms:${recipient}${separator}body=${encodeURIComponent(msg.textBody)}`;
 }
 
 function renderSelectedScheduleDay(){
