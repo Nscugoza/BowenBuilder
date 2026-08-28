@@ -2234,8 +2234,21 @@ async function deleteScheduleItemLive(){
  const label=item?.name||'this schedule item';
  if(!confirm(`Delete "${label}"? This cannot be undone.`))return;
 
- const {error}=await sb.from('schedule_items').delete().eq('id',id);
- if(error){alert(error.message);return}
+ const {data,error}=await db
+   .from('schedule_items')
+   .delete()
+   .eq('id',id)
+   .select('id');
+
+ if(error){
+   alert(error.message);
+   return;
+ }
+
+ if(!data || data.length===0){
+   alert('The schedule item was not deleted. Your account may not have permission to delete this item.');
+   return;
+ }
 
  $('scheduleDialog').close();
  const returnToSchedule=scheduleContext==='schedule';
