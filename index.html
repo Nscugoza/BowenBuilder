@@ -1160,6 +1160,24 @@ button.danger:hover{filter:brightness(.96)}
   .calendar-day-actions button{flex:1 1 auto}
 }
 
+
+.bb-calendar-comm-marks{
+  position:absolute;right:5px;top:5px;display:flex;gap:3px;z-index:2
+}
+.bb-calendar-comm-mark{
+  width:18px;height:18px;border-radius:999px;display:inline-flex;
+  align-items:center;justify-content:center;font-size:10px;font-weight:800;
+  line-height:1;background:#fff;border:1px solid rgba(15,23,42,.18);
+  box-shadow:0 1px 2px rgba(15,23,42,.08)
+}
+.bb-calendar-comm-mark.email{color:#175cd3}
+.bb-calendar-comm-mark.text{color:#067647}
+.bb-calendar-day{position:relative}
+@media(max-width:640px){
+  .bb-calendar-comm-marks{right:3px;top:3px;gap:2px}
+  .bb-calendar-comm-mark{width:16px;height:16px;font-size:9px}
+}
+
 </style>
 </head>
 <body>
@@ -1285,7 +1303,7 @@ button.danger:hover{filter:brightness(.96)}
         </div>
         <div class="bb-calendar-actions">
           <button id="calendarToday" class="secondary" type="button">Today</button>
-          <span class="called-in-help">Double-click / double-tap a date to mark Called In ✓</span>
+          <span class="called-in-help">Double-click / double-tap a date to mark Called In ✓ · E/T appear after Email Date or Text Date is opened</span>
         </div>
         <div class="bb-calendar-weekdays" aria-hidden="true">
           <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
@@ -1537,6 +1555,7 @@ function startRealtimeUpdates(){
     .on('postgres_changes',{event:'*',schema:'public',table:'subdivisions'},scheduleRealtimeReload)
     .on('postgres_changes',{event:'*',schema:'public',table:'lots'},scheduleRealtimeReload)
     .on('postgres_changes',{event:'*',schema:'public',table:'schedule_items'},scheduleRealtimeReload)
+      .on('postgres_changes',{event:'*',schema:'public',table:'lot_calendar_marks'},scheduleRealtimeReload)
     .on('postgres_changes',{event:'*',schema:'public',table:'punchout_items'},scheduleRealtimeReload)
     .on('postgres_changes',{event:'*',schema:'public',table:'punchout_photos'},scheduleRealtimeReload)
     .subscribe();
@@ -2208,13 +2227,13 @@ async function loadCalendarCalledInMarks(){
  if(!currentLot){calendarCalledInMarks=[];return}
  const {data,error}=await db
    .from('lot_calendar_marks')
-   .select('id,lot_id,calendar_date,called_in,created_by,updated_at')
-   .eq('lot_id',currentLot)
-   .eq('called_in',true);
+   .select('id,lot_id,calendar_date,called_in,email_sent,text_sent,email_sent_at,text_sent_at,created_by,updated_at')
+   .eq('lot_id',currentLot);
 
  if(error){
    calendarCalledInMarks=[];
-   if(String(error.message||'').toLowerCase().includes('lot_calendar_marks')){
+   const msg=String(error.message||'').toLowerCase();
+   if(msg.includes('lot_calendar_marks') || msg.includes('email_sent') || msg.includes('text_sent')){
      calledInTableAvailable=false;
    }
    return;
@@ -2222,19 +2241,30 @@ async function loadCalendarCalledInMarks(){
  calledInTableAvailable=true;
  calendarCalledInMarks=data||[];
 }
+function calendarMarkForDate(key){
+ return calendarCalledInMarks.find(m=>m.calendar_date===key)||null;
+}
 function isCalledInDate(key){
- return calendarCalledInMarks.some(m=>m.calendar_date===key && m.called_in===true);
+ return !!calendarMarkForDate(key)?.called_in;
+}
+function wasEmailedDate(key){
+ return !!calendarMarkForDate(key)?.email_sent;
+}
+function wasTextedDate(key){
+ return !!calendarMarkForDate(key)?.text_sent;
 }
 async function toggleCalledInDate(key){
  if(!currentLot)return;
  if(!calledInTableAvailable){
-   alert('Called In tracking needs the Supabase setup SQL to be run first.');
+   alert('Calendar tracking needs the Supabase setup SQL to be run first.');
    return;
  }
 
- const existing=calendarCalledInMarks.find(m=>m.calendar_date===key);
+ const existing=calendarMarkForDate(key);
  if(existing){
-   const {error}=await db.from('lot_calendar_marks').delete().eq('id',existing.id);
+   const {error}=await db.from('lot_calendar_marks')
+     .update({called_in:!existing.called_in,updated_at:new Date().toISOString()})
+     .eq('id',existing.id);
    if(error){alert(error.message);return}
  }else{
    const {error}=await db.from('lot_calendar_marks').insert({
@@ -2246,6 +2276,37 @@ async function toggleCalledInDate(key){
  }
  await loadCalendarCalledInMarks();
  renderScheduleCalendar();
+}
+async function markCalendarCommunication(kind,key=scheduleSelectedDate){
+ if(!currentLot || !key)return false;
+ if(!calledInTableAvailable){
+   alert('Email/Text calendar tracking needs the Supabase setup SQL to be run first.');
+   return false;
+ }
+ const existing=calendarMarkForDate(key);
+ const now=new Date().toISOString();
+ const patch=kind==='email'
+   ? {email_sent:true,email_sent_at:now,updated_at:now}
+   : {text_sent:true,text_sent_at:now,updated_at:now};
+
+ let error=null;
+ if(existing){
+   ({error}=await db.from('lot_calendar_marks').update(patch).eq('id',existing.id));
+ }else{
+   ({error}=await db.from('lot_calendar_marks').insert({
+     lot_id:currentLot,
+     calendar_date:key,
+     called_in:false,
+     ...patch
+   }));
+ }
+ if(error){
+   alert(error.message);
+   return false;
+ }
+ await loadCalendarCalledInMarks();
+ renderScheduleCalendar();
+ return true;
 }
 
 function subdivisionScheduleItems(){
@@ -2308,7 +2369,10 @@ function renderScheduleCalendar(){
    if(key===scheduleSelectedDate)btn.classList.add('selected');
    btn.setAttribute('aria-label',`${d.toLocaleDateString()}, ${dayItems.length} schedule item${dayItems.length===1?'':'s'}`);
    const eventHtml=dayItems.slice(0,3).map(x=>`<span class="bb-calendar-event ${esc(x.status||'scheduled')}" title="${esc(x.name)}">${esc(x.name)}</span>`).join('');
-   btn.innerHTML=`<span class="bb-calendar-number">${d.getDate()}</span><div class="bb-calendar-events">${eventHtml}</div>${dayItems.length>3?`<div class="bb-calendar-more">+${dayItems.length-3} more</div>`:''}`;
+   const commHtml=(wasEmailedDate(key)||wasTextedDate(key))
+     ? `<div class="bb-calendar-comm-marks">${wasEmailedDate(key)?'<span class="bb-calendar-comm-mark email" title="Email opened for this date">E</span>':''}${wasTextedDate(key)?'<span class="bb-calendar-comm-mark text" title="Text opened for this date">T</span>':''}</div>`
+     : '';
+   btn.innerHTML=`<span class="bb-calendar-number">${d.getDate()}</span>${commHtml}<div class="bb-calendar-events">${eventHtml}</div>${dayItems.length>3?`<div class="bb-calendar-more">+${dayItems.length-3} more</div>`:''}`;
    let lastTapAt=0;
    btn.addEventListener('click',()=>{
      const now=Date.now();
@@ -2457,15 +2521,19 @@ function selectedDateMessage(){
 
  return {subject,body:detailLines.join('\n'),textBody:textLines.join('\n')};
 }
-function emailSelectedCalendarDate(){
+async function emailSelectedCalendarDate(){
  const msg=selectedDateMessage();
  if(!msg){alert('Select a calendar date first.');return}
+ const marked=await markCalendarCommunication('email');
+ if(!marked)return;
  const href=`mailto:?subject=${encodeURIComponent(msg.subject)}&body=${encodeURIComponent(msg.body)}`;
  window.location.href=href;
 }
-function textSelectedCalendarDate(){
+async function textSelectedCalendarDate(){
  const msg=selectedDateMessage();
  if(!msg){alert('Select a calendar date first.');return}
+ const marked=await markCalendarCommunication('text');
+ if(!marked)return;
  const separator=/iPad|iPhone|iPod/.test(navigator.userAgent)?'&':'?';
  window.location.href=`sms:${separator}body=${encodeURIComponent(msg.textBody)}`;
 }
