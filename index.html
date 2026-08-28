@@ -1963,6 +1963,36 @@ async function signIn(){
  const {error}=await db.auth.signInWithOAuth({provider:'azure',options:{scopes:'openid email profile',redirectTo}});
  if(error) alert(error.message);
 }
+
+function captureCalendarViewState(){
+  const calendarVisible=$('calendarView') && !$('calendarView').classList.contains('hidden');
+  return {
+    subdivisionId:currentSubdivision||null,
+    lotId:currentLot||null,
+    selectedDate:scheduleSelectedDate||null,
+    month:scheduleCalendarMonth||null,
+    scrollY:window.scrollY||0,
+    calendarVisible
+  };
+}
+function restoreCalendarViewState(state){
+  if(!state || !state.calendarVisible || !state.lotId)return;
+  currentSubdivision=state.subdivisionId;
+  currentLot=state.lotId;
+  if(state.selectedDate)scheduleSelectedDate=state.selectedDate;
+  if(state.month)scheduleCalendarMonth=state.month;
+  showLot(currentLot);
+  showLotCalendar();
+  requestAnimationFrame(()=>{
+    requestAnimationFrame(()=>window.scrollTo(0,state.scrollY||0));
+  });
+}
+async function refreshPreservingCalendar(){
+  const state=captureCalendarViewState();
+  await load();
+  restoreCalendarViewState(state);
+}
+
 async function load(){
  const [{data:s,error:se},{data:l,error:le},{data:i,error:ie},{data:p,error:pe},{data:pp,error:ppe},{data:pr,error:pre},{data:mp,error:mpe}]=await Promise.all([
   db.from('subdivisions').select('*').order('name'),
@@ -3332,7 +3362,7 @@ function renderSelectedScheduleDay(){
      return;
    }
 
-   await load();
+   await refreshPreservingCalendar();
 
    currentLot=lotBeforeDelete;
    currentSubdivision=subdivisionBeforeDelete;
@@ -3408,7 +3438,7 @@ async function deleteScheduleItemLive(){
  }
 
  $('scheduleDialog').close();
- await load();
+ await refreshPreservingCalendar();
 
  currentLot=lotBeforeDelete;
  currentSubdivision=subdivisionBeforeDelete;
@@ -3452,7 +3482,7 @@ async function saveSchedule(e){
  $('scheduleDialog').close();
  const returnToSchedule=scheduleContext==='schedule';
  const returnSubdivision=currentSubdivision;
- await load();
+ await refreshPreservingCalendar();
  currentSubdivision=lots.find(l=>l.id===payload.lot_id)?.subdivision_id||returnSubdivision;
  currentLot=payload.lot_id;
  if(returnToSchedule){
