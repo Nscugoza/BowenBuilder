@@ -2734,6 +2734,11 @@ function showLot(preserveScroll=false){
  document.querySelectorAll('[data-edit-schedule]').forEach(btn=>{
    btn.onclick=()=>openScheduleDialogLive(btn.dataset.editSchedule);
  });
+
+ // Load saved E/T marks without rebuilding the Overview screen.
+ void loadCalendarCalledInMarks().then(()=>{
+   li.forEach(i=>refreshOverviewCommunicationBadges(i.id));
+ });
  renderPunchout(l.id);
  requestAnimationFrame(()=>{
    const header=document.querySelector('#lotView .lot-header');
@@ -3050,13 +3055,13 @@ async function markCalendarCommunication(kind,dateKey){
     return false;
   }
 
-  const existingIndex=calendarMarks.findIndex(
+  const existingIndex=calendarCalledInMarks.findIndex(
     x=>x.lot_id===currentLot && x.calendar_date===dateKey
   );
   if(existingIndex>=0){
-    calendarMarks[existingIndex]={...calendarMarks[existingIndex],...data};
+    calendarCalledInMarks[existingIndex]={...calendarCalledInMarks[existingIndex],...data};
   }else{
-    calendarMarks.push(data);
+    calendarCalledInMarks.push(data);
   }
 
   // Refresh calendar UI in place if it is visible, without moving the page.
@@ -3695,13 +3700,13 @@ async function markCalendarCommunicationSilent(kind,dateKey,lotId=currentLot){
     }
 
     // Update local mark state quietly. Do not rerender or move the screen.
-    const idx=calendarMarks.findIndex(
+    const idx=calendarCalledInMarks.findIndex(
       x=>x.lot_id===lotId && x.calendar_date===dateKey
     );
     if(idx>=0){
-      calendarMarks[idx]={...calendarMarks[idx],...patch};
+      calendarCalledInMarks[idx]={...calendarCalledInMarks[idx],...patch};
     }else{
-      calendarMarks.push({
+      calendarCalledInMarks.push({
         lot_id:lotId,
         calendar_date:dateKey,
         called_in:false,
@@ -3720,17 +3725,21 @@ function scheduleContactForItemName(name){
 }
 
 function overviewCommunicationMarks(item){
-  if(!item)return {email:false,text:false};
-  const dateKey=dateInputValue(item.starts_at);
-  if(!dateKey)return {email:false,text:false};
-  const marks=Array.isArray(calendarMarks)?calendarMarks:[];
-  const mark=marks.find(
-    x=>x.lot_id===item.lot_id && x.calendar_date===dateKey
-  );
-  return {
-    email:!!mark?.email_sent,
-    text:!!mark?.text_sent
-  };
+  try{
+    if(!item)return {email:false,text:false};
+    const dateKey=dateInputValue(item.starts_at);
+    if(!dateKey)return {email:false,text:false};
+    const marks=Array.isArray(calendarCalledInMarks)?calendarCalledInMarks:[];
+    const mark=marks.find(
+      x=>x.lot_id===item.lot_id && x.calendar_date===dateKey
+    );
+    return {
+      email:!!mark?.email_sent,
+      text:!!mark?.text_sent
+    };
+  }catch(_){
+    return {email:false,text:false};
+  }
 }
 
 function refreshOverviewCommunicationBadges(itemId){
@@ -3824,11 +3833,11 @@ function emailOverviewScheduleItem(itemId){
   // Show E immediately on the Overview card.
   const markDate=msg.dateKey;
   if(markDate){
-    const idx=calendarMarks.findIndex(
+    const idx=calendarCalledInMarks.findIndex(
       x=>x.lot_id===item.lot_id && x.calendar_date===markDate
     );
-    if(idx>=0)calendarMarks[idx]={...calendarMarks[idx],email_sent:true};
-    else calendarMarks.push({
+    if(idx>=0)calendarCalledInMarks[idx]={...calendarCalledInMarks[idx],email_sent:true};
+    else calendarCalledInMarks.push({
       lot_id:item.lot_id,
       calendar_date:markDate,
       called_in:false,
@@ -3875,11 +3884,11 @@ function textOverviewScheduleItem(itemId){
   // Show T immediately on the Overview card.
   const markDate=msg.dateKey;
   if(markDate){
-    const idx=calendarMarks.findIndex(
+    const idx=calendarCalledInMarks.findIndex(
       x=>x.lot_id===item.lot_id && x.calendar_date===markDate
     );
-    if(idx>=0)calendarMarks[idx]={...calendarMarks[idx],text_sent:true};
-    else calendarMarks.push({
+    if(idx>=0)calendarCalledInMarks[idx]={...calendarCalledInMarks[idx],text_sent:true};
+    else calendarCalledInMarks.push({
       lot_id:item.lot_id,
       calendar_date:markDate,
       called_in:false,
