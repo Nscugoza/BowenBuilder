@@ -1987,7 +1987,19 @@ async function openLotDocument(title,path){
  $('documentViewerDialog').showModal();
 }
 function wireLotDocumentButtons(){document.querySelectorAll('[data-lot-document]').forEach(b=>b.onclick=()=>openLotDocument(b.dataset.documentTitle||'Document',b.dataset.lotDocument))}
+function ensureLotCalendarVisible(){
+ const btn=$('lotCalendarBtn');
+ if(btn){
+   btn.classList.remove('hidden');
+   btn.style.display='';
+   btn.removeAttribute('hidden');
+   btn.disabled=false;
+ }
+}
+
 function showLot(){
+ ensureLotCalendarVisible();
+ setTimeout(ensureLotCalendarVisible,0);
   // Always isolate the lot detail screen from previous navigation views.
   ['subdivisionsView','subdivisionView','lotsView','scheduleView'].forEach(id=>{
     const el=$(id);
@@ -2302,6 +2314,7 @@ $('calendarPrev').onclick=()=>{scheduleCalendarCursor=new Date(scheduleCalendarC
 $('calendarNext').onclick=()=>{scheduleCalendarCursor=new Date(scheduleCalendarCursor.getFullYear(),scheduleCalendarCursor.getMonth()+1,1);renderScheduleCalendar()};
 $('calendarToday').onclick=()=>{const n=new Date();scheduleSelectedDate=localDateKey(n);scheduleCalendarCursor=new Date(n.getFullYear(),n.getMonth(),1);renderScheduleCalendar()};
 
+ensureLotCalendarVisible();
 $('lotCalendarBtn').onclick=()=>showScheduleView('calendar');
 $('addSchedule').onclick=()=>openScheduleDialogLive();
 $('scheduleForm').onsubmit=saveSchedule;$('scheduleX').onclick=()=>$('scheduleDialog').close();$('scheduleCancel').onclick=()=>$('scheduleDialog').close();
