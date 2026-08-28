@@ -1251,6 +1251,64 @@ button.danger:hover{filter:brightness(.96)}
   .admin-contact-save{width:100%}
 }
 
+
+.admin-section{
+  margin-top:28px;
+  padding-top:22px;
+  border-top:1px solid #dbe3ee;
+}
+.admin-section-head{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-end;
+  gap:12px;
+  flex-wrap:wrap;
+  margin-bottom:14px;
+}
+.admin-user-list{display:grid;gap:12px}
+.admin-user-card{
+  border:1px solid #dbe3ee;
+  border-radius:14px;
+  background:#fff;
+  padding:14px;
+}
+.admin-user-head{
+  display:flex;
+  justify-content:space-between;
+  gap:12px;
+  align-items:flex-start;
+  margin-bottom:12px;
+}
+.admin-user-name{font-weight:800;color:var(--navy);font-size:16px}
+.admin-user-email{font-size:12px;color:#667085;margin-top:2px}
+.admin-badge{
+  display:inline-flex;
+  align-items:center;
+  border-radius:999px;
+  padding:4px 9px;
+  font-size:11px;
+  font-weight:800;
+  background:#eef4ff;
+  color:#175cd3;
+}
+.admin-subdivision-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(190px,1fr));
+  gap:8px;
+}
+.admin-subdivision-check{
+  display:flex;
+  gap:9px;
+  align-items:center;
+  padding:9px 10px;
+  border:1px solid #e4e7ec;
+  border-radius:10px;
+  background:#f9fafb;
+  font-size:13px;
+}
+.admin-subdivision-check input{width:auto;margin:0}
+.admin-user-status{font-size:12px;margin-top:9px;min-height:17px}
+
 </style>
 </head>
 <body>
@@ -1421,6 +1479,24 @@ button.danger:hover{filter:brightness(.96)}
       </label>
       <div id="adminContactNotice" class="notice hidden" style="margin:12px 0"></div>
       <div id="adminContactList" class="admin-contact-list"></div>
+
+      <div class="admin-section">
+        <div class="admin-section-head">
+          <div>
+            <h2 style="margin:0">User Permissions</h2>
+            <div class="muted">Choose which subdivisions each BowenBuilder user can access.</div>
+          </div>
+        </div>
+        <div class="card admin-note">
+          <strong>Subdivision access</strong>
+          <div class="muted" style="margin-top:5px">Checked subdivisions are available to that user. Changes take effect through Supabase and Realtime.</div>
+        </div>
+        <label class="admin-search">Find User
+          <input id="adminUserSearch" type="search" placeholder="Search by name or email...">
+        </label>
+        <div id="adminUserNotice" class="notice hidden" style="margin:12px 0"></div>
+        <div id="adminUserPermissionsList" class="admin-user-list"></div>
+      </div>
     </section>
 
   </main>
@@ -1679,6 +1755,8 @@ const ADMIN_EMAIL='nick@bowenhomes.com';
 const ADMIN_USER_ID='20896c7c-cb4b-4c0b-823d-684ceb53a4f1';
 let currentAuthUserId='';
 let scheduleContacts=[];
+let adminUsers=[];
+let adminMemberships=[];
 let realtimeRefreshTimer=null;
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmt=v=>v?new Date(v).toLocaleString():'';
@@ -2732,6 +2810,113 @@ async function phonesForSelectedDate(){
   await loadScheduleContacts();
   return mappedPhonesForWork(workNames);
 }
+
+async function loadAdminUsersAndMemberships(){
+  if(!isBowenBuilderAdmin())return {error:{message:'Administrator access required.'}};
+  const [{data:users,error:userError},{data:memberships,error:membershipError}]=await Promise.all([
+    db.rpc('bowenbuilder_admin_list_users'),
+    db.from('subdivision_members').select('user_id,subdivision_id')
+  ]);
+  if(userError)return {error:userError};
+  if(membershipError)return {error:membershipError};
+  adminUsers=users||[];
+  adminMemberships=memberships||[];
+  return {data:true};
+}
+function adminUserHasSubdivision(userId,subdivisionId){
+  return adminMemberships.some(m=>m.user_id===userId && m.subdivision_id===subdivisionId);
+}
+async function renderAdminUserPermissions(){
+  const list=$('adminUserPermissionsList');
+  const notice=$('adminUserNotice');
+  if(!list||!notice)return;
+  notice.classList.add('hidden');
+  list.innerHTML='<div class="muted">Loading users and permissions...</div>';
+
+  const result=await loadAdminUsersAndMemberships();
+  if(result.error){
+    list.innerHTML='';
+    notice.classList.remove('hidden');
+    notice.textContent='User Permissions backend is not set up yet. Run the Supabase User Permissions SQL first.';
+    return;
+  }
+
+  const q=String($('adminUserSearch')?.value||'').trim().toLowerCase();
+  const users=adminUsers.filter(u=>{
+    const hay=`${u.full_name||''} ${u.email||''}`.toLowerCase();
+    return !q || hay.includes(q);
+  });
+
+  list.innerHTML=users.map(u=>{
+    const isAdmin=String(u.email||'').toLowerCase()===ADMIN_EMAIL || u.id===ADMIN_USER_ID;
+    const checks=subdivisions.map(s=>{
+      const checked=isAdmin || adminUserHasSubdivision(u.id,s.id);
+      return `<label class="admin-subdivision-check">
+        <input type="checkbox"
+          data-user-subdivision-user="${esc(u.id)}"
+          data-user-subdivision-sub="${esc(s.id)}"
+          ${checked?'checked':''}
+          ${isAdmin?'disabled':''}>
+        <span>${esc(s.name||'Subdivision')}</span>
+      </label>`;
+    }).join('');
+
+    return `<div class="admin-user-card">
+      <div class="admin-user-head">
+        <div>
+          <div class="admin-user-name">${esc(u.full_name||u.email||'User')}</div>
+          <div class="admin-user-email">${esc(u.email||'')}</div>
+        </div>
+        ${isAdmin?'<span class="admin-badge">Administrator</span>':'<span class="admin-badge">User</span>'}
+      </div>
+      <div class="admin-subdivision-grid">${checks||'<div class="muted">No subdivisions found.</div>'}</div>
+      <div class="admin-user-status muted" data-admin-user-status="${esc(u.id)}">${isAdmin?'Administrator has access to all subdivisions.':''}</div>
+    </div>`;
+  }).join('') || '<div class="muted">No users match your search.</div>';
+
+  document.querySelectorAll('[data-user-subdivision-user]').forEach(box=>{
+    box.onchange=()=>setAdminSubdivisionMembership(
+      box.dataset.userSubdivisionUser,
+      box.dataset.userSubdivisionSub,
+      box.checked,
+      box
+    );
+  });
+}
+async function setAdminSubdivisionMembership(userId,subdivisionId,allowed,checkbox){
+  if(!isBowenBuilderAdmin())return;
+  if(userId===ADMIN_USER_ID){
+    checkbox.checked=true;
+    return;
+  }
+  const status=[...document.querySelectorAll('[data-admin-user-status]')]
+    .find(x=>x.dataset.adminUserStatus===userId);
+  if(status){status.textContent='Saving...';status.style.color='';}
+
+  let error=null;
+  if(allowed){
+    ({error}=await db.from('subdivision_members').upsert({
+      user_id:userId,
+      subdivision_id:subdivisionId
+    },{onConflict:'subdivision_id,user_id'}));
+  }else{
+    ({error}=await db.from('subdivision_members')
+      .delete()
+      .eq('user_id',userId)
+      .eq('subdivision_id',subdivisionId));
+  }
+
+  if(error){
+    checkbox.checked=!allowed;
+    if(status){status.textContent=error.message;status.style.color='#b42318';}
+    return;
+  }
+
+  await loadAdminUsersAndMemberships();
+  if(status){status.textContent='Saved ✓';status.style.color='#067647';}
+}
+
+
 async function showAdminView(){
   if(!isBowenBuilderAdmin()){
     alert('Administrator access is limited to nick@bowenhomes.com.');
@@ -2744,7 +2929,7 @@ async function showAdminView(){
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.view==='admin'));
   $('heroTitle').textContent='Admin';
   $('heroSub').textContent='Manage default schedule email recipients.';
-  await renderAdminContacts();
+  await Promise.all([renderAdminContacts(),renderAdminUserPermissions()]);
 }
 async function renderAdminContacts(){
   const notice=$('adminContactNotice');
@@ -3335,6 +3520,7 @@ document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{
  }
 });
 $('adminContactSearch').oninput=()=>renderAdminContacts();
+$('adminUserSearch').oninput=()=>renderAdminUserPermissions();
 const {data:{session}}=await db.auth.getSession();
 if(session){
   appOn();
