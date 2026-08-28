@@ -1309,6 +1309,24 @@ button.danger:hover{filter:brightness(.96)}
 .admin-subdivision-check input{width:auto;margin:0}
 .admin-user-status{font-size:12px;margin-top:9px;min-height:17px}
 
+
+.admin-inner-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
+.admin-inner-tab{border:1px solid #d0d5dd;background:#fff;color:#344054;border-radius:999px;padding:9px 14px;font-weight:800}
+.admin-inner-tab.active{background:#eaf2fb;color:var(--navy);border-color:#c7d7ea}
+.admin-permission-head,.admin-permission-row{display:grid;grid-template-columns:minmax(160px,1fr) repeat(3,82px);gap:8px;align-items:center}
+.admin-permission-head{padding:0 8px 7px;font-size:11px;font-weight:800;color:#667085;text-align:center}
+.admin-permission-head div:first-child{text-align:left}
+.admin-permission-row{border:1px solid #e4e7ec;border-radius:11px;padding:9px 8px;background:#f9fafb;margin-top:7px}
+.admin-permission-sub{font-size:13px;font-weight:700;color:#344054}
+.admin-permission-toggle{display:flex;justify-content:center;align-items:center;margin:0}
+.admin-permission-toggle input{width:20px;height:20px;margin:0}
+@media(max-width:620px){
+ .admin-permission-head,.admin-permission-row{grid-template-columns:minmax(125px,1fr) repeat(3,58px);gap:4px}
+ .admin-permission-head{font-size:9px}
+ .admin-permission-row{padding:8px 5px}
+ .admin-permission-sub{font-size:11px}
+}
+
 </style>
 </head>
 <body>
@@ -1466,30 +1484,32 @@ button.danger:hover{filter:brightness(.96)}
     <section id="adminView" class="hidden">
       <div class="toolbar">
         <div>
-          <h2 style="margin:0">Schedule Contacts</h2>
-          <div class="muted">Assign the default email recipient and phone number for each schedule dropdown item.</div>
+          <h2 style="margin:0">Admin</h2>
+          <div class="muted">Manage BowenBuilder contacts and user permissions.</div>
         </div>
       </div>
-      <div class="card admin-note">
-        <strong>Administrator access</strong>
-        <div class="muted" style="margin-top:5px">Only nick@bowenhomes.com can change these mappings. Separate multiple email addresses or phone numbers with commas.</div>
-      </div>
-      <label class="admin-search">Find Schedule Item
-        <input id="adminContactSearch" type="search" placeholder="Search schedule items...">
-      </label>
-      <div id="adminContactNotice" class="notice hidden" style="margin:12px 0"></div>
-      <div id="adminContactList" class="admin-contact-list"></div>
 
-      <div class="admin-section">
-        <div class="admin-section-head">
-          <div>
-            <h2 style="margin:0">User Permissions</h2>
-            <div class="muted">Choose which subdivisions each BowenBuilder user can access.</div>
-          </div>
-        </div>
+      <div class="admin-inner-tabs">
+        <button id="adminContactsTab" class="admin-inner-tab active" type="button">Schedule Contacts</button>
+        <button id="adminPermissionsTab" class="admin-inner-tab" type="button">User Permissions</button>
+      </div>
+
+      <div id="adminContactsPanel">
         <div class="card admin-note">
-          <strong>Subdivision access</strong>
-          <div class="muted" style="margin-top:5px">Checked subdivisions are available to that user. Changes take effect through Supabase and Realtime.</div>
+          <strong>Schedule Contacts</strong>
+          <div class="muted" style="margin-top:5px">Assign default email addresses and phone numbers to schedule items. Separate multiple recipients with commas.</div>
+        </div>
+        <label class="admin-search">Find Schedule Item
+          <input id="adminContactSearch" type="search" placeholder="Search schedule items...">
+        </label>
+        <div id="adminContactNotice" class="notice hidden" style="margin:12px 0"></div>
+        <div id="adminContactList" class="admin-contact-list"></div>
+      </div>
+
+      <div id="adminPermissionsPanel" class="hidden">
+        <div class="card admin-note">
+          <strong>User Permissions</strong>
+          <div class="muted" style="margin-top:5px">Set subdivision access plus edit and delete permissions for each user.</div>
         </div>
         <label class="admin-search">Find User
           <input id="adminUserSearch" type="search" placeholder="Search by name or email...">
@@ -1757,6 +1777,8 @@ let currentAuthUserId='';
 let scheduleContacts=[];
 let adminUsers=[];
 let adminMemberships=[];
+let currentMembershipPermissions=[];
+let activeAdminPanel='contacts';
 let realtimeRefreshTimer=null;
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmt=v=>v?new Date(v).toLocaleString():'';
@@ -1775,6 +1797,26 @@ async function loadCurrentProfile(){
 }
 function isBowenBuilderAdmin(){
   return currentUserEmail===ADMIN_EMAIL || currentAuthUserId===ADMIN_USER_ID;
+}
+
+
+function permissionForSubdivision(subdivisionId){
+ if(isBowenBuilderAdmin()) return {can_edit:true,can_delete:true};
+ const row=currentMembershipPermissions.find(x=>x.subdivision_id===subdivisionId);
+ return {can_edit:!!row?.can_edit,can_delete:!!row?.can_delete};
+}
+function canEditSubdivision(subdivisionId=currentSubdivision){return permissionForSubdivision(subdivisionId).can_edit}
+function canDeleteSubdivision(subdivisionId=currentSubdivision){return permissionForSubdivision(subdivisionId).can_delete}
+function subdivisionForLot(lotId){return lots.find(l=>l.id===lotId)?.subdivision_id||null}
+function requireEditPermission(subdivisionId=currentSubdivision){
+ if(canEditSubdivision(subdivisionId))return true;
+ alert('You do not have edit permission for this subdivision.');
+ return false;
+}
+function requireDeletePermission(subdivisionId=currentSubdivision){
+ if(canDeleteSubdivision(subdivisionId))return true;
+ alert('You do not have delete permission for this subdivision.');
+ return false;
 }
 
 function currentScreen(){
@@ -1899,16 +1941,17 @@ async function signIn(){
  if(error) alert(error.message);
 }
 async function load(){
- const [{data:s,error:se},{data:l,error:le},{data:i,error:ie},{data:p,error:pe},{data:pp,error:ppe},{data:pr,error:pre}]=await Promise.all([
+ const [{data:s,error:se},{data:l,error:le},{data:i,error:ie},{data:p,error:pe},{data:pp,error:ppe},{data:pr,error:pre},{data:mp,error:mpe}]=await Promise.all([
   db.from('subdivisions').select('*').order('name'),
   db.from('lots').select('*').eq('active',true).order('lot_name'),
   db.from('schedule_items').select('*').order('starts_at'),
   db.from('punchout_items').select('*').order('created_at',{ascending:false}),
   db.from('punchout_photos').select('*').order('created_at'),
-  db.from('profiles').select('id,full_name')
+  db.from('profiles').select('id,full_name'),
+  db.from('subdivision_members').select('subdivision_id,can_edit,can_delete').eq('user_id',currentAuthUserId)
  ]);
- if(se||le||ie||pe||ppe||pre){alert((se||le||ie||pe||ppe||pre).message);return}
- subdivisions=s||[];lots=l||[];items=i||[];punchouts=p||[];punchoutPhotos=pp||[];profiles=pr||[];showSubs();
+ if(se||le||ie||pe||ppe||pre||mpe){alert((se||le||ie||pe||ppe||pre||mpe).message);return}
+ subdivisions=s||[];lots=l||[];items=i||[];punchouts=p||[];punchoutPhotos=pp||[];profiles=pr||[];currentMembershipPermissions=mp||[];showSubs();
 }
 function appOn(){ $('login').classList.add('hidden');$('app').classList.remove('hidden');}
 function showSubs(){
@@ -1948,6 +1991,7 @@ function showLots(){
 let pendingDeleteLotId=null;
 
 function requestDeleteLot(lotId){
+  if(!requireDeletePermission(subdivisionForLot(lotId)))return;
   const lot=lots.find(l=>l.id===lotId);
   if(!lot) return;
   pendingDeleteLotId=lotId;
@@ -2277,6 +2321,7 @@ async function togglePunchoutComplete(id){
 }
 
 async function deletePunchoutItem(id){
+  if(!requireDeletePermission())return;
   const item=punchouts.find(p=>p.id===id);
   if(!item) return;
   if(!confirm('Delete this punchout item and all of its photos?')) return;
@@ -2431,6 +2476,12 @@ function showLot(){
  const links=[['Schedule Inspection',l.permit_url],['Deco Sheet',l.deco_url]].filter(x=>safe(x[1]));
  const storedDocs=[['Plans',l.plans_file_path],['Redlined Plan',l.redlined_plan_file_path],['HLP',l.hlp_file_path],['LGP',l.lgp_file_path]].filter(x=>x[1]);
  $('lotInfo').innerHTML=`<div class="info-grid"><div class="info"><small>Address</small><strong>${esc(l.address||'Not added')}</strong></div><div class="info"><small>Permit Number</small><strong>${esc(l.permit_number||'Not added')}</strong></div><div class="info"><small>Plan</small><strong>${esc(l.plan_name||'Not added')}</strong></div><div class="info"><small>Included Options</small><strong>${esc(l.included_options||'None added')}</strong></div><div class="info"><small>County</small><strong>${esc(l.county||'Not added')}</strong></div></div>${(links.length||storedDocs.length)?`<div class="resource-row">${storedDocs.map(x=>`<button type="button" class="document-resource" data-lot-document="${esc(x[1])}" data-document-title="${esc(x[0])}">${esc(x[0])} ▣</button>`).join('')}${links.filter(x=>!storedDocs.some(d=>d[0]===x[0])).map(x=>`<a href="${safe(x[1])}" target="_blank">${x[0]} ↗</a>`).join('')}</div>`:''}${l.color_rendering_url?`<div class="card" style="margin-top:14px"><small class="muted">Color Rendering</small><div style="margin-top:8px"><img src="${l.color_rendering_url}" alt="${esc(l.lot_name)} color rendering" style="max-width:100%;max-height:320px;border-radius:14px;cursor:zoom-in" id="liveRendering"></div></div>`:''}`;
+ const editAllowed=canEditSubdivision(l.subdivision_id);
+ $('editLot').classList.toggle('hidden',!editAllowed);
+ $('addSchedule').classList.toggle('hidden',!editAllowed);
+ $('addPunchout').classList.toggle('hidden',!editAllowed);
+ $('checkWindowPlans').disabled=!editAllowed;
+ $('checkFramePackage').disabled=!editAllowed;
  $('checkWindowPlans').checked=!!l.submit_plans_window_order_completed;
  $('checkFramePackage').checked=!!l.setup_frame_package_completed;
 
@@ -2456,6 +2507,7 @@ function showLot(){
 }
 
 async function saveLotChecklistField(field,value){
+  if(!requireEditPermission()) return;
   if(!currentLot) return;
   const lot=lots.find(l=>l.id===currentLot);
   if(!lot) return;
@@ -2815,7 +2867,7 @@ async function loadAdminUsersAndMemberships(){
   if(!isBowenBuilderAdmin())return {error:{message:'Administrator access required.'}};
   const [{data:users,error:userError},{data:memberships,error:membershipError}]=await Promise.all([
     db.rpc('bowenbuilder_admin_list_users'),
-    db.from('subdivision_members').select('user_id,subdivision_id')
+    db.from('subdivision_members').select('user_id,subdivision_id,can_edit,can_delete')
   ]);
   if(userError)return {error:userError};
   if(membershipError)return {error:membershipError};
@@ -2823,99 +2875,96 @@ async function loadAdminUsersAndMemberships(){
   adminMemberships=memberships||[];
   return {data:true};
 }
-function adminUserHasSubdivision(userId,subdivisionId){
-  return adminMemberships.some(m=>m.user_id===userId && m.subdivision_id===subdivisionId);
+function adminMembershipFor(userId,subdivisionId){
+ return adminMemberships.find(m=>m.user_id===userId && m.subdivision_id===subdivisionId)||null;
 }
+function adminUserHasSubdivision(userId,subdivisionId){return !!adminMembershipFor(userId,subdivisionId)}
 async function renderAdminUserPermissions(){
-  const list=$('adminUserPermissionsList');
-  const notice=$('adminUserNotice');
-  if(!list||!notice)return;
-  notice.classList.add('hidden');
-  list.innerHTML='<div class="muted">Loading users and permissions...</div>';
+ const list=$('adminUserPermissionsList');
+ const notice=$('adminUserNotice');
+ if(!list||!notice)return;
+ notice.classList.add('hidden');
+ list.innerHTML='<div class="muted">Loading users and permissions...</div>';
 
-  const result=await loadAdminUsersAndMemberships();
-  if(result.error){
-    list.innerHTML='';
-    notice.classList.remove('hidden');
-    notice.textContent='User Permissions backend is not set up yet. Run the Supabase User Permissions SQL first.';
-    return;
-  }
+ const result=await loadAdminUsersAndMemberships();
+ if(result.error){
+   list.innerHTML='';
+   notice.classList.remove('hidden');
+   notice.textContent='User Permissions backend is not set up yet. Run the latest Supabase permissions SQL first.';
+   return;
+ }
 
-  const q=String($('adminUserSearch')?.value||'').trim().toLowerCase();
-  const users=adminUsers.filter(u=>{
-    const hay=`${u.full_name||''} ${u.email||''}`.toLowerCase();
-    return !q || hay.includes(q);
-  });
+ const q=String($('adminUserSearch')?.value||'').trim().toLowerCase();
+ const users=adminUsers.filter(u=>{
+   const hay=`${u.full_name||''} ${u.email||''}`.toLowerCase();
+   return !q||hay.includes(q);
+ });
 
-  list.innerHTML=users.map(u=>{
-    const isAdmin=String(u.email||'').toLowerCase()===ADMIN_EMAIL || u.id===ADMIN_USER_ID;
-    const checks=subdivisions.map(s=>{
-      const checked=isAdmin || adminUserHasSubdivision(u.id,s.id);
-      return `<label class="admin-subdivision-check">
-        <input type="checkbox"
-          data-user-subdivision-user="${esc(u.id)}"
-          data-user-subdivision-sub="${esc(s.id)}"
-          ${checked?'checked':''}
-          ${isAdmin?'disabled':''}>
-        <span>${esc(s.name||'Subdivision')}</span>
-      </label>`;
-    }).join('');
+ list.innerHTML=users.map(u=>{
+   const isAdmin=String(u.email||'').toLowerCase()===ADMIN_EMAIL||u.id===ADMIN_USER_ID;
+   const rows=subdivisions.map(s=>{
+     const m=adminMembershipFor(u.id,s.id);
+     const access=isAdmin||!!m;
+     const edit=isAdmin||!!m?.can_edit;
+     const del=isAdmin||!!m?.can_delete;
+     return `<div class="admin-permission-row">
+       <div class="admin-permission-sub">${esc(s.name||'Subdivision')}</div>
+       <label class="admin-permission-toggle"><input type="checkbox" data-perm-kind="access" data-perm-user="${esc(u.id)}" data-perm-sub="${esc(s.id)}" ${access?'checked':''} ${isAdmin?'disabled':''}></label>
+       <label class="admin-permission-toggle"><input type="checkbox" data-perm-kind="edit" data-perm-user="${esc(u.id)}" data-perm-sub="${esc(s.id)}" ${edit?'checked':''} ${(!access||isAdmin)?'disabled':''}></label>
+       <label class="admin-permission-toggle"><input type="checkbox" data-perm-kind="delete" data-perm-user="${esc(u.id)}" data-perm-sub="${esc(s.id)}" ${del?'checked':''} ${(!access||isAdmin)?'disabled':''}></label>
+     </div>`;
+   }).join('');
 
-    return `<div class="admin-user-card">
-      <div class="admin-user-head">
-        <div>
-          <div class="admin-user-name">${esc(u.full_name||u.email||'User')}</div>
-          <div class="admin-user-email">${esc(u.email||'')}</div>
-        </div>
-        ${isAdmin?'<span class="admin-badge">Administrator</span>':'<span class="admin-badge">User</span>'}
-      </div>
-      <div class="admin-subdivision-grid">${checks||'<div class="muted">No subdivisions found.</div>'}</div>
-      <div class="admin-user-status muted" data-admin-user-status="${esc(u.id)}">${isAdmin?'Administrator has access to all subdivisions.':''}</div>
-    </div>`;
-  }).join('') || '<div class="muted">No users match your search.</div>';
+   return `<div class="admin-user-card">
+    <div class="admin-user-head">
+      <div><div class="admin-user-name">${esc(u.full_name||u.email||'User')}</div><div class="admin-user-email">${esc(u.email||'')}</div></div>
+      ${isAdmin?'<span class="admin-badge">Administrator</span>':'<span class="admin-badge">User</span>'}
+    </div>
+    <div class="admin-permission-head"><div>Subdivision</div><div>Access</div><div>Edit</div><div>Delete</div></div>
+    <div>${rows||'<div class="muted">No subdivisions found.</div>'}</div>
+    <div class="admin-user-status muted" data-admin-user-status="${esc(u.id)}">${isAdmin?'Administrator has full access to all subdivisions.':''}</div>
+   </div>`;
+ }).join('')||'<div class="muted">No users match your search.</div>';
 
-  document.querySelectorAll('[data-user-subdivision-user]').forEach(box=>{
-    box.onchange=()=>setAdminSubdivisionMembership(
-      box.dataset.userSubdivisionUser,
-      box.dataset.userSubdivisionSub,
-      box.checked,
-      box
-    );
-  });
+ document.querySelectorAll('[data-perm-kind]').forEach(box=>{
+   box.onchange=()=>setAdminSubdivisionPermission(box.dataset.permUser,box.dataset.permSub,box.dataset.permKind,box.checked,box);
+ });
 }
-async function setAdminSubdivisionMembership(userId,subdivisionId,allowed,checkbox){
-  if(!isBowenBuilderAdmin())return;
-  if(userId===ADMIN_USER_ID){
-    checkbox.checked=true;
-    return;
-  }
-  const status=[...document.querySelectorAll('[data-admin-user-status]')]
-    .find(x=>x.dataset.adminUserStatus===userId);
-  if(status){status.textContent='Saving...';status.style.color='';}
+async function setAdminSubdivisionPermission(userId,subdivisionId,kind,value,checkbox){
+ if(!isBowenBuilderAdmin())return;
+ if(userId===ADMIN_USER_ID){checkbox.checked=true;return}
+ const status=[...document.querySelectorAll('[data-admin-user-status]')].find(x=>x.dataset.adminUserStatus===userId);
+ if(status){status.textContent='Saving...';status.style.color=''}
+ const existing=adminMembershipFor(userId,subdivisionId);
+ let error=null;
 
-  let error=null;
-  if(allowed){
-    ({error}=await db.from('subdivision_members').upsert({
-      user_id:userId,
-      subdivision_id:subdivisionId
-    },{onConflict:'subdivision_id,user_id'}));
-  }else{
-    ({error}=await db.from('subdivision_members')
-      .delete()
-      .eq('user_id',userId)
-      .eq('subdivision_id',subdivisionId));
-  }
+ if(kind==='access'){
+   if(value){
+     ({error}=await db.from('subdivision_members').upsert({
+       user_id:userId,subdivision_id:subdivisionId,can_edit:false,can_delete:false
+     },{onConflict:'subdivision_id,user_id'}));
+   }else{
+     ({error}=await db.from('subdivision_members').delete().eq('user_id',userId).eq('subdivision_id',subdivisionId));
+   }
+ }else{
+   if(!existing){
+     checkbox.checked=false;
+     if(status){status.textContent='Turn on Access first.';status.style.color='#b42318'}
+     return;
+   }
+   const patch=kind==='edit'?{can_edit:value}:{can_delete:value};
+   ({error}=await db.from('subdivision_members').update(patch).eq('user_id',userId).eq('subdivision_id',subdivisionId));
+ }
 
-  if(error){
-    checkbox.checked=!allowed;
-    if(status){status.textContent=error.message;status.style.color='#b42318';}
-    return;
-  }
-
-  await loadAdminUsersAndMemberships();
-  if(status){status.textContent='Saved ✓';status.style.color='#067647';}
+ if(error){
+   checkbox.checked=!value;
+   if(status){status.textContent=error.message;status.style.color='#b42318'}
+   return;
+ }
+ await loadAdminUsersAndMemberships();
+ if(status){status.textContent='Saved ✓';status.style.color='#067647'}
+ await renderAdminUserPermissions();
 }
-
 
 async function showAdminView(){
   if(!isBowenBuilderAdmin()){
@@ -2928,8 +2977,17 @@ async function showAdminView(){
   $('adminView').classList.remove('hidden');
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.view==='admin'));
   $('heroTitle').textContent='Admin';
-  $('heroSub').textContent='Manage default schedule email recipients.';
-  await Promise.all([renderAdminContacts(),renderAdminUserPermissions()]);
+  $('heroSub').textContent='Manage BowenBuilder contacts and user permissions.';
+  showAdminPanel(activeAdminPanel);
+}
+function showAdminPanel(panel='contacts'){
+ activeAdminPanel=panel;
+ const contacts=panel==='contacts';
+ $('adminContactsPanel').classList.toggle('hidden',!contacts);
+ $('adminPermissionsPanel').classList.toggle('hidden',contacts);
+ $('adminContactsTab').classList.toggle('active',contacts);
+ $('adminPermissionsTab').classList.toggle('active',!contacts);
+ if(contacts)renderAdminContacts(); else renderAdminUserPermissions();
 }
 async function renderAdminContacts(){
   const notice=$('adminContactNotice');
@@ -3195,6 +3253,8 @@ async function showScheduleView(mode=scheduleViewMode){
 
 async function deleteScheduleItemLive(){
  const id=$('scheduleId')?.value;
+ const permissionItem=items.find(i=>String(i.id)===String(id));
+ if(!requireDeletePermission(subdivisionForLot(permissionItem?.lot_id)))return;
  if(!id)return;
  const item=items.find(x=>String(x.id)===String(id));
  const label=item?.name||'this schedule item';
@@ -3305,6 +3365,9 @@ function updateScheduleCustomVisibility(){
 $('scheduleName').onchange=updateScheduleCustomVisibility;
 
 function openScheduleDialogLive(id='',context='lot',prefillDate=''){
+ const permissionItem=items.find(i=>i.id===id);
+ const permissionSub=id?subdivisionForLot(permissionItem?.lot_id):currentSubdivision;
+ if(!requireEditPermission(permissionSub))return;
  const deleteBtn=$('scheduleDelete');
  if(deleteBtn)deleteBtn.classList.toggle('hidden',!id);
  scheduleContext=context;
@@ -3482,8 +3545,8 @@ $('lotForm').onsubmit=async e=>{
   showLot();
 };
 
-$('addLot').onclick=()=>openLotDialogLive();
-$('editLot').onclick=()=>openLotDialogLive(currentLot);
+$('addLot').onclick=()=>{if(requireEditPermission())openLotDialogLive()};
+$('editLot').onclick=()=>{if(requireEditPermission())openLotDialogLive(currentLot)};
 $('lotX').onclick=()=>$('lotDialog').close();
 $('lotCancel').onclick=()=>$('lotDialog').close();
 $('emailLot').onclick=()=>{
@@ -3519,6 +3582,8 @@ document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{
    showAdminView();
  }
 });
+$('adminContactsTab').onclick=()=>showAdminPanel('contacts');
+$('adminPermissionsTab').onclick=()=>showAdminPanel('permissions');
 $('adminContactSearch').oninput=()=>renderAdminContacts();
 $('adminUserSearch').oninput=()=>renderAdminUserPermissions();
 const {data:{session}}=await db.auth.getSession();
@@ -3540,7 +3605,7 @@ $('deleteLotDialog').addEventListener('click',e=>{
 });
 
 
-$('addPunchout').onclick=openPunchoutDialog;
+$('addPunchout').onclick=()=>{if(requireEditPermission())openPunchoutDialog()};
 $('punchoutForm').onsubmit=savePunchout;
 $('punchoutX').onclick=()=>$('punchoutDialog').close();
 $('punchoutCancel').onclick=()=>$('punchoutDialog').close();
