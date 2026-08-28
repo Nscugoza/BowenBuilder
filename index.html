@@ -1226,6 +1226,31 @@ button.danger:hover{filter:brightness(.96)}
   .bb-calendar-events{padding-bottom:19px}
 }
 
+
+.admin-contact-list{display:grid;gap:10px}
+.admin-contact-card{
+  display:grid;
+  grid-template-columns:minmax(180px,1fr) minmax(240px,1.4fr) auto;
+  gap:10px;
+  align-items:end;
+  padding:12px;
+  border:1px solid #dbe3ee;
+  border-radius:14px;
+  background:#fff;
+}
+.admin-contact-name{font-weight:800;color:var(--navy);padding-bottom:11px}
+.admin-contact-card label{margin:0}
+.admin-contact-card input{margin-top:5px}
+.admin-contact-save{min-width:78px}
+.admin-contact-status{font-size:12px;min-height:18px;margin-top:4px}
+.admin-search{max-width:520px}
+.admin-note{margin-bottom:14px}
+@media(max-width:720px){
+  .admin-contact-card{grid-template-columns:1fr}
+  .admin-contact-name{padding-bottom:0}
+  .admin-contact-save{width:100%}
+}
+
 </style>
 </head>
 <body>
@@ -1247,6 +1272,7 @@ button.danger:hover{filter:brightness(.96)}
   <nav class="tabs">
     <button class="tab active" data-view="subdivisions" type="button">Subdivisions</button>
     <button class="tab" data-view="schedule" type="button">Schedule</button>
+    <button id="adminTab" class="tab hidden" data-view="admin" type="button">Admin</button>
   </nav>
   <main>
     <div class="hero"><h2 id="heroTitle">Subdivisions</h2><p id="heroSub">Choose a subdivision to view its lots.</p></div>
@@ -1378,6 +1404,25 @@ button.danger:hover{filter:brightness(.96)}
         <div id="allSchedule" class="schedule-list"></div>
       </div>
     </section>
+
+    <section id="adminView" class="hidden">
+      <div class="toolbar">
+        <div>
+          <h2 style="margin:0">Schedule Contacts</h2>
+          <div class="muted">Assign the default email recipient for each schedule dropdown item.</div>
+        </div>
+      </div>
+      <div class="card admin-note">
+        <strong>Administrator access</strong>
+        <div class="muted" style="margin-top:5px">Only nick@bowenhomes.com can change these mappings. Separate multiple recipients with commas.</div>
+      </div>
+      <label class="admin-search">Find Schedule Item
+        <input id="adminContactSearch" type="search" placeholder="Search schedule items...">
+      </label>
+      <div id="adminContactNotice" class="notice hidden" style="margin:12px 0"></div>
+      <div id="adminContactList" class="admin-contact-list"></div>
+    </section>
+
   </main>
 </section>
 
@@ -1629,6 +1674,11 @@ let subdivisions=[],lots=[],items=[],punchouts=[],punchoutPhotos=[],profiles=[],
 let realtimeChannel=null;
 let presenceChannel=null;
 let currentUserProfile=null;
+let currentUserEmail='';
+const ADMIN_EMAIL='nick@bowenhomes.com';
+const ADMIN_USER_ID='20896c7c-cb4b-4c0b-823d-684ceb53a4f1';
+let currentAuthUserId='';
+let scheduleContacts=[];
 let realtimeRefreshTimer=null;
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmt=v=>v?new Date(v).toLocaleString():'';
@@ -1638,15 +1688,22 @@ const safe=u=>{try{let x=new URL(u);return /^https?:$/.test(x.protocol)?x.href:'
 async function loadCurrentProfile(){
   const {data:{user}}=await db.auth.getUser();
   if(!user) return null;
+  currentAuthUserId=String(user.id||'');
+  currentUserEmail=String(user.email||'').trim().toLowerCase();
   const {data}=await db.from('profiles').select('id,full_name,role').eq('id',user.id).maybeSingle();
   currentUserProfile=data||{id:user.id,full_name:user.email||'User',role:'crew'};
+  if($('adminTab')) $('adminTab').classList.toggle('hidden',!isBowenBuilderAdmin());
   return currentUserProfile;
+}
+function isBowenBuilderAdmin(){
+  return currentUserEmail===ADMIN_EMAIL || currentAuthUserId===ADMIN_USER_ID;
 }
 
 function currentScreen(){
   if(!$('lotView').classList.contains('hidden')) return 'lot';
   if(!$('lotsView').classList.contains('hidden')) return 'lots';
   if(!$('scheduleView').classList.contains('hidden')) return 'schedule';
+  if(!$('adminView').classList.contains('hidden')) return 'admin';
   return 'subdivisions';
 }
 
@@ -1655,6 +1712,7 @@ function rerenderCurrentScreen(){
   if(screen==='lot' && currentLot && lots.some(l=>l.id===currentLot)) showLot();
   else if(screen==='lots' && currentSubdivision) showLots();
   else if(screen==='schedule' && currentLot && lots.some(l=>l.id===currentLot)) showScheduleView(scheduleViewMode);
+  else if(screen==='admin' && isBowenBuilderAdmin()) showAdminView();
   else showSubs();
 }
 
@@ -1779,7 +1837,7 @@ function showSubs(){
  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.view==='subdivisions'));
  leaveLotPresence();
  currentSubdivision=null;currentLot=null;
- ['lotsView','lotView','scheduleView'].forEach(x=>$(x).classList.add('hidden'));
+ ['lotsView','lotView','scheduleView','adminView'].forEach(x=>$(x).classList.add('hidden'));
  $('subdivisionsView').classList.remove('hidden');$('heroTitle').textContent='Subdivisions';$('heroSub').textContent='Choose a subdivision to view its lots.';
  $('subdivisionGrid').innerHTML=subdivisions.map(s=>`<button class="card click-card sub-card" data-sub="${s.id}"><div><span class="pill">Subdivision</span><h3>${esc(s.name)}</h3></div><div class="muted">${lots.filter(l=>l.subdivision_id===s.id).length} lots</div></button>`).join('');
  document.querySelectorAll('[data-sub]').forEach(b=>b.onclick=()=>{currentSubdivision=b.dataset.sub;showLots()});
@@ -1787,7 +1845,7 @@ function showSubs(){
 function showLots(){
  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.view==='subdivisions'));
  leaveLotPresence();
- $('subdivisionsView').classList.add('hidden');$('lotView').classList.add('hidden');$('scheduleView').classList.add('hidden');$('lotsView').classList.remove('hidden');
+ $('subdivisionsView').classList.add('hidden');$('lotView').classList.add('hidden');$('scheduleView').classList.add('hidden');$('adminView').classList.add('hidden');$('lotsView').classList.remove('hidden');
  const s=subdivisions.find(x=>x.id===currentSubdivision);$('heroTitle').textContent=s?.name||'Lots';$('heroSub').textContent='Lots and schedules in this subdivision.';$('subdivisionName').textContent=s?.name||'';
  const arr=lots.filter(l=>l.subdivision_id===currentSubdivision);
  $('lotsGrid').innerHTML=arr.map(l=>`
@@ -2277,7 +2335,7 @@ function showLot(){
  ensureLotCalendarVisible();
  setTimeout(ensureLotCalendarVisible,0);
   // Always isolate the lot detail screen from previous navigation views.
-  ['subdivisionsView','subdivisionView','lotsView','scheduleView'].forEach(id=>{
+  ['subdivisionsView','subdivisionView','lotsView','scheduleView','adminView'].forEach(id=>{
     const el=$(id);
     if(el) el.classList.add('hidden');
   });
@@ -2603,6 +2661,138 @@ function bindCalendarSwipeRows(){
 }
 
 
+
+function scheduleDropdownChoices(){
+  const el=$('scheduleName');
+  if(!el)return [];
+  return [...el.options]
+    .map(o=>o.value)
+    .filter(v=>v && v!=='__custom__');
+}
+function normalizeEmailList(value){
+  return String(value||'')
+    .split(/[,;\n]+/)
+    .map(x=>x.trim())
+    .filter(Boolean);
+}
+async function loadScheduleContacts(){
+  const {data,error}=await db
+    .from('schedule_item_contacts')
+    .select('schedule_item,email_addresses,updated_at')
+    .order('schedule_item');
+  if(error){
+    scheduleContacts=[];
+    return {error};
+  }
+  scheduleContacts=data||[];
+  return {data:scheduleContacts};
+}
+function mappedRecipientsForWork(workNames){
+  const wanted=new Set((workNames||[]).map(x=>String(x||'').trim()));
+  const emails=[];
+  scheduleContacts.forEach(row=>{
+    if(wanted.has(row.schedule_item)){
+      normalizeEmailList(row.email_addresses).forEach(email=>{
+        if(!emails.some(x=>x.toLowerCase()===email.toLowerCase())) emails.push(email);
+      });
+    }
+  });
+  return emails;
+}
+async function recipientsForSelectedDate(){
+  const workNames=selectedDateScheduleItems().map(i=>i.name||'').filter(Boolean);
+  // Refresh on every email launch so all users get the latest Admin mapping.
+  await loadScheduleContacts();
+  return mappedRecipientsForWork(workNames);
+}
+async function showAdminView(){
+  if(!isBowenBuilderAdmin()){
+    alert('Administrator access is limited to nick@bowenhomes.com.');
+    showSubs();
+    return;
+  }
+  leaveLotPresence();
+  ['subdivisionsView','lotsView','lotView','scheduleView'].forEach(id=>$(id).classList.add('hidden'));
+  $('adminView').classList.remove('hidden');
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.view==='admin'));
+  $('heroTitle').textContent='Admin';
+  $('heroSub').textContent='Manage default schedule email recipients.';
+  await renderAdminContacts();
+}
+async function renderAdminContacts(){
+  const notice=$('adminContactNotice');
+  const list=$('adminContactList');
+  notice.classList.add('hidden');
+  list.innerHTML='<div class="muted">Loading schedule contacts...</div>';
+
+  const result=await loadScheduleContacts();
+  if(result.error){
+    list.innerHTML='';
+    notice.classList.remove('hidden');
+    notice.textContent='Schedule Contacts backend is not set up yet. Run the Supabase setup SQL first.';
+    return;
+  }
+
+  const q=String($('adminContactSearch').value||'').trim().toLowerCase();
+  const map=new Map(scheduleContacts.map(r=>[r.schedule_item,r]));
+  const choices=scheduleDropdownChoices().filter(name=>!q || name.toLowerCase().includes(q));
+
+  list.innerHTML=choices.map(name=>{
+    const row=map.get(name);
+    return `<div class="admin-contact-card" data-admin-contact-card="${esc(name)}">
+      <div class="admin-contact-name">${esc(name)}</div>
+      <label>Default Email Address(es)
+        <input type="text" data-admin-contact-email="${esc(name)}" value="${esc(row?.email_addresses||'')}" placeholder="vendor@company.com, second@company.com">
+        <div class="admin-contact-status muted" data-admin-contact-status="${esc(name)}"></div>
+      </label>
+      <button class="primary admin-contact-save" type="button" data-admin-contact-save="${esc(name)}">Save</button>
+    </div>`;
+  }).join('') || '<div class="muted">No schedule items match your search.</div>';
+
+  document.querySelectorAll('[data-admin-contact-save]').forEach(btn=>{
+    btn.onclick=()=>saveAdminScheduleContact(btn.dataset.adminContactSave);
+  });
+}
+async function saveAdminScheduleContact(scheduleItem){
+  if(!isBowenBuilderAdmin())return;
+  const input=[...document.querySelectorAll('[data-admin-contact-email]')]
+    .find(x=>x.dataset.adminContactEmail===scheduleItem);
+  const status=[...document.querySelectorAll('[data-admin-contact-status]')]
+    .find(x=>x.dataset.adminContactStatus===scheduleItem);
+  if(!input)return;
+
+  const emails=normalizeEmailList(input.value);
+  const invalid=emails.find(x=>!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(x));
+  if(invalid){
+    if(status){status.textContent=`Check email address: ${invalid}`;status.style.color='#b42318';}
+    return;
+  }
+
+  btnText='Saving...';
+  if(status){status.textContent=btnText;status.style.color='';}
+
+  const {data:{user}}=await db.auth.getUser();
+  let error=null;
+  if(!emails.length){
+    ({error}=await db.from('schedule_item_contacts').delete().eq('schedule_item',scheduleItem));
+  }else{
+    ({error}=await db.from('schedule_item_contacts').upsert({
+      schedule_item:scheduleItem,
+      email_addresses:emails.join(', '),
+      updated_at:new Date().toISOString(),
+      updated_by:user?.id||null
+    },{onConflict:'schedule_item'}));
+  }
+
+  if(error){
+    if(status){status.textContent=error.message;status.style.color='#b42318';}
+    return;
+  }
+  if(status){status.textContent=emails.length?'Saved ✓':'Mapping cleared ✓';status.style.color='#067647';}
+  await loadScheduleContacts();
+}
+
+
 function selectedDateScheduleItems(){
  if(!scheduleSelectedDate)return [];
  return subdivisionScheduleItems().filter(x=>itemOccursOn(x,scheduleSelectedDate));
@@ -2666,9 +2856,11 @@ function selectedDateMessage(){
 async function emailSelectedCalendarDate(){
  const msg=selectedDateMessage();
  if(!msg){alert('Select a calendar date first.');return}
+ const recipients=await recipientsForSelectedDate();
  const marked=await markCalendarCommunication('email');
  if(!marked)return;
- const href=`mailto:?subject=${encodeURIComponent(msg.subject)}&body=${encodeURIComponent(msg.body)}`;
+ const to=recipients.map(x=>encodeURIComponent(x)).join(',');
+ const href=`mailto:${to}?subject=${encodeURIComponent(msg.subject)}&body=${encodeURIComponent(msg.body)}`;
  window.location.href=href;
 }
 async function textSelectedCalendarDate(){
@@ -2760,6 +2952,7 @@ async function showScheduleView(mode=scheduleViewMode){
  $('subdivisionsView').classList.add('hidden');
  $('lotsView').classList.add('hidden');
  $('lotView').classList.add('hidden');
+ $('adminView').classList.add('hidden');
  $('scheduleView').classList.remove('hidden');
  const sub=subdivisions.find(s=>s.id===currentSubdivision);
  $('heroTitle').textContent=`${activeLot?.lot_name||'Lot'} Schedule`;
@@ -3096,8 +3289,11 @@ document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{
    if(!currentLot){alert('Open a lot first to view its calendar.');return}
    document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t===b));
    showScheduleView('calendar');
+ }else if(b.dataset.view==='admin'){
+   showAdminView();
  }
 });
+$('adminContactSearch').oninput=()=>renderAdminContacts();
 const {data:{session}}=await db.auth.getSession();
 if(session){
   appOn();
