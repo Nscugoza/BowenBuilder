@@ -3976,55 +3976,125 @@ function selectedDateMessage(planUrl='',includePlans=false,renderingUrl='',inclu
  }
  return {subject,body:detailLines.join('\n'),textBody:textLines.join('\n')};
 }
+function launchCalendarComposer(href){
+  // A real anchor click is the most reliable way to preserve the iPhone tap
+  // for mailto: and sms: custom URL schemes.
+  const a=document.createElement('a');
+  a.href=href;
+  a.style.display='none';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
+function setCalendarCommunicationLocal(kind,dateKey,lotId=currentLot){
+  if(!lotId || !dateKey)return;
+  const idx=calendarCalledInMarks.findIndex(
+    x=>x.lot_id===lotId && x.calendar_date===dateKey
+  );
+  if(idx>=0){
+    calendarCalledInMarks[idx]={
+      ...calendarCalledInMarks[idx],
+      ...(kind==='email'?{email_sent:true}:{text_sent:true})
+    };
+  }else{
+    calendarCalledInMarks.push({
+      lot_id:lotId,
+      calendar_date:dateKey,
+      called_in:false,
+      email_sent:kind==='email',
+      text_sent:kind==='text'
+    });
+  }
+}
+
 function emailSelectedCalendarDate(){
- if(!scheduleSelectedDate){alert('Select a calendar date first.');return}
+ try{
+   if(!scheduleSelectedDate){
+     alert('Select a calendar date first.');
+     return;
+   }
 
- // Everything used below is already cached while the lot is open.
- // Do not await before mailto: on iPhone or Safari may block the launch.
- const includePlans=shouldIncludePlansForSelectedDate('email');
- const includeRendering=shouldIncludeRenderingForSelectedDate('email');
- const sameLotCache=overviewShareCache.lotId===currentLot;
- const planUrl=(includePlans && sameLotCache)?overviewShareCache.plansUrl:'';
- const renderingUrl=(includeRendering && sameLotCache)?overviewShareCache.renderingUrl:'';
+   const workNames=selectedWorkNames();
+   const includePlans=shouldIncludePlansForSelectedDate('email');
+   const includeRendering=shouldIncludeRenderingForSelectedDate('email');
+   const sameLotCache=overviewShareCache && overviewShareCache.lotId===currentLot;
 
- const msg=selectedDateMessage(planUrl,includePlans,renderingUrl,includeRendering);
- if(!msg)return;
+   const planUrl=(includePlans && sameLotCache)?(overviewShareCache.plansUrl||''):'';
+   const renderingUrl=(includeRendering && sameLotCache)?(overviewShareCache.renderingUrl||''):'';
 
- const recipients=mappedRecipientsForWork(selectedWorkNames());
- const to=recipients.map(x=>encodeURIComponent(x)).join(',');
- const href=`mailto:${to}?subject=${encodeURIComponent(msg.subject)}&body=${encodeURIComponent(msg.body)}`;
+   const msg=selectedDateMessage(
+     planUrl,
+     includePlans && !!planUrl,
+     renderingUrl,
+     includeRendering && !!renderingUrl
+   );
+   if(!msg){
+     alert('Could not build the email for this date.');
+     return;
+   }
 
- // Launch Mail immediately from the user's tap.
- window.location.href=href;
+   const recipients=mappedRecipientsForWork(workNames);
+   const to=recipients.join(',');
+   const href=`mailto:${to}?subject=${encodeURIComponent(msg.subject)}&body=${encodeURIComponent(msg.body)}`;
 
- // Record E on the selected calendar date after Mail has been launched.
- void markCalendarCommunicationSilent('email',scheduleSelectedDate,currentLot);
+   // Match the working Overview behavior: mark locally first, then launch.
+   setCalendarCommunicationLocal('email',scheduleSelectedDate,currentLot);
+   renderScheduleCalendar();
+
+   launchCalendarComposer(href);
+
+   // Persist E after Mail is launched.
+   void markCalendarCommunicationSilent('email',scheduleSelectedDate,currentLot);
+ }catch(err){
+   console.error('Calendar Email Date failed:',err);
+   alert(`Email Date could not open: ${err?.message||err}`);
+ }
 }
 
 function textSelectedCalendarDate(){
- if(!scheduleSelectedDate){alert('Select a calendar date first.');return}
+ try{
+   if(!scheduleSelectedDate){
+     alert('Select a calendar date first.');
+     return;
+   }
 
- // Everything used below is already cached while the lot is open.
- // Do not await before sms: on iPhone or Safari may block the launch.
- const includePlans=shouldIncludePlansForSelectedDate('text');
- const includeRendering=shouldIncludeRenderingForSelectedDate('text');
- const sameLotCache=overviewShareCache.lotId===currentLot;
- const planUrl=(includePlans && sameLotCache)?overviewShareCache.plansUrl:'';
- const renderingUrl=(includeRendering && sameLotCache)?overviewShareCache.renderingUrl:'';
+   const workNames=selectedWorkNames();
+   const includePlans=shouldIncludePlansForSelectedDate('text');
+   const includeRendering=shouldIncludeRenderingForSelectedDate('text');
+   const sameLotCache=overviewShareCache && overviewShareCache.lotId===currentLot;
 
- const msg=selectedDateMessage(planUrl,includePlans,renderingUrl,includeRendering);
- if(!msg)return;
+   const planUrl=(includePlans && sameLotCache)?(overviewShareCache.plansUrl||''):'';
+   const renderingUrl=(includeRendering && sameLotCache)?(overviewShareCache.renderingUrl||''):'';
 
- const phones=mappedPhonesForWork(selectedWorkNames());
- const recipient=phones.join(',');
- const separator=/iPad|iPhone|iPod/.test(navigator.userAgent)?'&':'?';
- const href=`sms:${recipient}${separator}body=${encodeURIComponent(msg.textBody)}`;
+   const msg=selectedDateMessage(
+     planUrl,
+     includePlans && !!planUrl,
+     renderingUrl,
+     includeRendering && !!renderingUrl
+   );
+   if(!msg){
+     alert('Could not build the text for this date.');
+     return;
+   }
 
- // Launch Messages immediately from the user's tap.
- window.location.href=href;
+   const phones=mappedPhonesForWork(workNames);
+   const recipient=phones.join(',');
+   const separator=/iPad|iPhone|iPod/.test(navigator.userAgent)?'&':'?';
+   const href=`sms:${recipient}${separator}body=${encodeURIComponent(msg.textBody)}`;
 
- // Record T on the selected calendar date after Messages has been launched.
- void markCalendarCommunicationSilent('text',scheduleSelectedDate,currentLot);
+   // Match the working Overview behavior: mark locally first, then launch.
+   setCalendarCommunicationLocal('text',scheduleSelectedDate,currentLot);
+   renderScheduleCalendar();
+
+   launchCalendarComposer(href);
+
+   // Persist T after Messages is launched.
+   void markCalendarCommunicationSilent('text',scheduleSelectedDate,currentLot);
+ }catch(err){
+   console.error('Calendar Text Date failed:',err);
+   alert(`Text Date could not open: ${err?.message||err}`);
+ }
 }
 
 function renderSelectedScheduleDay(){
