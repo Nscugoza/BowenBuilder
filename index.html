@@ -3758,6 +3758,16 @@ function refreshOverviewCommunicationBadges(itemId){
   if(textBadge)textBadge.classList.toggle('active',marks.text);
 }
 
+
+function includedOptionsLinesForMessage(lot){
+  const raw=String(lot?.options||lot?.included_options||'').trim();
+  if(!raw)return [];
+  return raw
+    .split(/\r?\n|;|,/)
+    .map(x=>x.replace(/^[\s•\-*]+/,'').trim())
+    .filter(Boolean);
+}
+
 function overviewScheduleItemMessage(item,planUrl='',includePlans=false,renderingUrl='',includeRendering=false){
   if(!item)return null;
   const lot=lots.find(l=>l.id===item.lot_id)||activeLotInfo();
@@ -3766,10 +3776,9 @@ function overviewScheduleItemMessage(item,planUrl='',includePlans=false,renderin
   const d=dateKey?dateFromKey(dateKey):null;
   const dateLabel=d?d.toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric',year:'numeric'}):dateKey;
   const work=item.name||'Schedule Item';
+  const optionLines=includedOptionsLinesForMessage(lot);
 
-  const detailLines=[
-    `${lot?.lot_name||'Lot'} Schedule`
-  ];
+  const detailLines=[`${lot?.lot_name||'Lot'} Schedule`];
   if(lot?.address)detailLines.push(lot.address);
   if(sub?.name)detailLines.push(sub.name);
   if(lot?.plan_name)detailLines.push(`Plan: ${lot.plan_name}`);
@@ -3778,6 +3787,12 @@ function overviewScheduleItemMessage(item,planUrl='',includePlans=false,renderin
   detailLines.push('');
   detailLines.push('Scheduled Work:');
   detailLines.push(`- ${work}${item.crew?' — '+item.crew:''}`);
+
+  if(optionLines.length){
+    detailLines.push('');
+    detailLines.push('Included Options:');
+    optionLines.forEach(x=>detailLines.push(`- ${x}`));
+  }
 
   const textLines=[
     `${lot?.lot_name||'Lot'} Schedule`,
@@ -3788,6 +3803,11 @@ function overviewScheduleItemMessage(item,planUrl='',includePlans=false,renderin
   if(lot?.plan_name)textLines.push(`Plan: ${lot.plan_name}`);
   if(lot?.permit_number)textLines.push(`Permit Number: ${lot.permit_number}`);
   if(dateLabel)textLines.push(`Requested Schedule Date: ${dateLabel}`);
+
+  if(optionLines.length){
+    textLines.push('Included Options:');
+    optionLines.forEach(x=>textLines.push(`- ${x}`));
+  }
 
   if(includePlans && planUrl){
     detailLines.push('',`Plans: ${planUrl}`);
@@ -3805,6 +3825,7 @@ function overviewScheduleItemMessage(item,planUrl='',includePlans=false,renderin
     dateKey
   };
 }
+
 function emailOverviewScheduleItem(itemId){
   const item=items.find(i=>i.id===itemId);
   if(!item)return;
@@ -3926,6 +3947,7 @@ function selectedDateMessage(planUrl='',includePlans=false,renderingUrl='',inclu
  const dateLabel=d?d.toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric',year:'numeric'}):scheduleSelectedDate;
  const workNames=arr.map(i=>i.name||'Schedule Item');
  const workSubject=workNames.length?workNames.join(', '):dateLabel;
+ const optionLines=includedOptionsLinesForMessage(lot);
 
  const detailLines=[];
  detailLines.push(`${lot?.lot_name||'Lot'} Schedule`);
@@ -3936,6 +3958,7 @@ function selectedDateMessage(planUrl='',includePlans=false,renderingUrl='',inclu
  detailLines.push(`Requested Schedule Date: ${dateLabel}`);
  detailLines.push('');
  detailLines.push('Scheduled Work:');
+
  if(arr.length){
    arr.forEach(i=>{
      const parts=[i.name||'Schedule Item'];
@@ -3945,15 +3968,20 @@ function selectedDateMessage(planUrl='',includePlans=false,renderingUrl='',inclu
  }else{
    detailLines.push('No schedule items are currently listed for this date.');
  }
+
+ if(optionLines.length){
+   detailLines.push('');
+   detailLines.push('Included Options:');
+   optionLines.forEach(x=>detailLines.push(`- ${x}`));
+ }
+
  if(isCalledInDate(scheduleSelectedDate)){
    detailLines.push('');
    detailLines.push('Called In: Yes ✓');
  }
 
- // Email subject: lot number + requested work only. No "Scheduled Work:" phrase.
  const subject=`${lot?.lot_name||'Lot'} - ${workSubject}`;
 
- // Text: scheduled work is the second line.
  const textLines=[];
  textLines.push(`${lot?.lot_name||'Lot'} Schedule`);
  textLines.push(`Scheduled Work: ${workNames.length?workNames.join(', '):'None listed'}`);
@@ -3962,6 +3990,12 @@ function selectedDateMessage(planUrl='',includePlans=false,renderingUrl='',inclu
  if(lot?.plan_name)textLines.push(`Plan: ${lot.plan_name}`);
  if(lot?.permit_number)textLines.push(`Permit Number: ${lot.permit_number}`);
  textLines.push(`Requested Schedule Date: ${dateLabel}`);
+
+ if(optionLines.length){
+   textLines.push('Included Options:');
+   optionLines.forEach(x=>textLines.push(`- ${x}`));
+ }
+
  if(isCalledInDate(scheduleSelectedDate))textLines.push('Called In: Yes ✓');
 
  if(includePlans && planUrl){
@@ -3974,8 +4008,14 @@ function selectedDateMessage(planUrl='',includePlans=false,renderingUrl='',inclu
    detailLines.push(`Color Rendering: ${renderingUrl}`);
    textLines.push(`Color Rendering: ${renderingUrl}`);
  }
- return {subject,body:detailLines.join('\n'),textBody:textLines.join('\n')};
+
+ return {
+   subject,
+   body:detailLines.join('\n'),
+   textBody:textLines.join('\n')
+ };
 }
+
 function launchCalendarComposer(href){
   // A real anchor click is the most reliable way to preserve the iPhone tap
   // for mailto: and sms: custom URL schemes.
