@@ -2673,6 +2673,7 @@ function showLot(preserveScroll=false){
  $('addSchedule').classList.toggle('hidden',!editAllowed);
  $('addPunchout').classList.toggle('hidden',!editAllowed);
  renderLotChecklist();
+ void warmOverviewCommunicationData();
  if($('addPunchout'))$('addPunchout').classList.toggle('hidden',!canPunchoutAdd(l.subdivision_id));
 
  wireLotDocumentButtons();
@@ -3571,6 +3572,102 @@ async function saveAdminScheduleContact(scheduleItem){
 
 
 
+
+let overviewShareCache={
+  lotId:null,
+  plansUrl:'',
+  renderingUrl:'',
+  warming:false
+};
+
+async function warmOverviewCommunicationData(){
+  const lotId=currentLot;
+  if(!lotId)return;
+  try{
+    // Contacts are cached in scheduleContacts for synchronous button taps.
+    await loadScheduleContacts();
+
+    if(overviewShareCache.lotId!==lotId){
+      overviewShareCache={lotId,plansUrl:'',renderingUrl:'',warming:true};
+      const [plansUrl,renderingUrl]=await Promise.all([
+        currentLotPlansShareUrl().catch(()=> ''),
+        currentLotRenderingShareUrl().catch(()=> '')
+      ]);
+      if(currentLot===lotId){
+        overviewShareCache={
+          lotId,
+          plansUrl:plansUrl||'',
+          renderingUrl:renderingUrl||'',
+          warming:false
+        };
+      }
+    }
+  }catch(_){
+    if(overviewShareCache.lotId===lotId)overviewShareCache.warming=false;
+  }
+}
+
+async function markCalendarCommunicationSilent(kind,dateKey,lotId=currentLot){
+  if(!lotId || !dateKey)return;
+
+  const field=kind==='email'?'email_sent':'text_sent';
+  const timeField=kind==='email'?'email_sent_at':'text_sent_at';
+  const patch={
+    [field]:true,
+    [timeField]:new Date().toISOString(),
+    updated_at:new Date().toISOString()
+  };
+
+  try{
+    // UPDATE first so existing Called In / E / T values remain untouched.
+    const {data,error}=await db
+      .from('lot_calendar_marks')
+      .update(patch)
+      .eq('lot_id',lotId)
+      .eq('calendar_date',dateKey)
+      .select('id');
+
+    if(error)throw error;
+
+    if(!data?.length){
+      const insertPayload={
+        lot_id:lotId,
+        calendar_date:dateKey,
+        ...patch
+      };
+      const {error:insertError}=await db
+        .from('lot_calendar_marks')
+        .insert(insertPayload);
+
+      // If another event created the row first, simply UPDATE it.
+      if(insertError){
+        const isDuplicate=
+          insertError.code==='23505' ||
+          /duplicate key|unique constraint/i.test(insertError.message||'');
+        if(isDuplicate){
+          await db
+            .from('lot_calendar_marks')
+            .update(patch)
+            .eq('lot_id',lotId)
+            .eq('calendar_date',dateKey);
+        }else{
+          throw insertError;
+        }
+      }
+    }
+
+    // Update local mark state quietly. Do not rerender or move the screen.
+    const idx=calendarMarks.findIndex(
+      x=>x.lot_id===lotId && x.calendar_date===dateKey
+    );
+    if(idx>=0){
+      calendarMarks[idx]={...calendarMarks[idx],...patch};
+    }
+  }catch(err){
+    console.warn('Calendar communication mark could not be saved:',err);
+  }
+}
+
 function scheduleContactForItemName(name){
   return scheduleContacts.find(r=>r.schedule_item===String(name||'').trim())||null;
 }
@@ -3621,46 +3718,71 @@ function overviewScheduleItemMessage(item,planUrl='',includePlans=false,renderin
     dateKey
   };
 }
-async function emailOverviewScheduleItem(itemId){
+function emailOverviewScheduleItem(itemId){
   const item=items.find(i=>i.id===itemId);
   if(!item)return;
-  await loadScheduleContacts();
+
   const contact=scheduleContactForItemName(item.name);
   const includePlans=!!contact?.include_plans_email;
   const includeRendering=!!contact?.include_rendering_email;
-  const [planUrl,renderingUrl]=await Promise.all([
-    includePlans ? currentLotPlansShareUrl() : Promise.resolve(''),
-    includeRendering ? currentLotRenderingShareUrl() : Promise.resolve('')
-  ]);
-  const msg=overviewScheduleItemMessage(item,planUrl,includePlans,renderingUrl,includeRendering);
+  const sameLotCache=overviewShareCache.lotId===item.lot_id;
+
+  const planUrl=(includePlans && sameLotCache)?overviewShareCache.plansUrl:'';
+  const renderingUrl=(includeRendering && sameLotCache)?overviewShareCache.renderingUrl:'';
+  const msg=overviewScheduleItemMessage(
+    item,
+    planUrl,
+    includePlans && !!planUrl,
+    renderingUrl,
+    includeRendering && !!renderingUrl
+  );
+  if(!msg)return;
+
   const recipients=mappedRecipientsForWork([item.name]);
-  if(msg?.dateKey){
-    const marked=await markCalendarCommunication('email',msg.dateKey);
-    if(!marked)return;
-  }
   const to=recipients.map(x=>encodeURIComponent(x)).join(',');
-  window.location.href=`mailto:${to}?subject=${encodeURIComponent(msg.subject)}&body=${encodeURIComponent(msg.body)}`;
+  const href=`mailto:${to}?subject=${encodeURIComponent(msg.subject)}&body=${encodeURIComponent(msg.body)}`;
+
+  // IMPORTANT for iPhone: launch Mail directly inside the original tap handler.
+  window.location.href=href;
+
+  // Record E afterward without blocking the app launch or rerendering the page.
+  if(msg.dateKey){
+    void markCalendarCommunicationSilent('email',msg.dateKey,item.lot_id);
+  }
 }
-async function textOverviewScheduleItem(itemId){
+
+function textOverviewScheduleItem(itemId){
   const item=items.find(i=>i.id===itemId);
   if(!item)return;
-  await loadScheduleContacts();
+
   const contact=scheduleContactForItemName(item.name);
   const includePlans=!!contact?.include_plans_text;
   const includeRendering=!!contact?.include_rendering_text;
-  const [planUrl,renderingUrl]=await Promise.all([
-    includePlans ? currentLotPlansShareUrl() : Promise.resolve(''),
-    includeRendering ? currentLotRenderingShareUrl() : Promise.resolve('')
-  ]);
-  const msg=overviewScheduleItemMessage(item,planUrl,includePlans,renderingUrl,includeRendering);
+  const sameLotCache=overviewShareCache.lotId===item.lot_id;
+
+  const planUrl=(includePlans && sameLotCache)?overviewShareCache.plansUrl:'';
+  const renderingUrl=(includeRendering && sameLotCache)?overviewShareCache.renderingUrl:'';
+  const msg=overviewScheduleItemMessage(
+    item,
+    planUrl,
+    includePlans && !!planUrl,
+    renderingUrl,
+    includeRendering && !!renderingUrl
+  );
+  if(!msg)return;
+
   const phones=mappedPhonesForWork([item.name]);
-  if(msg?.dateKey){
-    const marked=await markCalendarCommunication('text',msg.dateKey);
-    if(!marked)return;
-  }
   const recipient=phones.join(',');
   const separator=/iPad|iPhone|iPod/.test(navigator.userAgent)?'&':'?';
-  window.location.href=`sms:${recipient}${separator}body=${encodeURIComponent(msg.textBody)}`;
+  const href=`sms:${recipient}${separator}body=${encodeURIComponent(msg.textBody)}`;
+
+  // IMPORTANT for iPhone: launch Messages directly inside the original tap handler.
+  window.location.href=href;
+
+  // Record T afterward without blocking the app launch or rerendering the page.
+  if(msg.dateKey){
+    void markCalendarCommunicationSilent('text',msg.dateKey,item.lot_id);
+  }
 }
 
 function selectedDateScheduleItems(){
