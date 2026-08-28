@@ -1356,10 +1356,38 @@ button.danger:hover{filter:brightness(.96)}
 .checklist-row input[type="checkbox"]{width:20px;height:20px;margin:0;flex:0 0 auto}
 .checklist-row-label{font-weight:700;color:#344054;flex:1}
 .checklist-custom-row .checklist-row-label{font-style:italic}
-.checklist-delete{border:0;background:transparent;color:#b42318;font-weight:800;padding:4px 6px}
+
 @media(max-width:620px){
   .lot-checklist-head{align-items:flex-start;gap:10px;flex-wrap:wrap}
   #addCustomChecklistItem{width:100%}
+}
+
+
+.checklist-swipe-wrap{
+  position:relative;
+  overflow:hidden;
+  border-radius:12px;
+}
+.checklist-swipe-delete{
+  position:absolute;
+  inset:0 0 0 auto;
+  width:92px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:#b42318;
+  color:#fff;
+  font-weight:800;
+  border-radius:0 12px 12px 0;
+  user-select:none;
+  -webkit-user-select:none;
+}
+.checklist-swipe-wrap .checklist-row{
+  position:relative;
+  z-index:1;
+  margin:0;
+  transition:transform .18s ease;
+  touch-action:pan-y;
 }
 
 </style>
@@ -2629,13 +2657,15 @@ function renderLotChecklist(){
   const editable=canEditSubdivision(lot.subdivision_id);
 
   host.innerHTML=rows.map((item,index)=>`
-    <div class="checklist-row ${item.custom?'checklist-custom-row':''}">
-      <input type="checkbox"
-        data-checklist-index="${index}"
-        ${item.complete?'checked':''}
-        ${editable?'':'disabled'}>
-      <div class="checklist-row-label">${esc(item.name)}</div>
-      ${item.custom&&editable?`<button type="button" class="checklist-delete" data-checklist-delete="${index}">Delete</button>`:''}
+    <div class="checklist-swipe-wrap ${item.custom&&editable?'is-custom':''}" ${item.custom&&editable?`data-checklist-swipe="${index}"`:''}>
+      ${item.custom&&editable?`<div class="checklist-swipe-delete">Delete</div>`:''}
+      <div class="checklist-row ${item.custom?'checklist-custom-row':''}">
+        <input type="checkbox"
+          data-checklist-index="${index}"
+          ${item.complete?'checked':''}
+          ${editable?'':'disabled'}>
+        <div class="checklist-row-label">${esc(item.name)}</div>
+      </div>
     </div>
   `).join('');
 
@@ -2671,14 +2701,69 @@ function renderLotChecklist(){
     };
   });
 
-  host.querySelectorAll('[data-checklist-delete]').forEach(btn=>{
-    btn.onclick=async()=>{
-      const current=lotChecklistData(lot);
-      const index=Number(btn.dataset.checklistDelete);
-      if(!current[index]?.custom)return;
-      current.splice(index,1);
-      if(await saveLotChecklist(current))renderLotChecklist();
-    };
+  async function deleteCustomChecklistIndex(index){
+    const current=lotChecklistData(lot);
+    if(!current[index]?.custom)return;
+    const itemName=current[index].name||'this custom item';
+    if(!confirm(`Delete "${itemName}" from this lot checklist?`))return;
+    current.splice(index,1);
+    if(await saveLotChecklist(current))renderLotChecklist();
+  }
+
+  host.querySelectorAll('[data-checklist-swipe]').forEach(wrap=>{
+    let startX=0,startY=0,dx=0,dragging=false;
+    const row=wrap.querySelector('.checklist-row');
+    const index=Number(wrap.dataset.checklistSwipe);
+
+    wrap.addEventListener('touchstart',e=>{
+      if(!e.touches?.length)return;
+      startX=e.touches[0].clientX;
+      startY=e.touches[0].clientY;
+      dx=0;
+      dragging=true;
+      row.style.transition='none';
+    },{passive:true});
+
+    wrap.addEventListener('touchmove',e=>{
+      if(!dragging || !e.touches?.length)return;
+      const x=e.touches[0].clientX;
+      const y=e.touches[0].clientY;
+      const moveX=x-startX;
+      const moveY=y-startY;
+
+      // Only treat a clearly horizontal left gesture as a swipe.
+      if(Math.abs(moveY)>Math.abs(moveX) && Math.abs(moveY)>8){
+        dragging=false;
+        row.style.transform='';
+        return;
+      }
+
+      dx=Math.min(0,Math.max(-92,moveX));
+      row.style.transform=`translateX(${dx}px)`;
+    },{passive:true});
+
+    wrap.addEventListener('touchend',async()=>{
+      if(!dragging){
+        row.style.transition='transform .18s ease';
+        row.style.transform='';
+        return;
+      }
+      dragging=false;
+      row.style.transition='transform .18s ease';
+
+      if(dx<=-70){
+        row.style.transform='translateX(-92px)';
+        await deleteCustomChecklistIndex(index);
+      }else{
+        row.style.transform='';
+      }
+    },{passive:true});
+
+    // Desktop/tap fallback: tapping the revealed red area also uses confirmation.
+    const deleteArea=wrap.querySelector('.checklist-swipe-delete');
+    if(deleteArea){
+      deleteArea.onclick=()=>deleteCustomChecklistIndex(index);
+    }
   });
 }
 
