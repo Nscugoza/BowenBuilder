@@ -3320,6 +3320,10 @@ async function renderAdminUserPermissions(){
  });
 }
 async function setAdminSubdivisionPermission(userId,subdivisionId,kind,value,checkbox){
+ const adminScrollY=window.scrollY||0;
+ const adminMain=document.querySelector('main');
+ const adminMainScrollY=adminMain?adminMain.scrollTop:0;
+
  if(!isBowenBuilderAdmin())return;
  if(userId===ADMIN_USER_ID){checkbox.checked=true;return}
  const status=[...document.querySelectorAll('[data-admin-user-status]')].find(x=>x.dataset.adminUserStatus===userId);
@@ -3357,7 +3361,17 @@ async function setAdminSubdivisionPermission(userId,subdivisionId,kind,value,che
  }
  await loadAdminUsersAndMemberships();
  if(status){status.textContent='Saved ✓';status.style.color='#067647'}
- await renderAdminUserPermissions();
+ await 
+ requestAnimationFrame(()=>{
+   window.scrollTo({top:adminScrollY,left:0,behavior:'auto'});
+   if(adminMain)adminMain.scrollTop=adminMainScrollY;
+   try{input?.focus?.({preventScroll:true})}catch(_){}
+   requestAnimationFrame(()=>{
+     window.scrollTo({top:adminScrollY,left:0,behavior:'auto'});
+     if(adminMain)adminMain.scrollTop=adminMainScrollY;
+   });
+ });
+
 }
 
 async function showAdminView(){
