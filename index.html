@@ -1313,7 +1313,7 @@ button.danger:hover{filter:brightness(.96)}
 .admin-inner-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
 .admin-inner-tab{border:1px solid #d0d5dd;background:#fff;color:#344054;border-radius:999px;padding:9px 14px;font-weight:800}
 .admin-inner-tab.active{background:#eaf2fb;color:var(--navy);border-color:#c7d7ea}
-.admin-permission-head,.admin-permission-row{display:grid;grid-template-columns:minmax(160px,1fr) repeat(3,82px);gap:8px;align-items:center}
+.admin-permission-head,.admin-permission-row{display:grid;grid-template-columns:minmax(150px,1fr) repeat(6,82px);gap:8px;align-items:center}
 .admin-permission-head{padding:0 8px 7px;font-size:11px;font-weight:800;color:#667085;text-align:center}
 .admin-permission-head div:first-child{text-align:left}
 .admin-permission-row{border:1px solid #e4e7ec;border-radius:11px;padding:9px 8px;background:#f9fafb;margin-top:7px}
@@ -1321,7 +1321,7 @@ button.danger:hover{filter:brightness(.96)}
 .admin-permission-toggle{display:flex;justify-content:center;align-items:center;margin:0}
 .admin-permission-toggle input{width:20px;height:20px;margin:0}
 @media(max-width:620px){
- .admin-permission-head,.admin-permission-row{grid-template-columns:minmax(125px,1fr) repeat(3,58px);gap:4px}
+ .admin-permission-head,.admin-permission-row{grid-template-columns:minmax(112px,1fr) repeat(6,54px);gap:4px}
  .admin-permission-head{font-size:9px}
  .admin-permission-row{padding:8px 5px}
  .admin-permission-sub{font-size:11px}
@@ -1885,12 +1885,42 @@ function isBowenBuilderAdmin(){
 
 
 function permissionForSubdivision(subdivisionId){
- if(isBowenBuilderAdmin()) return {can_edit:true,can_delete:true};
+ if(isBowenBuilderAdmin()) return {
+   can_edit:true,
+   can_delete:true,
+   can_punchout_add:true,
+   can_punchout_edit:true,
+   can_punchout_delete:true
+ };
  const row=currentMembershipPermissions.find(x=>x.subdivision_id===subdivisionId);
- return {can_edit:!!row?.can_edit,can_delete:!!row?.can_delete};
+ return {
+   can_edit:!!row?.can_edit,
+   can_delete:!!row?.can_delete,
+   can_punchout_add:!!row?.can_punchout_add,
+   can_punchout_edit:!!row?.can_punchout_edit,
+   can_punchout_delete:!!row?.can_punchout_delete
+ };
 }
 function canEditSubdivision(subdivisionId=currentSubdivision){return permissionForSubdivision(subdivisionId).can_edit}
 function canDeleteSubdivision(subdivisionId=currentSubdivision){return permissionForSubdivision(subdivisionId).can_delete}
+function canPunchoutAdd(subdivisionId=currentSubdivision){return permissionForSubdivision(subdivisionId).can_punchout_add}
+function canPunchoutEdit(subdivisionId=currentSubdivision){return permissionForSubdivision(subdivisionId).can_punchout_edit}
+function canPunchoutDelete(subdivisionId=currentSubdivision){return permissionForSubdivision(subdivisionId).can_punchout_delete}
+function requirePunchoutAddPermission(subdivisionId=currentSubdivision){
+ if(canPunchoutAdd(subdivisionId))return true;
+ alert('You do not have permission to add Punchout items in this subdivision.');
+ return false;
+}
+function requirePunchoutEditPermission(subdivisionId=currentSubdivision){
+ if(canPunchoutEdit(subdivisionId))return true;
+ alert('You do not have permission to edit Punchout items in this subdivision.');
+ return false;
+}
+function requirePunchoutDeletePermission(subdivisionId=currentSubdivision){
+ if(canPunchoutDelete(subdivisionId))return true;
+ alert('You do not have permission to delete Punchout items in this subdivision.');
+ return false;
+}
 function subdivisionForLot(lotId){return lots.find(l=>l.id===lotId)?.subdivision_id||null}
 function requireEditPermission(subdivisionId=currentSubdivision){
  if(canEditSubdivision(subdivisionId))return true;
@@ -2059,7 +2089,7 @@ async function load(){
   db.from('punchout_items').select('*').order('created_at',{ascending:false}),
   db.from('punchout_photos').select('*').order('created_at'),
   db.from('profiles').select('id,full_name'),
-  db.from('subdivision_members').select('subdivision_id,can_edit,can_delete').eq('user_id',currentAuthUserId)
+  db.from('subdivision_members').select('subdivision_id,can_edit,can_delete,can_punchout_add,can_punchout_edit,can_punchout_delete').eq('user_id',currentAuthUserId)
  ]);
  if(se||le||ie||pe||ppe||pre||mpe){alert((se||le||ie||pe||ppe||pre||mpe).message);return}
  subdivisions=s||[];lots=l||[];items=i||[];punchouts=p||[];punchoutPhotos=pp||[];profiles=pr||[];currentMembershipPermissions=mp||[];showSubs();
@@ -2325,8 +2355,8 @@ async function renderPunchout(lotId){
         <div class="punchout-actions">
           <button class="share-btn" type="button" data-text-punchout="${p.id}">Text</button>
           <button class="share-btn" type="button" data-email-punchout="${p.id}">Email</button>
-          <button class="${p.completed?'reopen-btn':'complete-btn'}" type="button" data-toggle-punchout="${p.id}">${p.completed?'Reopen':'Mark Completed'}</button>
-          <button class="secondary danger" type="button" data-delete-punchout="${p.id}">Delete</button>
+          ${canPunchoutEdit(subdivisionForLot(p.lot_id))?`<button class="${p.completed?'reopen-btn':'complete-btn'}" type="button" data-toggle-punchout="${p.id}">${p.completed?'Reopen':'Mark Completed'}</button>`:''}
+          ${canPunchoutDelete(subdivisionForLot(p.lot_id))?`<button class="secondary danger" type="button" data-delete-punchout="${p.id}">Delete</button>`:''}
         </div>
       </div>
     </div>`;
@@ -2416,6 +2446,7 @@ async function sharePunchouts(ids,mode){
 async function togglePunchoutComplete(id){
   const item=punchouts.find(p=>p.id===id);
   if(!item) return;
+  if(!requirePunchoutEditPermission(subdivisionForLot(item.lot_id)))return;
   const next=!item.completed;
   const {data:{user}}=await db.auth.getUser();
   const payload={
@@ -2432,7 +2463,9 @@ async function togglePunchoutComplete(id){
 }
 
 async function deletePunchoutItem(id){
-  if(!requireDeletePermission())return;
+  const existingItem=punchouts.find(p=>p.id===id);
+  if(!existingItem)return;
+  if(!requirePunchoutDeletePermission(subdivisionForLot(existingItem.lot_id)))return;
   const item=punchouts.find(p=>p.id===id);
   if(!item) return;
   if(!confirm('Delete this punchout item and all of its photos?')) return;
@@ -2456,6 +2489,7 @@ function openPunchoutDialog(){
 
 async function savePunchout(e){
   e.preventDefault();
+  if(!requirePunchoutAddPermission(subdivisionForLot(currentLot)))return;
   const description=$('punchoutText').value.trim();
   const photos=[...($('punchoutPhoto').files||[])];
 
@@ -2604,6 +2638,7 @@ function showLot(preserveScroll=false){
  $('addSchedule').classList.toggle('hidden',!editAllowed);
  $('addPunchout').classList.toggle('hidden',!editAllowed);
  renderLotChecklist();
+ if($('addPunchout'))$('addPunchout').classList.toggle('hidden',!canPunchoutAdd(l.subdivision_id));
 
  wireLotDocumentButtons();
  const liveRendering=$('liveRendering');
@@ -3215,7 +3250,7 @@ async function loadAdminUsersAndMemberships(){
   if(!isBowenBuilderAdmin())return {error:{message:'Administrator access required.'}};
   const [{data:users,error:userError},{data:memberships,error:membershipError}]=await Promise.all([
     db.rpc('bowenbuilder_admin_list_users'),
-    db.from('subdivision_members').select('user_id,subdivision_id,can_edit,can_delete')
+    db.from('subdivision_members').select('user_id,subdivision_id,can_edit,can_delete,can_punchout_add,can_punchout_edit,can_punchout_delete')
   ]);
   if(userError)return {error:userError};
   if(membershipError)return {error:membershipError};
@@ -3255,11 +3290,17 @@ async function renderAdminUserPermissions(){
      const access=isAdmin||!!m;
      const edit=isAdmin||!!m?.can_edit;
      const del=isAdmin||!!m?.can_delete;
+     const punchAdd=isAdmin||!!m?.can_punchout_add;
+     const punchEdit=isAdmin||!!m?.can_punchout_edit;
+     const punchDelete=isAdmin||!!m?.can_punchout_delete;
      return `<div class="admin-permission-row">
        <div class="admin-permission-sub">${esc(s.name||'Subdivision')}</div>
        <label class="admin-permission-toggle"><input type="checkbox" data-perm-kind="access" data-perm-user="${esc(u.id)}" data-perm-sub="${esc(s.id)}" ${access?'checked':''} ${isAdmin?'disabled':''}></label>
        <label class="admin-permission-toggle"><input type="checkbox" data-perm-kind="edit" data-perm-user="${esc(u.id)}" data-perm-sub="${esc(s.id)}" ${edit?'checked':''} ${(!access||isAdmin)?'disabled':''}></label>
        <label class="admin-permission-toggle"><input type="checkbox" data-perm-kind="delete" data-perm-user="${esc(u.id)}" data-perm-sub="${esc(s.id)}" ${del?'checked':''} ${(!access||isAdmin)?'disabled':''}></label>
+       <label class="admin-permission-toggle"><input type="checkbox" data-perm-kind="punchout_add" data-perm-user="${esc(u.id)}" data-perm-sub="${esc(s.id)}" ${punchAdd?'checked':''} ${(!access||isAdmin)?'disabled':''}></label>
+       <label class="admin-permission-toggle"><input type="checkbox" data-perm-kind="punchout_edit" data-perm-user="${esc(u.id)}" data-perm-sub="${esc(s.id)}" ${punchEdit?'checked':''} ${(!access||isAdmin)?'disabled':''}></label>
+       <label class="admin-permission-toggle"><input type="checkbox" data-perm-kind="punchout_delete" data-perm-user="${esc(u.id)}" data-perm-sub="${esc(s.id)}" ${punchDelete?'checked':''} ${(!access||isAdmin)?'disabled':''}></label>
      </div>`;
    }).join('');
 
@@ -3268,7 +3309,7 @@ async function renderAdminUserPermissions(){
       <div><div class="admin-user-name">${esc(u.full_name||u.email||'User')}</div><div class="admin-user-email">${esc(u.email||'')}</div></div>
       ${isAdmin?'<span class="admin-badge">Administrator</span>':'<span class="admin-badge">User</span>'}
     </div>
-    <div class="admin-permission-head"><div>Subdivision</div><div>Access</div><div>Edit</div><div>Delete</div></div>
+    <div class="admin-permission-head"><div>Subdivision</div><div>Access</div><div>Edit</div><div>Delete</div><div>Punch Add</div><div>Punch Edit</div><div>Punch Delete</div></div>
     <div>${rows||'<div class="muted">No subdivisions found.</div>'}</div>
     <div class="admin-user-status muted" data-admin-user-status="${esc(u.id)}">${isAdmin?'Administrator has full access to all subdivisions.':''}</div>
    </div>`;
@@ -3289,7 +3330,7 @@ async function setAdminSubdivisionPermission(userId,subdivisionId,kind,value,che
  if(kind==='access'){
    if(value){
      ({error}=await db.from('subdivision_members').upsert({
-       user_id:userId,subdivision_id:subdivisionId,can_edit:false,can_delete:false
+       user_id:userId,subdivision_id:subdivisionId,can_edit:false,can_delete:false,can_punchout_add:false,can_punchout_edit:false,can_punchout_delete:false
      },{onConflict:'subdivision_id,user_id'}));
    }else{
      ({error}=await db.from('subdivision_members').delete().eq('user_id',userId).eq('subdivision_id',subdivisionId));
@@ -3300,7 +3341,12 @@ async function setAdminSubdivisionPermission(userId,subdivisionId,kind,value,che
      if(status){status.textContent='Turn on Access first.';status.style.color='#b42318'}
      return;
    }
-   const patch=kind==='edit'?{can_edit:value}:{can_delete:value};
+   const patch=
+     kind==='edit'?{can_edit:value}:
+     kind==='delete'?{can_delete:value}:
+     kind==='punchout_add'?{can_punchout_add:value}:
+     kind==='punchout_edit'?{can_punchout_edit:value}:
+     {can_punchout_delete:value};
    ({error}=await db.from('subdivision_members').update(patch).eq('user_id',userId).eq('subdivision_id',subdivisionId));
  }
 
@@ -4014,7 +4060,7 @@ $('deleteLotDialog').addEventListener('click',e=>{
 });
 
 
-$('addPunchout').onclick=()=>{if(requireEditPermission())openPunchoutDialog()};
+$('addPunchout').onclick=()=>{if(requirePunchoutAddPermission(subdivisionForLot(currentLot)))openPunchoutDialog()};
 $('punchoutForm').onsubmit=savePunchout;
 $('punchoutX').onclick=()=>$('punchoutDialog').close();
 $('punchoutCancel').onclick=()=>$('punchoutDialog').close();
