@@ -1412,7 +1412,113 @@ button.danger:hover{filter:brightness(.96)}
   <input id="scheduleId" type="hidden">
   <label>Lot<select id="scheduleLot" required></select></label>
   <div class="two"><label>Type<select id="scheduleType"><option>Job</option><option>Crew</option><option>Equipment</option><option>Inspection</option></select></label><label>Status<select id="scheduleStatus" class="status-scheduled"><option>Scheduled</option><option>In Progress</option><option>Delayed</option><option>Complete</option></select></label></div>
-  <label>Schedule Item<input id="scheduleName" required placeholder="Framing, electrical rough, inspection..."></label>
+  <label>Schedule Item
+  <select id="scheduleName" required>
+    <option value="">Select schedule item...</option>
+    <option value="Septic or Sewer Permit">Septic or Sewer Permit</option>
+<option value="Water Meter">Water Meter</option>
+<option value="Building Permit">Building Permit</option>
+<option value="Set up Power">Set up Power</option>
+<option value="Set up Gas">Set up Gas</option>
+<option value="Install Temp Pole">Install Temp Pole</option>
+<option value="Call in Temp Pole Inspection">Call in Temp Pole Inspection</option>
+<option value="Order Floor System">Order Floor System</option>
+<option value="Order Toilet">Order Toilet</option>
+<option value="Grade Lot (Call in Locate)">Grade Lot (Call in Locate)</option>
+<option value="Erosion Control (Slit and Straw)">Erosion Control (Slit and Straw)</option>
+<option value="Driveway Inspection(Walton County)">Driveway Inspection(Walton County)</option>
+<option value="Mark Corners of House">Mark Corners of House</option>
+<option value="Order Slab Materials">Order Slab Materials</option>
+<option value="Form Slab">Form Slab</option>
+<option value="Measure Slab">Measure Slab</option>
+<option value="Slab Plumbing">Slab Plumbing</option>
+<option value="Run Sewer">Run Sewer</option>
+<option value="Slab Plumbing Inspection">Slab Plumbing Inspection</option>
+<option value="Prep Slab for Concrete">Prep Slab for Concrete</option>
+<option value="Install Electric Pipe for Island if necessary">Install Electric Pipe for Island if necessary</option>
+<option value="Slab Inspection">Slab Inspection</option>
+<option value="Schedule Concrete">Schedule Concrete</option>
+<option value="Pour Slab">Pour Slab</option>
+<option value="Schedule Lumber Delivery">Schedule Lumber Delivery</option>
+<option value="Order Windows">Order Windows</option>
+<option value="Schedule Framers">Schedule Framers</option>
+<option value="Order Steps">Order Steps</option>
+<option value="Screw Done Floor and Shoot Down Plates">Screw Done Floor and Shoot Down Plates</option>
+<option value="Do Framing Walk Through">Do Framing Walk Through</option>
+<option value="Schedule Roof Materials">Schedule Roof Materials</option>
+<option value="Schedule Roof Install">Schedule Roof Install</option>
+<option value="Measure cabinets">Measure cabinets</option>
+<option value="Schedule Green Guard">Schedule Green Guard</option>
+<option value="Schedule Round 1 Insulation">Schedule Round 1 Insulation</option>
+<option value="Schedule Fireplace">Schedule Fireplace</option>
+<option value="Schedule House Wrap">Schedule House Wrap</option>
+<option value="Schedule Windows">Schedule Windows</option>
+<option value="Order Siding">Order Siding</option>
+<option value="Schedule Siding Install">Schedule Siding Install</option>
+<option value="Schedule Septic Install">Schedule Septic Install</option>
+<option value="Run Water Line">Run Water Line</option>
+<option value="Schedule Rough Plumbing">Schedule Rough Plumbing</option>
+<option value="Schedule Rough HVAC">Schedule Rough HVAC</option>
+<option value="Schedule Rough Electric">Schedule Rough Electric</option>
+<option value="Schedule Smart Home System">Schedule Smart Home System</option>
+<option value="Schedule Light Take Of">Schedule Light Take Of</option>
+<option value="Schedule Round 2 Insulation">Schedule Round 2 Insulation</option>
+<option value="Call in Mechanical Inspection">Call in Mechanical Inspection</option>
+<option value="Schedule Framing Inspection">Schedule Framing Inspection</option>
+<option value="Order Materials and Install Front and Back Porch">Order Materials and Install Front and Back Porch</option>
+<option value="Order Brick/Stone">Order Brick/Stone</option>
+<option value="Schedule Brick/Stone Install">Schedule Brick/Stone Install</option>
+<option value="Schedule Round 3 Insulation">Schedule Round 3 Insulation</option>
+<option value="Call in Insulation Inspection (Gwinnett County)">Call in Insulation Inspection (Gwinnett County)</option>
+<option value="Install Electric Meter and call in Temp Power Release">Install Electric Meter and call in Temp Power Release</option>
+<option value="Run Power">Run Power</option>
+<option value="Run Gas">Run Gas</option>
+<option value="Schedule Front and Back Porch Install">Schedule Front and Back Porch Install</option>
+<option value="Schedule Drywall">Schedule Drywall</option>
+<option value="Schedule Cabinet Install">Schedule Cabinet Install</option>
+<option value="Schedule Trim Delivery">Schedule Trim Delivery</option>
+<option value="Schedule Trim Labor">Schedule Trim Labor</option>
+<option value="Schedule Inside/Outside Paint">Schedule Inside/Outside Paint</option>
+<option value="Schedule Sheetrock Skim Coat after Priming">Schedule Sheetrock Skim Coat after Priming</option>
+<option value="Schedule Vinyl in Bathrooms and Laundry Room">Schedule Vinyl in Bathrooms and Laundry Room</option>
+<option value="Install Tile">Install Tile</option>
+<option value="Measure Mirrors, Shelves, Shower Door">Measure Mirrors, Shelves, Shower Door</option>
+<option value="Schedule Final Grade">Schedule Final Grade</option>
+<option value="Schedule Driveway">Schedule Driveway</option>
+<option value="Order Appliances">Order Appliances</option>
+<option value="Schedule Light Delivery">Schedule Light Delivery</option>
+<option value="Order Garage Doors">Order Garage Doors</option>
+<option value="Schedule HVAC Trim">Schedule HVAC Trim</option>
+<option value="Schedule Plumbing Trim">Schedule Plumbing Trim</option>
+<option value="Schedule Electric Trim">Schedule Electric Trim</option>
+<option value="Schedule HVAC Startup">Schedule HVAC Startup</option>
+<option value="Schedule Blower Door Test">Schedule Blower Door Test</option>
+<option value="Schedule Smart Home Trim">Schedule Smart Home Trim</option>
+<option value="Rough Cleaning and Pressure Wash">Rough Cleaning and Pressure Wash</option>
+<option value="Install Landscaping">Install Landscaping</option>
+<option value="Schedule Centcom">Schedule Centcom</option>
+<option value="Schedule Final Sheetrock Touch Up">Schedule Final Sheetrock Touch Up</option>
+<option value="Order Gutters">Order Gutters</option>
+<option value="Schedule Wood or LVP Floors">Schedule Wood or LVP Floors</option>
+<option value="Schedule Mirrors, Shelves, Shower Door">Schedule Mirrors, Shelves, Shower Door</option>
+<option value="Schedule Shoe Mold and Lockout">Schedule Shoe Mold and Lockout</option>
+<option value="Schedule Garage Door Install">Schedule Garage Door Install</option>
+<option value="Schedule Carpet">Schedule Carpet</option>
+<option value="Install Shutters">Install Shutters</option>
+<option value="Install Mail Box">Install Mail Box</option>
+<option value="Schedule Blow in Insulation">Schedule Blow in Insulation</option>
+<option value="Turn in Final Septic Drawings">Turn in Final Septic Drawings</option>
+<option value="Turn in Energy Code Sheet">Turn in Energy Code Sheet</option>
+<option value="Final Paint Touch Up and Stain Stairs">Final Paint Touch Up and Stain Stairs</option>
+<option value="Final Cleaning">Final Cleaning</option>
+<option value="Call In Driveway Inspection">Call In Driveway Inspection</option>
+<option value="Call in CO Inspection">Call in CO Inspection</option>
+    <option value="__custom__">Other / Custom Item...</option>
+  </select>
+</label>
+<label id="scheduleCustomWrap" class="hidden">Custom Schedule Item
+  <input id="scheduleCustomName" placeholder="Enter custom schedule item">
+</label>
   <label>Crew / Assignee<input id="scheduleCrew"></label>
   <div class="two"><label>Start Date<input id="scheduleStart" type="date" required></label><label>End Date<input id="scheduleEnd" type="date" required></label></div>
   <label>Location<input id="scheduleLocation"></label>
@@ -2731,7 +2837,7 @@ async function saveSchedule(e){
  const payload={
   lot_id:$('scheduleLot').value,
   item_type:$('scheduleType').value,
-  name:$('scheduleName').value.trim(),
+  name:($('scheduleName').value==='__custom__' ? $('scheduleCustomName').value.trim() : $('scheduleName').value.trim()),
   status:$('scheduleStatus').value.toLowerCase().replaceAll(' ','_'),
   crew:$('scheduleCrew').value.trim(),
   starts_at:startDate+'T12:00:00Z',
@@ -2783,6 +2889,14 @@ function todayInput(){
  const day=String(d.getDate()).padStart(2,'0');
  return `${y}-${m}-${day}`;
 }
+function updateScheduleCustomVisibility(){
+ const custom=$('scheduleName').value==='__custom__';
+ $('scheduleCustomWrap').classList.toggle('hidden',!custom);
+ $('scheduleCustomName').required=custom;
+ if(!custom)$('scheduleCustomName').value='';
+}
+$('scheduleName').onchange=updateScheduleCustomVisibility;
+
 function openScheduleDialogLive(id='',context='lot',prefillDate=''){
  const deleteBtn=$('scheduleDelete');
  if(deleteBtn)deleteBtn.classList.toggle('hidden',!id);
@@ -2798,7 +2912,16 @@ function openScheduleDialogLive(id='',context='lot',prefillDate=''){
    $('scheduleType').value=existing.item_type||'Job';
    const statusMap={scheduled:'Scheduled',in_progress:'In Progress',delayed:'Delayed',complete:'Complete'};
    $('scheduleStatus').value=statusMap[existing.status]||'Scheduled';
-   $('scheduleName').value=existing.name||'';
+   const scheduleOptions=[...$('scheduleName').options].map(o=>o.value);
+   if(scheduleOptions.includes(existing.name||'')){
+     $('scheduleName').value=existing.name||'';
+     $('scheduleCustomName').value='';
+   }else{
+     $('scheduleName').value='__custom__';
+     $('scheduleCustomName').value=existing.name||'';
+   }
+   updateScheduleCustomVisibility();
+   if($('scheduleName').value==='__custom__')$('scheduleCustomName').value=existing.name||'';
    $('scheduleCrew').value=existing.crew||'';
    $('scheduleStart').value=dateInputValue(existing.starts_at);
    $('scheduleEnd').value=dateInputValue(existing.ends_at);
@@ -2808,6 +2931,9 @@ function openScheduleDialogLive(id='',context='lot',prefillDate=''){
    $('scheduleNotes').value=existing.notes||'';
  }else{
    $('scheduleDialogTitle').textContent='Add Schedule Item';
+   $('scheduleName').value='';
+   $('scheduleCustomName').value='';
+   updateScheduleCustomVisibility();
    $('scheduleLot').value=currentLot||'';
    const t=prefillDate||todayInput();
    $('scheduleStart').value=t;
