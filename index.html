@@ -990,6 +990,63 @@ dialog::backdrop{background:rgba(7,21,39,.7);backdrop-filter:blur(4px)}
   .bb-calendar-day-panel{padding:12px}
 }
 
+
+/* Calendar day status backgrounds */
+.bb-calendar-day.day-delayed{
+  background:#fff0f0;
+  box-shadow:inset 0 0 0 2px #d65a5a;
+}
+.bb-calendar-day.day-in_progress{
+  background:#fff9df;
+  box-shadow:inset 0 0 0 2px #d3aa27;
+}
+.bb-calendar-day.day-scheduled{
+  background:#f0f6ff;
+  box-shadow:inset 0 0 0 2px #5d96cf;
+}
+.bb-calendar-day.day-complete{
+  background:#eff9f2;
+  box-shadow:inset 0 0 0 2px #5aa26f;
+}
+.bb-calendar-day.selected{
+  outline:3px solid #174f86;
+  outline-offset:-3px;
+}
+.bb-calendar-event{
+  line-height:1.2;
+}
+@media(max-width:640px){
+  .bb-calendar-day{
+    min-height:96px;
+  }
+  .bb-calendar-events{
+    display:grid;
+    gap:3px;
+    line-height:normal;
+    padding-left:0;
+  }
+  .bb-calendar-event{
+    display:block;
+    width:100%;
+    height:auto;
+    padding:3px 4px;
+    border-radius:5px;
+    font-size:9px;
+    line-height:1.15;
+    white-space:normal;
+    overflow:hidden;
+    display:-webkit-box;
+    -webkit-line-clamp:2;
+    -webkit-box-orient:vertical;
+    margin-right:0;
+  }
+  .bb-calendar-more{
+    display:block;
+    font-size:9px;
+    padding-left:2px;
+  }
+}
+
 </style>
 </head>
 <body>
@@ -2036,6 +2093,16 @@ function renderScheduleListView(){
  }).join(''):'<div class="card muted">No schedule items yet.</div>';
  document.querySelectorAll('[data-schedule-list-edit]').forEach(b=>b.onclick=()=>openScheduleDialogLive(b.dataset.scheduleListEdit,'schedule'));
 }
+
+function calendarDayStatus(dayItems){
+ const statuses=new Set(dayItems.map(x=>String(x.status||'scheduled').toLowerCase()));
+ if(statuses.has('delayed')) return 'delayed';
+ if(statuses.has('in_progress')) return 'in_progress';
+ if(statuses.has('scheduled')) return 'scheduled';
+ if(statuses.has('complete')) return 'complete';
+ return '';
+}
+
 function renderScheduleCalendar(){
  const grid=$('calendarGrid'); if(!grid)return;
  const y=scheduleCalendarCursor.getFullYear(),m=scheduleCalendarCursor.getMonth();
@@ -2054,10 +2121,12 @@ function renderScheduleCalendar(){
    btn.type='button';
    btn.className='bb-calendar-day';
    if(d.getMonth()!==m)btn.classList.add('other-month');
+   const dayStatus=calendarDayStatus(dayItems);
+   if(dayStatus)btn.classList.add(`day-${dayStatus}`);
    if(key===today)btn.classList.add('today');
    if(key===scheduleSelectedDate)btn.classList.add('selected');
    btn.setAttribute('aria-label',`${d.toLocaleDateString()}, ${dayItems.length} schedule item${dayItems.length===1?'':'s'}`);
-   const eventHtml=dayItems.slice(0,3).map(x=>`<span class="bb-calendar-event ${esc(x.status||'scheduled')}">${esc(scheduleLotName(x))} · ${esc(x.name)}</span>`).join('');
+   const eventHtml=dayItems.slice(0,3).map(x=>`<span class="bb-calendar-event ${esc(x.status||'scheduled')}" title="${esc(x.name)}">${esc(x.name)}</span>`).join('');
    btn.innerHTML=`<span class="bb-calendar-number">${d.getDate()}</span><div class="bb-calendar-events">${eventHtml}</div>${dayItems.length>3?`<div class="bb-calendar-more">+${dayItems.length-3} more</div>`:''}`;
    btn.onclick=()=>{
      scheduleSelectedDate=key;
