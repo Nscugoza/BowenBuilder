@@ -1350,6 +1350,18 @@ button.danger:hover{filter:brightness(.96)}
   margin:0;
 }
 
+
+.checklist-list{display:grid;gap:8px;margin-top:12px}
+.checklist-row{display:flex;align-items:center;gap:10px;border:1px solid #e4e7ec;border-radius:12px;padding:10px 12px;background:#fff}
+.checklist-row input[type="checkbox"]{width:20px;height:20px;margin:0;flex:0 0 auto}
+.checklist-row-label{font-weight:700;color:#344054;flex:1}
+.checklist-custom-row .checklist-row-label{font-style:italic}
+.checklist-delete{border:0;background:transparent;color:#b42318;font-weight:800;padding:4px 6px}
+@media(max-width:620px){
+  .lot-checklist-head{align-items:flex-start;gap:10px;flex-wrap:wrap}
+  #addCustomChecklistItem{width:100%}
+}
+
 </style>
 </head>
 <body>
@@ -1412,15 +1424,9 @@ button.danger:hover{filter:brightness(.96)}
             <strong>Lot Checklist</strong>
             <div class="muted">Quick completion items for this lot.</div>
           </div>
+          <button id="addCustomChecklistItem" class="secondary" type="button">+ Other / Custom Item</button>
         </div>
-        <label class="check-row">
-          <input id="checkWindowPlans" type="checkbox">
-          <span>Submit Plans for window order</span>
-        </label>
-        <label class="check-row">
-          <input id="checkFramePackage" type="checkbox">
-          <span>Setup frame package</span>
-        </label>
+        <div id="lotChecklistList" class="checklist-list"></div>
       </div>
       <div class="lot-tabs">
         <button class="lot-tab active" data-lottab="overview" type="button">Overview</button>
@@ -1802,6 +1808,17 @@ let adminUsers=[];
 let adminMemberships=[];
 let currentMembershipPermissions=[];
 let activeAdminPanel='contacts';
+
+const DEFAULT_LOT_CHECKLIST_ITEMS=[
+  'Install Temp Pole',
+  'Call in Temp Pole Inspection',
+  'Order Floor System',
+  'Order Windows',
+  'Order Slab Materials',
+  'Install Island Pipe for Island if Necessary',
+  'Order Steps (2nd Floor Decking)'
+];
+
 let realtimeRefreshTimer=null;
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmt=v=>v?new Date(v).toLocaleString():'';
@@ -2530,10 +2547,7 @@ function showLot(){
  $('editLot').classList.toggle('hidden',!editAllowed);
  $('addSchedule').classList.toggle('hidden',!editAllowed);
  $('addPunchout').classList.toggle('hidden',!editAllowed);
- $('checkWindowPlans').disabled=!editAllowed;
- $('checkFramePackage').disabled=!editAllowed;
- $('checkWindowPlans').checked=!!l.submit_plans_window_order_completed;
- $('checkFramePackage').checked=!!l.setup_frame_package_completed;
+ renderLotChecklist();
 
  wireLotDocumentButtons();
  const liveRendering=$('liveRendering');
@@ -2556,20 +2570,80 @@ function showLot(){
  });
 }
 
-async function saveLotChecklistField(field,value){
-  if(!requireEditPermission()) return;
-  if(!currentLot) return;
-  const lot=lots.find(l=>l.id===currentLot);
-  if(!lot) return;
+function lotChecklistData(lot){
+  const raw=Array.isArray(lot?.checklist_items)?lot.checklist_items:[];
+  const standard=DEFAULT_LOT_CHECKLIST_ITEMS.map(name=>{
+    const existing=raw.find(x=>x && x.name===name && !x.custom);
+    return {name,complete:!!existing?.complete,custom:false};
+  });
+  const custom=raw
+    .filter(x=>x && x.custom && String(x.name||'').trim())
+    .map(x=>({name:String(x.name).trim(),complete:!!x.complete,custom:true}));
+  return [...standard,...custom];
+}
 
-  const {error}=await db.from('lots').update({[field]:value}).eq('id',currentLot);
-  if(error){
-    alert(error.message);
-    if(field==='submit_plans_window_order_completed') $('checkWindowPlans').checked=!value;
-    if(field==='setup_frame_package_completed') $('checkFramePackage').checked=!value;
-    return;
-  }
-  lot[field]=value;
+async function saveLotChecklist(items){
+  if(!requireEditPermission())return false;
+  if(!currentLot)return false;
+  const {error}=await db.from('lots').update({checklist_items:items}).eq('id',currentLot);
+  if(error){alert(error.message);return false}
+  const lot=lots.find(l=>l.id===currentLot);
+  if(lot)lot.checklist_items=items;
+  return true;
+}
+
+function renderLotChecklist(){
+  const host=$('lotChecklistList');
+  const lot=lots.find(l=>l.id===currentLot);
+  if(!host||!lot)return;
+
+  const rows=lotChecklistData(lot);
+  const editable=canEditSubdivision(lot.subdivision_id);
+
+  host.innerHTML=rows.map((item,index)=>`
+    <div class="checklist-row ${item.custom?'checklist-custom-row':''}">
+      <input type="checkbox"
+        data-checklist-index="${index}"
+        ${item.complete?'checked':''}
+        ${editable?'':'disabled'}>
+      <div class="checklist-row-label">${esc(item.name)}</div>
+      ${item.custom&&editable?`<button type="button" class="checklist-delete" data-checklist-delete="${index}">Delete</button>`:''}
+    </div>
+  `).join('');
+
+  $('addCustomChecklistItem').classList.toggle('hidden',!editable);
+
+  host.querySelectorAll('[data-checklist-index]').forEach(box=>{
+    box.onchange=async()=>{
+      const current=lotChecklistData(lot);
+      const index=Number(box.dataset.checklistIndex);
+      if(!current[index])return;
+      current[index]={...current[index],complete:box.checked};
+      if(!(await saveLotChecklist(current)))box.checked=!box.checked;
+    };
+  });
+
+  host.querySelectorAll('[data-checklist-delete]').forEach(btn=>{
+    btn.onclick=async()=>{
+      const current=lotChecklistData(lot);
+      const index=Number(btn.dataset.checklistDelete);
+      if(!current[index]?.custom)return;
+      current.splice(index,1);
+      if(await saveLotChecklist(current))renderLotChecklist();
+    };
+  });
+}
+
+async function addCustomChecklistItem(){
+  if(!requireEditPermission())return;
+  const lot=lots.find(l=>l.id===currentLot);
+  if(!lot)return;
+  const name=prompt('Custom checklist item:')?.trim();
+  if(!name)return;
+
+  const current=lotChecklistData(lot);
+  current.push({name,complete:false,custom:true});
+  if(await saveLotChecklist(current))renderLotChecklist();
 }
 
 function updateScheduleStatusColor(){
@@ -2948,25 +3022,6 @@ function mappedRecipientsForWork(workNames){
 function selectedWorkNames(){
   return selectedDateScheduleItems().map(i=>i.name||'').filter(Boolean);
 }
-
-function selectedDateHasPlumbingWork(){
-  return selectedWorkNames().some(name=>String(name).toLowerCase().includes('plumb'));
-}
-function currentLotIncludedOptionsText(){
-  const lot=activeLotInfo();
-  if(!lot)return '';
-  const raw=lot.options ?? lot.included_options ?? '';
-  if(Array.isArray(raw)) return raw.filter(Boolean).join(', ');
-  if(typeof raw==='object' && raw!==null){
-    try{
-      return Object.entries(raw)
-        .filter(([,v])=>v!==false && v!==null && v!=='')
-        .map(([k,v])=>v===true?k:`${k}: ${v}`)
-        .join(', ');
-    }catch(e){return ''}
-  }
-  return String(raw||'').trim();
-}
 function shouldIncludePlansForSelectedDate(channel){
   const workNames=new Set(selectedWorkNames());
   return scheduleContacts.some(row=>
@@ -3279,7 +3334,7 @@ function activeLotInfo(){
 function activeSubdivisionInfo(){
  return subdivisions.find(s=>s.id===currentSubdivision)||null;
 }
-function selectedDateMessage(planUrl='',includePlans=false,renderingUrl='',includeRendering=false,includedOptions=''){
+function selectedDateMessage(planUrl='',includePlans=false,renderingUrl='',includeRendering=false){
  if(!scheduleSelectedDate)return null;
  const d=dateFromKey(scheduleSelectedDate);
  const lot=activeLotInfo();
@@ -3327,11 +3382,6 @@ function selectedDateMessage(planUrl='',includePlans=false,renderingUrl='',inclu
  textLines.push(`Requested Schedule Date: ${dateLabel}`);
  if(isCalledInDate(scheduleSelectedDate))textLines.push('Called In: Yes ✓');
 
- if(includedOptions){
-   detailLines.push('');
-   detailLines.push(`Included Options: ${includedOptions}`);
-   textLines.push(`Included Options: ${includedOptions}`);
- }
  if(includePlans && planUrl){
    detailLines.push('');
    detailLines.push(`Plans: ${planUrl}`);
@@ -3353,8 +3403,7 @@ async function emailSelectedCalendarDate(){
    includePlans ? currentLotPlansShareUrl() : Promise.resolve(''),
    includeRendering ? currentLotRenderingShareUrl() : Promise.resolve('')
  ]);
- const includedOptions=selectedDateHasPlumbingWork()?currentLotIncludedOptionsText():'';
- const msg=selectedDateMessage(planUrl,includePlans,renderingUrl,includeRendering,includedOptions);
+ const msg=selectedDateMessage(planUrl,includePlans,renderingUrl,includeRendering);
  const recipients=mappedRecipientsForWork(selectedWorkNames());
  const marked=await markCalendarCommunication('email');
  if(!marked)return;
@@ -3371,8 +3420,7 @@ async function textSelectedCalendarDate(){
    includePlans ? currentLotPlansShareUrl() : Promise.resolve(''),
    includeRendering ? currentLotRenderingShareUrl() : Promise.resolve('')
  ]);
- const includedOptions=selectedDateHasPlumbingWork()?currentLotIncludedOptionsText():'';
- const msg=selectedDateMessage(planUrl,includePlans,renderingUrl,includeRendering,includedOptions);
+ const msg=selectedDateMessage(planUrl,includePlans,renderingUrl,includeRendering);
  const phones=mappedPhonesForWork(selectedWorkNames());
  const marked=await markCalendarCommunication('text');
  if(!marked)return;
@@ -3851,8 +3899,7 @@ $('clearSelectedPunchouts').onclick=()=>{
 };
 
 
-$('checkWindowPlans').onchange=e=>saveLotChecklistField('submit_plans_window_order_completed',e.target.checked);
-$('checkFramePackage').onchange=e=>saveLotChecklistField('setup_frame_package_completed',e.target.checked);
+$('addCustomChecklistItem').onclick=addCustomChecklistItem;
 
 $('scheduleStatus').addEventListener('change',updateScheduleStatusColor); updateScheduleStatusColor();
 
