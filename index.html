@@ -1105,6 +1105,48 @@ button.danger:hover{filter:brightness(.96)}
   .bb-swipe-content{transition:none}
 }
 
+
+.bb-calendar-day.called-in::after{
+  content:"✓";
+  position:absolute;
+  top:6px;
+  right:7px;
+  width:24px;
+  height:24px;
+  border-radius:50%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:#1f7a45;
+  color:#fff;
+  font-size:16px;
+  font-weight:900;
+  line-height:1;
+  box-shadow:0 1px 3px rgba(0,0,0,.16);
+}
+.bb-calendar-day.called-in .bb-calendar-number{
+  padding-right:1px;
+}
+.called-in-help{
+  font-size:12px;
+  color:var(--muted);
+  margin-left:auto;
+  align-self:center;
+}
+@media(max-width:640px){
+  .bb-calendar-day.called-in::after{
+    width:20px;
+    height:20px;
+    top:4px;
+    right:4px;
+    font-size:13px;
+  }
+  .called-in-help{
+    width:100%;
+    margin-left:0;
+  }
+}
+
 </style>
 </head>
 <body>
@@ -1230,6 +1272,7 @@ button.danger:hover{filter:brightness(.96)}
         </div>
         <div class="bb-calendar-actions">
           <button id="calendarToday" class="secondary" type="button">Today</button>
+          <span class="called-in-help">Double-click / double-tap a date to mark Called In ✓</span>
         </div>
         <div class="bb-calendar-weekdays" aria-hidden="true">
           <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
@@ -2121,6 +2164,8 @@ function updateScheduleStatusColor(){
 }
 
 
+let calendarCalledInMarks=[];
+let calledInTableAvailable=true;
 let scheduleViewMode='calendar';
 let scheduleContext='lot';
 let scheduleCalendarCursor=new Date();
@@ -2141,6 +2186,51 @@ function itemOccursOn(item,key){
  const s=itemStartKey(item),e=itemEndKey(item);
  return !!s && key>=s && key<=e;
 }
+
+async function loadCalendarCalledInMarks(){
+ if(!currentLot){calendarCalledInMarks=[];return}
+ const {data,error}=await db
+   .from('lot_calendar_marks')
+   .select('id,lot_id,calendar_date,called_in,created_by,updated_at')
+   .eq('lot_id',currentLot)
+   .eq('called_in',true);
+
+ if(error){
+   calendarCalledInMarks=[];
+   if(String(error.message||'').toLowerCase().includes('lot_calendar_marks')){
+     calledInTableAvailable=false;
+   }
+   return;
+ }
+ calledInTableAvailable=true;
+ calendarCalledInMarks=data||[];
+}
+function isCalledInDate(key){
+ return calendarCalledInMarks.some(m=>m.calendar_date===key && m.called_in===true);
+}
+async function toggleCalledInDate(key){
+ if(!currentLot)return;
+ if(!calledInTableAvailable){
+   alert('Called In tracking needs the Supabase setup SQL to be run first.');
+   return;
+ }
+
+ const existing=calendarCalledInMarks.find(m=>m.calendar_date===key);
+ if(existing){
+   const {error}=await db.from('lot_calendar_marks').delete().eq('id',existing.id);
+   if(error){alert(error.message);return}
+ }else{
+   const {error}=await db.from('lot_calendar_marks').insert({
+     lot_id:currentLot,
+     calendar_date:key,
+     called_in:true
+   });
+   if(error){alert(error.message);return}
+ }
+ await loadCalendarCalledInMarks();
+ renderScheduleCalendar();
+}
+
 function subdivisionScheduleItems(){
  if(!currentLot) return [];
  return items.filter(i=>i.lot_id===currentLot);
@@ -2196,17 +2286,31 @@ function renderScheduleCalendar(){
    if(d.getMonth()!==m)btn.classList.add('other-month');
    const dayStatus=calendarDayStatus(dayItems);
    if(dayStatus)btn.classList.add(`day-${dayStatus}`);
+   if(isCalledInDate(key))btn.classList.add('called-in');
    if(key===today)btn.classList.add('today');
    if(key===scheduleSelectedDate)btn.classList.add('selected');
    btn.setAttribute('aria-label',`${d.toLocaleDateString()}, ${dayItems.length} schedule item${dayItems.length===1?'':'s'}`);
    const eventHtml=dayItems.slice(0,3).map(x=>`<span class="bb-calendar-event ${esc(x.status||'scheduled')}" title="${esc(x.name)}">${esc(x.name)}</span>`).join('');
    btn.innerHTML=`<span class="bb-calendar-number">${d.getDate()}</span><div class="bb-calendar-events">${eventHtml}</div>${dayItems.length>3?`<div class="bb-calendar-more">+${dayItems.length-3} more</div>`:''}`;
-   btn.onclick=()=>{
+   let lastTapAt=0;
+   btn.addEventListener('click',()=>{
+     const now=Date.now();
+     if(now-lastTapAt<330){
+       lastTapAt=0;
+       toggleCalledInDate(key);
+       return;
+     }
+     lastTapAt=now;
      scheduleSelectedDate=key;
      scheduleCalendarCursor=new Date(d.getFullYear(),d.getMonth(),1);
      renderScheduleCalendar();
      renderSelectedScheduleDay();
-   };
+   });
+   btn.addEventListener('dblclick',e=>{
+     e.preventDefault();
+     lastTapAt=0;
+     toggleCalledInDate(key);
+   });
    grid.appendChild(btn);
  }
  renderSelectedScheduleDay();
@@ -2345,7 +2449,7 @@ function setScheduleViewMode(mode){
  if(scheduleViewMode==='calendar')renderScheduleCalendar();
  else renderScheduleListView();
 }
-function showScheduleView(mode=scheduleViewMode){
+async function showScheduleView(mode=scheduleViewMode){
  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.view==='schedule'));
  if(!currentLot){alert('Open a lot first to view its calendar.');return}
  const activeLot=lots.find(l=>l.id===currentLot);
@@ -2363,6 +2467,7 @@ function showScheduleView(mode=scheduleViewMode){
  if(!scheduleSelectedDate)scheduleSelectedDate=localDateKey(new Date());
  const selected=dateFromKey(scheduleSelectedDate);
  if(selected)scheduleCalendarCursor=new Date(selected.getFullYear(),selected.getMonth(),1);
+ await loadCalendarCalledInMarks();
  setScheduleViewMode(mode);
  window.scrollTo({top:0,left:0,behavior:'auto'});
 }
@@ -2911,6 +3016,19 @@ $('aiUseDraft').onclick=()=>{
 $('documentViewerX').onclick=()=>$('documentViewerDialog').close();
 $('documentViewerClose').onclick=()=>$('documentViewerDialog').close();
 $('documentViewerDialog').addEventListener('click',e=>{if(e.target===e.currentTarget)$('documentViewerDialog').close()});
+
+
+try{
+ db.channel('lot-calendar-marks-live')
+   .on('postgres_changes',{event:'*',schema:'public',table:'lot_calendar_marks'},async payload=>{
+     if(!currentLot)return;
+     const changedLot=payload.new?.lot_id||payload.old?.lot_id;
+     if(changedLot && changedLot!==currentLot)return;
+     await loadCalendarCalledInMarks();
+     if(!$('scheduleView').classList.contains('hidden'))renderScheduleCalendar();
+   })
+   .subscribe();
+}catch(e){}
 
 })();
 </script>
