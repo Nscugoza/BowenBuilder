@@ -2444,9 +2444,8 @@ function emailSelectedCalendarDate(){
 function textSelectedCalendarDate(){
  const msg=selectedDateMessage();
  if(!msg){alert('Select a calendar date first.');return}
- const combined=`${msg.subject}\n\n${msg.body}`;
  const separator=/iPad|iPhone|iPod/.test(navigator.userAgent)?'&':'?';
- window.location.href=`sms:${separator}body=${encodeURIComponent(combined)}`;
+ window.location.href=`sms:${separator}body=${encodeURIComponent(msg.body)}`;
 }
 
 function renderSelectedScheduleDay(){
