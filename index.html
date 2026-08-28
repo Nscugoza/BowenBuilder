@@ -2415,31 +2415,47 @@ function selectedDateMessage(){
  const arr=selectedDateScheduleItems();
 
  const dateLabel=d?d.toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric',year:'numeric'}):scheduleSelectedDate;
- const lines=[];
- lines.push(`${lot?.lot_name||'Lot'} Schedule`);
- if(lot?.address)lines.push(lot.address);
- if(sub?.name)lines.push(sub.name);
- if(lot?.plan_name)lines.push(`Plan: ${lot.plan_name}`);
- if(lot?.permit_number)lines.push(`Permit Number: ${lot.permit_number}`);
- lines.push(`Requested Schedule Date: ${dateLabel}`);
- lines.push('');
+ const workNames=arr.map(i=>i.name||'Schedule Item');
+ const workSubject=workNames.length?workNames.join(', '):dateLabel;
+
+ const detailLines=[];
+ detailLines.push(`${lot?.lot_name||'Lot'} Schedule`);
+ if(lot?.address)detailLines.push(lot.address);
+ if(sub?.name)detailLines.push(sub.name);
+ if(lot?.plan_name)detailLines.push(`Plan: ${lot.plan_name}`);
+ if(lot?.permit_number)detailLines.push(`Permit Number: ${lot.permit_number}`);
+ detailLines.push(`Requested Schedule Date: ${dateLabel}`);
+ detailLines.push('');
+ detailLines.push('Scheduled Work:');
  if(arr.length){
-   lines.push('Scheduled Work:');
    arr.forEach(i=>{
      const parts=[i.name||'Schedule Item'];
      if(i.crew)parts.push(i.crew);
-     lines.push(`- ${parts.join(' — ')}`);
+     detailLines.push(`- ${parts.join(' — ')}`);
    });
  }else{
-   lines.push('No schedule items are currently listed for this date.');
+   detailLines.push('No schedule items are currently listed for this date.');
  }
  if(isCalledInDate(scheduleSelectedDate)){
-   lines.push('');
-   lines.push('Called In: Yes ✓');
+   detailLines.push('');
+   detailLines.push('Called In: Yes ✓');
  }
 
- const subject=`${lot?.lot_name||'Lot'} Schedule`;
- return {subject,body:lines.join('\n')};
+ // Email subject: lot number + requested work only. No "Scheduled Work:" phrase.
+ const subject=`${lot?.lot_name||'Lot'} - ${workSubject}`;
+
+ // Text: scheduled work is the second line.
+ const textLines=[];
+ textLines.push(`${lot?.lot_name||'Lot'} Schedule`);
+ textLines.push(`Scheduled Work: ${workNames.length?workNames.join(', '):'None listed'}`);
+ if(lot?.address)textLines.push(lot.address);
+ if(sub?.name)textLines.push(sub.name);
+ if(lot?.plan_name)textLines.push(`Plan: ${lot.plan_name}`);
+ if(lot?.permit_number)textLines.push(`Permit Number: ${lot.permit_number}`);
+ textLines.push(`Requested Schedule Date: ${dateLabel}`);
+ if(isCalledInDate(scheduleSelectedDate))textLines.push('Called In: Yes ✓');
+
+ return {subject,body:detailLines.join('\n'),textBody:textLines.join('\n')};
 }
 function emailSelectedCalendarDate(){
  const msg=selectedDateMessage();
@@ -2451,7 +2467,7 @@ function textSelectedCalendarDate(){
  const msg=selectedDateMessage();
  if(!msg){alert('Select a calendar date first.');return}
  const separator=/iPad|iPhone|iPod/.test(navigator.userAgent)?'&':'?';
- window.location.href=`sms:${separator}body=${encodeURIComponent(msg.body)}`;
+ window.location.href=`sms:${separator}body=${encodeURIComponent(msg.textBody)}`;
 }
 
 function renderSelectedScheduleDay(){
