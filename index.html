@@ -1618,7 +1618,7 @@ button.teams-file-row:hover{border-color:#bdccdd}
 
     <section id="lotsView" class="hidden">
       <button id="backToSubs" class="secondary back" type="button">← Subdivisions</button>
-      <div class="toolbar"><div><strong id="subdivisionName"></strong><div class="muted">Lots in this subdivision</div></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button id="aiImportLot" class="secondary" type="button">✨ Import Lot with AI</button><button id="addLot" class="primary" type="button">+ Add Lot</button></div></div>
+      <div class="toolbar"><div><strong id="subdivisionName"></strong><div class="muted">Lots in this subdivision</div></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button id="aiImportLot" class="secondary" type="button">⬇ Import Lot from Teams</button><button id="addLot" class="primary" type="button">+ Add Lot</button></div></div>
       <div id="lotsGrid" class="grid"></div>
     </section>
 
@@ -1954,21 +1954,37 @@ button.teams-file-row:hover{border-color:#bdccdd}
 <dialog id="aiImportDialog">
   <div class="sheet ai-import-sheet">
     <div class="dialog-head">
-      <h2>✨ Import Lot with AI</h2>
+      <h2>⬇ Import Lot from Teams</h2>
       <button id="aiImportX" class="xbtn" type="button">×</button>
     </div>
 
     <div id="aiUploadStep">
-      <div class="notice">Upload text-based PDF, DOCX, or TXT files. BowenBuilder will read them and prepare a lot draft for review.</div>
-      <label>Documents
-        <input id="aiDocuments" type="file" accept=".pdf,.docx,.txt,text/plain,application/pdf" multiple>
-        <span class="muted">You can select multiple documents for the same lot.</span>
-      </label>
-      <div id="aiFileList" class="ai-file-list"></div>
-      <div id="aiAnalyzeStatus" class="muted" style="margin-top:10px"></div>
+      <div class="notice">Choose a PDF, DOCX, or TXT file from Microsoft Teams. BowenBuilder will read it and prepare a lot draft for review before anything is saved.</div>
+      <div style="display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin:12px 0">
+        <strong>Microsoft Teams Files</strong>
+        <div style="display:flex;gap:8px">
+          <button id="aiTeamsBack" class="secondary" type="button" disabled>‹ Back</button>
+          <button id="aiTeamsRefresh" class="secondary" type="button">↻ Refresh</button>
+        </div>
+      </div>
+      <div id="aiTeamsBreadcrumbs" class="teams-files-breadcrumbs"></div>
+      <div id="aiAnalyzeStatus" class="muted" style="margin:8px 0 10px">Loading Teams…</div>
+      <div id="aiTeamsGrid" class="teams-files-grid"></div>
+      <div style="margin-top:14px;padding-top:14px;border-top:1px solid #e2e8f0">
+        <details>
+          <summary style="cursor:pointer;font-weight:700">Or upload a document from this device</summary>
+          <label style="margin-top:10px">Documents
+            <input id="aiDocuments" type="file" accept=".pdf,.docx,.txt,text/plain,application/pdf" multiple>
+            <span class="muted">PDF, DOCX, or TXT</span>
+          </label>
+          <div id="aiFileList" class="ai-file-list"></div>
+          <div class="actions">
+            <button id="aiAnalyze" class="primary" type="button">Analyze Uploaded Documents</button>
+          </div>
+        </details>
+      </div>
       <div class="actions">
         <button id="aiCancel" class="secondary" type="button">Cancel</button>
-        <button id="aiAnalyze" class="primary" type="button">Analyze Documents</button>
       </div>
     </div>
 
@@ -5218,13 +5234,148 @@ $('addCustomChecklistItem').onclick=addCustomChecklistItem;
 
 $('scheduleStatus').addEventListener('change',updateScheduleStatusColor); updateScheduleStatusColor();
 
+
+let aiTeamsState={level:'teams',team:null,channel:null,driveId:'',folderId:'',folderStack:[]};
+
+function aiTeamsReadable(name=''){
+  return /\.(pdf|docx|txt)$/i.test(String(name));
+}
+
+function aiTeamsRenderBreadcrumbs(){
+  const root=$('aiTeamsBreadcrumbs');
+  if(!root)return;
+  const parts=[{label:'Teams',action:'teams'}];
+  if(aiTeamsState.team)parts.push({label:aiTeamsState.team.displayName||'Team',action:'team'});
+  if(aiTeamsState.channel)parts.push({label:aiTeamsState.channel.displayName||'Channel',action:'channel'});
+  aiTeamsState.folderStack.forEach((f,i)=>parts.push({label:f.name,action:`folder:${i}`}));
+  root.innerHTML=parts.map((p,i)=>`${i?'<span class="teams-files-crumb-sep">›</span>':''}<button type="button" class="teams-files-crumb" data-ai-teams-crumb="${esc(p.action)}">${esc(p.label)}</button>`).join('');
+  root.querySelectorAll('[data-ai-teams-crumb]').forEach(b=>b.onclick=()=>aiTeamsNavigateBreadcrumb(b.dataset.aiTeamsCrumb));
+  const back=$('aiTeamsBack');
+  if(back)back.disabled=aiTeamsState.level==='teams';
+}
+
+function aiTeamsRenderRows(items,type){
+  const grid=$('aiTeamsGrid');
+  if(!grid)return;
+  if(type==='teams'){
+    grid.innerHTML=items.map(t=>`<button class="teams-file-row" type="button" data-ai-team-id="${esc(t.id)}" data-ai-team-name="${esc(t.displayName||'Team')}"><span class="teams-file-row-icon">👥</span><span class="teams-file-row-main"><span class="teams-file-row-name">${esc(t.displayName||'Team')}</span><span class="teams-file-row-meta">${esc(t.description||'Microsoft Team')}</span></span><span class="teams-file-row-arrow">›</span></button>`).join('');
+    grid.querySelectorAll('[data-ai-team-id]').forEach(b=>b.onclick=()=>aiTeamsLoadChannels(b.dataset.aiTeamId,b.dataset.aiTeamName));
+    return;
+  }
+  if(type==='channels'){
+    grid.innerHTML=items.map(c=>`<button class="teams-file-row" type="button" data-ai-channel-id="${esc(c.id)}" data-ai-channel-name="${esc(c.displayName||'Channel')}"><span class="teams-file-row-icon">#</span><span class="teams-file-row-main"><span class="teams-file-row-name">${esc(c.displayName||'Channel')}</span><span class="teams-file-row-meta">${esc(c.description||'Team channel')}</span></span><span class="teams-file-row-arrow">›</span></button>`).join('');
+    grid.querySelectorAll('[data-ai-channel-id]').forEach(b=>b.onclick=()=>aiTeamsLoadChannelRoot(aiTeamsState.team.id,b.dataset.aiChannelId,b.dataset.aiChannelName));
+    return;
+  }
+  grid.innerHTML=items.map(item=>{
+    const folder=!!item.folder;
+    const readable=aiTeamsReadable(item.name);
+    const meta=folder?`${item.folder?.childCount??''} item${item.folder?.childCount===1?'':'s'}`:[teamsFilesFormatBytes(item.size),item.lastModifiedDateTime?new Date(item.lastModifiedDateTime).toLocaleDateString():null].filter(Boolean).join(' · ');
+    return `<button class="teams-file-row" type="button" data-ai-drive-item="${esc(item.id)}" data-ai-drive-name="${esc(item.name||'File')}" data-ai-drive-folder="${folder?'1':'0'}" ${(!folder&&!readable)?'disabled style="opacity:.5"':''}><span class="teams-file-row-icon">${teamsFilesIcon(item)}</span><span class="teams-file-row-main"><span class="teams-file-row-name">${esc(item.name||'File')}</span><span class="teams-file-row-meta">${esc(meta)}${(!folder&&!readable)?' · PDF, DOCX, or TXT only':''}</span></span><span class="teams-file-row-arrow">${folder?'›':readable?'Import':''}</span></button>`;
+  }).join('');
+  grid.querySelectorAll('[data-ai-drive-item]').forEach(b=>b.onclick=()=>{
+    if(b.dataset.aiDriveFolder==='1')return aiTeamsOpenFolder(b.dataset.aiDriveItem,b.dataset.aiDriveName);
+    if(aiTeamsReadable(b.dataset.aiDriveName))return aiTeamsImportFile(b.dataset.aiDriveItem,b.dataset.aiDriveName);
+  });
+}
+
+async function aiTeamsLoadTeams(){
+  aiTeamsState={level:'teams',team:null,channel:null,driveId:'',folderId:'',folderStack:[]};
+  aiTeamsRenderBreadcrumbs();
+  $('aiAnalyzeStatus').textContent='Loading your Microsoft Teams…';
+  $('aiTeamsGrid').innerHTML='';
+  try{
+    const data=await microsoftGraphJson('/me/joinedTeams?$select=id,displayName,description');
+    const teams=data.value||[];
+    aiTeamsRenderRows(teams,'teams');
+    $('aiAnalyzeStatus').textContent=teams.length?'Choose a Team.':'No Microsoft Teams were found for this account.';
+  }catch(err){$('aiAnalyzeStatus').textContent=err?.message||String(err);}
+}
+
+async function aiTeamsLoadChannels(teamId,teamName){
+  aiTeamsState.level='channels';aiTeamsState.team={id:teamId,displayName:teamName};aiTeamsState.channel=null;aiTeamsState.driveId='';aiTeamsState.folderId='';aiTeamsState.folderStack=[];
+  aiTeamsRenderBreadcrumbs();$('aiAnalyzeStatus').textContent='Loading channels…';$('aiTeamsGrid').innerHTML='';
+  try{
+    const data=await microsoftGraphJson(`/teams/${encodeURIComponent(teamId)}/channels?$select=id,displayName,description,membershipType`);
+    const channels=data.value||[];aiTeamsRenderRows(channels,'channels');$('aiAnalyzeStatus').textContent=channels.length?'Choose a channel.':'No channels were found in this Team.';
+  }catch(err){$('aiAnalyzeStatus').textContent=err?.message||String(err);}
+}
+
+async function aiTeamsLoadChannelRoot(teamId,channelId,channelName){
+  aiTeamsState.level='files';aiTeamsState.channel={id:channelId,displayName:channelName};aiTeamsState.folderStack=[];
+  aiTeamsRenderBreadcrumbs();$('aiAnalyzeStatus').textContent='Opening channel files…';$('aiTeamsGrid').innerHTML='';
+  try{
+    const folder=await microsoftGraphJson(`/teams/${encodeURIComponent(teamId)}/channels/${encodeURIComponent(channelId)}/filesFolder`);
+    aiTeamsState.driveId=folder.parentReference?.driveId||'';aiTeamsState.folderId=folder.id;
+    await aiTeamsLoadFolderChildren(folder.id,false);
+  }catch(err){$('aiAnalyzeStatus').textContent=err?.message||String(err);}
+}
+
+async function aiTeamsLoadFolderChildren(folderId){
+  $('aiAnalyzeStatus').textContent='Loading files…';$('aiTeamsGrid').innerHTML='';aiTeamsRenderBreadcrumbs();
+  try{
+    const data=await microsoftGraphJson(`/drives/${encodeURIComponent(aiTeamsState.driveId)}/items/${encodeURIComponent(folderId)}/children?$select=id,name,size,folder,file,lastModifiedDateTime,parentReference`);
+    const all=data.value||[];aiTeamsRenderRows(all,'files');$('aiAnalyzeStatus').textContent=all.length?'Choose a PDF, DOCX, or TXT file to import.':'This folder is empty.';
+  }catch(err){$('aiAnalyzeStatus').textContent=err?.message||String(err);}
+}
+
+async function aiTeamsOpenFolder(itemId,name){
+  aiTeamsState.folderId=itemId;aiTeamsState.folderStack.push({id:itemId,name});
+  await aiTeamsLoadFolderChildren(itemId);
+}
+
+async function aiTeamsNavigateBreadcrumb(action){
+  if(action==='teams')return aiTeamsLoadTeams();
+  if(action==='team'&&aiTeamsState.team)return aiTeamsLoadChannels(aiTeamsState.team.id,aiTeamsState.team.displayName);
+  if(action==='channel'&&aiTeamsState.channel)return aiTeamsLoadChannelRoot(aiTeamsState.team.id,aiTeamsState.channel.id,aiTeamsState.channel.displayName);
+  if(action?.startsWith('folder:')){
+    const idx=Number(action.split(':')[1]);const target=aiTeamsState.folderStack[idx];if(!target)return;
+    aiTeamsState.folderStack=aiTeamsState.folderStack.slice(0,idx+1);aiTeamsState.folderId=target.id;await aiTeamsLoadFolderChildren(target.id);
+  }
+}
+
+async function aiTeamsGoBack(){
+  if(aiTeamsState.level==='teams')return;
+  if(aiTeamsState.level==='channels')return aiTeamsLoadTeams();
+  if(aiTeamsState.level==='files'&&aiTeamsState.folderStack.length){
+    if(aiTeamsState.folderStack.length===1)return aiTeamsLoadChannelRoot(aiTeamsState.team.id,aiTeamsState.channel.id,aiTeamsState.channel.displayName);
+    aiTeamsState.folderStack.pop();const target=aiTeamsState.folderStack[aiTeamsState.folderStack.length-1];aiTeamsState.folderId=target.id;return aiTeamsLoadFolderChildren(target.id);
+  }
+  if(aiTeamsState.level==='files'&&aiTeamsState.team)return aiTeamsLoadChannels(aiTeamsState.team.id,aiTeamsState.team.displayName);
+}
+
+async function aiTeamsImportFile(itemId,name){
+  if(!aiTeamsState.driveId)return;
+  $('aiAnalyzeStatus').textContent=`Reading ${name} from Teams…`;
+  const grid=$('aiTeamsGrid');if(grid)grid.querySelectorAll('button').forEach(b=>b.disabled=true);
+  try{
+    const token=await microsoftProviderToken();
+    if(!token)throw new Error('Microsoft sign-in token is unavailable. Sign out and back in, then try again.');
+    const r=await fetch(`https://graph.microsoft.com/v1.0/drives/${encodeURIComponent(aiTeamsState.driveId)}/items/${encodeURIComponent(itemId)}/content`,{headers:{Authorization:`Bearer ${token}`}});
+    if(!r.ok)throw new Error(`Could not read ${name} from Teams (${r.status}).`);
+    const blob=await r.blob();
+    const file=new File([blob],name,{type:blob.type||''});
+    const text=await aiReadFile(file);
+    if(!text.trim())throw new Error('BowenBuilder could not extract text from this file. Try a text-based PDF, DOCX, or TXT file.');
+    const fields=aiExtractFields(text);
+    $('aiLotName').value=fields.lot||'';$('aiAddress').value=fields.address||'';$('aiPermit').value=fields.permit||'';$('aiPlan').value=fields.plan||'';$('aiOptions').value=fields.options||'';
+    $('aiDetectedFiles').innerHTML=`<div class="ai-file"><strong>${esc(aiClassifyFile(name))}</strong><br>${esc(name)}<br><span class="muted">Imported from Microsoft Teams</span></div>`;
+    $('aiUploadStep').classList.add('hidden');$('aiReviewStep').classList.remove('hidden');
+    requestAnimationFrame(()=>$('aiReviewStep').scrollIntoView({block:'start',behavior:'auto'}));
+  }catch(err){alert(err?.message||String(err));$('aiAnalyzeStatus').textContent='Choose a PDF, DOCX, or TXT file to import.';}
+  finally{if(grid)grid.querySelectorAll('button').forEach(b=>b.disabled=false);aiTeamsRenderBreadcrumbs();}
+}
+
 function resetAiImport(){
   $('aiUploadStep').classList.remove('hidden');
   $('aiReviewStep').classList.add('hidden');
   $('aiDocuments').value='';
   $('aiFileList').innerHTML='';
-  $('aiAnalyzeStatus').textContent='';
+  $('aiAnalyzeStatus').textContent='Loading Teams…';
+  if($('aiTeamsGrid'))$('aiTeamsGrid').innerHTML='';
+  aiTeamsState={level:'teams',team:null,channel:null,driveId:'',folderId:'',folderStack:[]};
 }
+
 
 function aiCleanText(t){
   return String(t||'')
@@ -5330,6 +5481,7 @@ function aiClassifyFile(name){
 $('aiImportLot').onclick=()=>{
   resetAiImport();
   $('aiImportDialog').showModal();
+  aiTeamsLoadTeams();
 };
 $('aiImportX').onclick=()=>$('aiImportDialog').close();
 $('aiCancel').onclick=()=>$('aiImportDialog').close();
@@ -5395,6 +5547,7 @@ $('aiAnalyze').onclick=async()=>{
 $('aiBack').onclick=()=>{
   $('aiReviewStep').classList.add('hidden');
   $('aiUploadStep').classList.remove('hidden');
+  if(!$('aiTeamsGrid').children.length)aiTeamsLoadTeams();
 };
 
 $('aiUseDraft').onclick=()=>{
@@ -5414,6 +5567,8 @@ $('aiUseDraft').onclick=()=>{
   $('includedOptions').value=options;
 };
 
+if($('aiTeamsBack'))$('aiTeamsBack').onclick=()=>aiTeamsGoBack();
+if($('aiTeamsRefresh'))$('aiTeamsRefresh').onclick=()=>aiTeamsLoadTeams();
 if($('teamsFilesBack'))$('teamsFilesBack').onclick=()=>goBackTeamsFiles();
 if($('teamsFilesRefresh'))$('teamsFilesRefresh').onclick=()=>loadTeamsFilesTeams(true);
 $('documentViewerX').onclick=()=>$('documentViewerDialog').close();
