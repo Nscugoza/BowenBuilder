@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="2026-08-31-teams-files-no-jump-v2">
+<meta name="bowenbuilder-version" content="2026-08-31-teams-folders-no-jump">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -4011,6 +4011,30 @@ function overviewScheduleItemMessage(item,planUrl='',includePlans=false,renderin
 
 
 
+let teamsFilesStableMinHeight=0;
+
+function beginTeamsFilesNavigation(){
+  const grid=$('filesGrid');
+  const y=window.scrollY||window.pageYOffset||0;
+  if(grid){
+    const h=Math.ceil(grid.getBoundingClientRect().height||0);
+    teamsFilesStableMinHeight=Math.max(teamsFilesStableMinHeight,h);
+    if(teamsFilesStableMinHeight>0)grid.style.minHeight=`${teamsFilesStableMinHeight}px`;
+  }
+  return y;
+}
+
+function restoreTeamsFilesNavigation(y){
+  const top=Number.isFinite(Number(y))?Number(y):0;
+  const restore=()=>window.scrollTo({top,left:0,behavior:'auto'});
+  requestAnimationFrame(()=>{
+    restore();
+    requestAnimationFrame(restore);
+  });
+  setTimeout(restore,80);
+  setTimeout(restore,220);
+}
+
 function teamsFilesSetStatus(message,isError=false){
   const el=$('teamsFilesStatus');
   if(!el)return;
@@ -4076,13 +4100,16 @@ async function navigateTeamsBreadcrumb(action){
   if(action==='team' && teamsFilesState.team)return loadTeamsChannels(teamsFilesState.team.id,teamsFilesState.team.displayName);
   if(action==='channel' && teamsFilesState.channel)return loadTeamsChannelRoot(teamsFilesState.team.id,teamsFilesState.channel.id,teamsFilesState.channel.displayName);
   if(action?.startsWith('folder:')){
+    const preservedScrollY=beginTeamsFilesNavigation();
     const idx=Number(action.split(':')[1]);
     const target=teamsFilesState.folderStack[idx];
     if(!target)return;
     teamsFilesState.folderStack=teamsFilesState.folderStack.slice(0,idx+1);
     teamsFilesState.folderId=target.id;
     teamsFilesState.folderName=target.name;
-    return loadTeamsFolderChildren(teamsFilesState.driveId,target.id,false);
+    await loadTeamsFolderChildren(teamsFilesState.driveId,target.id,false);
+    restoreTeamsFilesNavigation(preservedScrollY);
+    return;
   }
 }
 
@@ -4177,10 +4204,12 @@ async function loadTeamsFolderChildren(driveId,folderId,updateBreadcrumb=true){
 }
 
 async function openTeamsFolder(itemId,name){
+  const preservedScrollY=beginTeamsFilesNavigation();
   teamsFilesState.folderId=itemId;teamsFilesState.folderName=name;
   teamsFilesState.folderStack.push({id:itemId,name});
   renderTeamsFilesBreadcrumbs();
   await loadTeamsFolderChildren(teamsFilesState.driveId,itemId,false);
+  restoreTeamsFilesNavigation(preservedScrollY);
 }
 
 function cleanupTeamsPreviewObjectUrl(){
@@ -5080,8 +5109,14 @@ document.querySelectorAll('.lot-tab').forEach(b=>b.onclick=()=>{
   $('filesPanel').classList.toggle('hidden',b.dataset.lottab!=='files');
   if(b.dataset.lottab==='punchout' && currentLot) renderPunchout(currentLot);
   if(b.dataset.lottab==='files'){
-    if(!teamsFilesLoaded)loadTeamsFilesTeams();
-    else renderTeamsFilesBreadcrumbs();
+    if(!teamsFilesLoaded){
+      teamsFilesStableMinHeight=0;
+      if($('filesGrid'))$('filesGrid').style.minHeight='';
+      loadTeamsFilesTeams();
+    }else renderTeamsFilesBreadcrumbs();
+  }else{
+    teamsFilesStableMinHeight=0;
+    if($('filesGrid'))$('filesGrid').style.minHeight='';
   }
 });
 document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{
@@ -5386,7 +5421,7 @@ try{
 </script>
 
 <div id="bbBuildVersion" style="text-align:center;color:#8a96a8;font-size:10px;padding:10px 8px 18px">
-  BowenBuilder build 2026-08-31-teams-files-no-jump-v2
+  BowenBuilder build 2026-08-31-teams-folders-no-jump
 </div>
 
 
