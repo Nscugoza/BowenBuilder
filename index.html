@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="2026-08-31-rendering-close-fix">
+<meta name="bowenbuilder-version" content="2026-08-31-rendering-overlay-fix">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -1449,17 +1449,18 @@ button.danger:hover{filter:brightness(.96)}
 
 /* In-app Color Rendering viewer */
 .rendering-viewer-dialog{
+  position:fixed;
+  inset:0;
+  z-index:999999;
   width:100vw;
-  max-width:none;
   height:100dvh;
-  max-height:none;
   margin:0;
   padding:0;
   border:0;
   background:#0b1220;
   overflow:hidden;
 }
-.rendering-viewer-dialog::backdrop{background:#0b1220}
+.rendering-viewer-dialog.hidden{display:none!important}
 .rendering-viewer-stage{
   width:100%;
   height:100%;
@@ -4474,32 +4475,41 @@ $('subForm').onsubmit=async e=>{e.preventDefault();let name=$('subName').value.t
 
 
 function openRenderingViewer(src){
-  const dlg=$('renderingViewerDialog');
+  const viewer=$('renderingViewerDialog');
   const img=$('renderingViewerImage');
-  if(!dlg||!img||!src)return;
+  if(!viewer||!img||!src)return;
   img.src=src;
-  if(typeof dlg.showModal==='function')dlg.showModal();
-  else dlg.setAttribute('open','');
+  viewer.classList.remove('hidden');
+  viewer.setAttribute('aria-hidden','false');
+  document.documentElement.style.overflow='hidden';
+  document.body.style.overflow='hidden';
 }
 
 function closeRenderingViewer(){
-  const dlg=$('renderingViewerDialog');
+  const viewer=$('renderingViewerDialog');
   const img=$('renderingViewerImage');
-  if(dlg?.open)dlg.close();
-  else dlg?.removeAttribute('open');
+  if(!viewer)return;
+  viewer.classList.add('hidden');
+  viewer.setAttribute('aria-hidden','true');
+  document.documentElement.style.overflow='';
+  document.body.style.overflow='';
   if(img)img.src='';
 }
 
 const renderingCloseBtn=$('closeRenderingViewer');
 if(renderingCloseBtn){
-  const closeFromTap=e=>{
+  renderingCloseBtn.onclick=e=>{
     e.preventDefault();
     e.stopPropagation();
     closeRenderingViewer();
+    return false;
   };
-  renderingCloseBtn.addEventListener('pointerup',closeFromTap);
-  renderingCloseBtn.addEventListener('touchend',closeFromTap,{passive:false});
-  renderingCloseBtn.addEventListener('click',closeFromTap);
+  renderingCloseBtn.ontouchend=e=>{
+    e.preventDefault();
+    e.stopPropagation();
+    closeRenderingViewer();
+    return false;
+  };
 }
 $('renderingViewerDialog')?.addEventListener('click',e=>{
   if(e.target===$('renderingViewerDialog'))closeRenderingViewer();
@@ -4951,12 +4961,12 @@ try{
 </div>
 
 
-<dialog id="renderingViewerDialog" class="rendering-viewer-dialog">
-  <button id="closeRenderingViewer" class="rendering-viewer-close" type="button" aria-label="Close">×</button>
+<div id="renderingViewerDialog" class="rendering-viewer-dialog hidden" aria-hidden="true">
+  <button id="closeRenderingViewer" class="rendering-viewer-close" type="button" aria-label="Close Color Rendering">×</button>
   <div class="rendering-viewer-stage">
     <img id="renderingViewerImage" alt="Color Rendering">
   </div>
-</dialog>
+</div>
 
 </body>
 </html>
