@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="2026-08-31-teams-files-no-jump-fixed">
+<meta name="bowenbuilder-version" content="2026-08-31-teams-files-no-jump-v2">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -1520,6 +1520,68 @@ button.teams-file-row:hover{border-color:#bdccdd}
 .teams-files-refresh{white-space:nowrap}
 @media(max-width:700px){.teams-files-head{align-items:stretch}.teams-files-refresh{width:100%}.teams-file-row{padding:11px}.teams-file-row-icon{width:38px;height:38px}}
 
+/* Teams file viewer: fixed overlay instead of native <dialog> to prevent iPhone Safari scroll jumps. */
+.teams-viewer-overlay{
+  position:fixed;
+  inset:0;
+  z-index:1000000;
+  background:rgba(7,21,39,.96);
+  display:flex;
+  flex-direction:column;
+  width:100vw;
+  height:100dvh;
+  overflow:hidden;
+}
+.teams-viewer-overlay.hidden{display:none!important}
+.teams-viewer-head{
+  flex:0 0 auto;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  padding:max(10px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) 10px max(12px,env(safe-area-inset-left));
+  background:#fff;
+  border-bottom:1px solid var(--border);
+}
+.teams-viewer-title-wrap{min-width:0;flex:1}
+.teams-viewer-title{font-weight:850;color:#10233c;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.teams-viewer-meta{font-size:12px;color:var(--muted);margin-top:2px}
+.teams-viewer-close{
+  flex:0 0 auto;
+  width:46px;
+  height:46px;
+  border:0;
+  border-radius:50%;
+  background:#eef3f8;
+  color:#10243e;
+  font-size:29px;
+  line-height:1;
+  touch-action:manipulation;
+}
+.teams-viewer-body{
+  flex:1 1 auto;
+  min-height:0;
+  overflow:auto;
+  -webkit-overflow-scrolling:touch;
+  background:#eef3f8;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+.teams-viewer-body iframe{width:100%;height:100%;border:0;background:#fff}
+.teams-viewer-body img{display:block;max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain;margin:auto}
+.teams-viewer-loading{padding:22px;text-align:center;color:#475467}
+.teams-viewer-actions{
+  flex:0 0 auto;
+  display:flex;
+  gap:8px;
+  justify-content:flex-end;
+  padding:10px max(12px,env(safe-area-inset-right)) max(10px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left));
+  background:#fff;
+  border-top:1px solid var(--border);
+}
+@media(max-width:700px){.teams-viewer-actions>a{width:100%;text-align:center}.teams-viewer-actions{justify-content:stretch}}
+
 </style>
 </head>
 <body>
@@ -1982,50 +2044,30 @@ let teamsFilesState={level:'teams',team:null,channel:null,driveId:'',folderId:''
 let teamsFilesLoaded=false;
 let teamsPreviewObjectUrl='';
 let teamsFilesPageScrollY=0;
-let teamsFilesViewerScrollLocked=false;
-let teamsFilesBodyStyleSnapshot=null;
 
-function lockTeamsFilesPageScroll(){
-  if(teamsFilesViewerScrollLocked)return;
+function openTeamsFileViewerShell(name){
   teamsFilesPageScrollY=window.scrollY||window.pageYOffset||0;
-  teamsFilesBodyStyleSnapshot={
-    position:document.body.style.position,
-    top:document.body.style.top,
-    left:document.body.style.left,
-    right:document.body.style.right,
-    width:document.body.style.width,
-    overflow:document.body.style.overflow
-  };
-  document.body.style.position='fixed';
-  document.body.style.top=`-${teamsFilesPageScrollY}px`;
-  document.body.style.left='0';
-  document.body.style.right='0';
-  document.body.style.width='100%';
-  document.body.style.overflow='hidden';
-  teamsFilesViewerScrollLocked=true;
-}
-
-function unlockTeamsFilesPageScroll(){
-  if(!teamsFilesViewerScrollLocked)return;
-  const snap=teamsFilesBodyStyleSnapshot||{};
-  document.body.style.position=snap.position||'';
-  document.body.style.top=snap.top||'';
-  document.body.style.left=snap.left||'';
-  document.body.style.right=snap.right||'';
-  document.body.style.width=snap.width||'';
-  document.body.style.overflow=snap.overflow||'';
-  teamsFilesViewerScrollLocked=false;
-  teamsFilesBodyStyleSnapshot=null;
-  requestAnimationFrame(()=>{
-    window.scrollTo({top:teamsFilesPageScrollY,left:0,behavior:'auto'});
-    requestAnimationFrame(()=>window.scrollTo({top:teamsFilesPageScrollY,left:0,behavior:'auto'}));
-  });
+  const overlay=$('teamsFileViewerOverlay');
+  if(!overlay)return;
+  $('teamsFileViewerTitle').textContent=name||'File';
+  $('teamsFileViewerMeta').textContent='Microsoft Teams / SharePoint · Read only';
+  $('teamsFileViewerBody').innerHTML='<div class="teams-viewer-loading">Loading file…</div>';
+  $('teamsFileViewerOpen').href='#';
+  $('teamsFileViewerOpen').classList.add('hidden');
+  overlay.classList.remove('hidden');
+  overlay.setAttribute('aria-hidden','false');
 }
 
 function closeTeamsFileViewer(){
   cleanupTeamsPreviewObjectUrl();
-  try{$('documentViewerDialog').close()}catch(_){ }
-  unlockTeamsFilesPageScroll();
+  const overlay=$('teamsFileViewerOverlay');
+  if(overlay){
+    overlay.classList.add('hidden');
+    overlay.setAttribute('aria-hidden','true');
+  }
+  const body=$('teamsFileViewerBody');
+  if(body)body.innerHTML='';
+  requestAnimationFrame(()=>window.scrollTo({top:teamsFilesPageScrollY,left:0,behavior:'auto'}));
 }
 
 const DEFAULT_LOT_CHECKLIST_ITEMS=[
@@ -4147,45 +4189,40 @@ function cleanupTeamsPreviewObjectUrl(){
 
 async function openTeamsDriveItem(itemId,name){
   if(!teamsFilesState.driveId)return;
-  teamsFilesPageScrollY=window.scrollY||window.pageYOffset||0;
-  teamsFilesSetStatus(`Opening ${name}…`);
   cleanupTeamsPreviewObjectUrl();
+  openTeamsFileViewerShell(name);
   try{
     const token=await microsoftProviderToken();
     if(!token)throw new Error('Microsoft Teams file permission is not active. Sign out and back in with Microsoft.');
     const ext=fileExtension(name);
-    $('documentViewerTitle').textContent=name;
-    $('documentViewerMeta').textContent='Microsoft Teams / SharePoint · Read only';
-    $('documentViewerOpen').textContent='Open in Microsoft 365';
 
     let openUrl='';
     try{
       const meta=await microsoftGraphJson(`/drives/${encodeURIComponent(teamsFilesState.driveId)}/items/${encodeURIComponent(itemId)}?$select=webUrl`);
       openUrl=meta?.webUrl||'';
     }catch(_){ }
-    $('documentViewerOpen').href=openUrl||'#';
-    $('documentViewerOpen').classList.toggle('hidden',!openUrl);
+    $('teamsFileViewerOpen').href=openUrl||'#';
+    $('teamsFileViewerOpen').classList.toggle('hidden',!openUrl);
 
     if(['jpg','jpeg','png','gif','webp'].includes(ext) || ext==='pdf'){
       const r=await fetch(`https://graph.microsoft.com/v1.0/drives/${encodeURIComponent(teamsFilesState.driveId)}/items/${encodeURIComponent(itemId)}/content`,{headers:{Authorization:`Bearer ${token}`}});
       if(!r.ok)throw new Error(`Microsoft could not load this file (${r.status}).`);
       const blob=await r.blob();
       teamsPreviewObjectUrl=URL.createObjectURL(blob);
-      if(ext==='pdf')$('documentViewerBody').innerHTML=`<iframe src="${teamsPreviewObjectUrl}#view=FitH" title="${esc(name)}"></iframe>`;
-      else $('documentViewerBody').innerHTML=`<img src="${teamsPreviewObjectUrl}" alt="${esc(name)}">`;
+      if(ext==='pdf')$('teamsFileViewerBody').innerHTML=`<iframe src="${teamsPreviewObjectUrl}#view=FitH" title="${esc(name)}"></iframe>`;
+      else $('teamsFileViewerBody').innerHTML=`<img src="${teamsPreviewObjectUrl}" alt="${esc(name)}">`;
     }else{
       let preview=null;
       try{preview=await microsoftGraphJson(`/drives/${encodeURIComponent(teamsFilesState.driveId)}/items/${encodeURIComponent(itemId)}/preview`,{method:'POST',body:'{}'});}catch(_){ }
       if(preview?.getUrl){
-        $('documentViewerBody').innerHTML=`<iframe src="${esc(preview.getUrl)}" title="${esc(name)}" allowfullscreen></iframe>`;
+        $('teamsFileViewerBody').innerHTML=`<iframe src="${esc(preview.getUrl)}" title="${esc(name)}" allowfullscreen></iframe>`;
       }else{
-        $('documentViewerBody').innerHTML='<div class="card" style="margin:18px"><strong>Preview not available inside BowenBuilder.</strong><div class="muted">Use Open in Microsoft 365 to view this file.</div></div>';
+        $('teamsFileViewerBody').innerHTML='<div class="card" style="margin:18px"><strong>Preview not available inside BowenBuilder.</strong><div class="muted">Use Open in Microsoft 365 to view this file.</div></div>';
       }
     }
-    lockTeamsFilesPageScroll();
-    $('documentViewerDialog').showModal();
-    teamsFilesSetStatus('');
-  }catch(err){teamsFilesSetStatus(err?.message||String(err),true);}
+  }catch(err){
+    $('teamsFileViewerBody').innerHTML=`<div class="card" style="margin:18px"><strong>Could not open file.</strong><div class="muted">${esc(err?.message||String(err))}</div></div>`;
+  }
 }
 
 async function microsoftProviderToken(){
@@ -5301,9 +5338,19 @@ $('aiUseDraft').onclick=()=>{
 };
 
 if($('teamsFilesRefresh'))$('teamsFilesRefresh').onclick=()=>loadTeamsFilesTeams(true);
-$('documentViewerX').onclick=()=>closeTeamsFileViewer();
-$('documentViewerClose').onclick=()=>closeTeamsFileViewer();
-$('documentViewerDialog').addEventListener('click',e=>{if(e.target===e.currentTarget)closeTeamsFileViewer()});
+$('documentViewerX').onclick=()=>$('documentViewerDialog').close();
+$('documentViewerClose').onclick=()=>$('documentViewerDialog').close();
+$('documentViewerDialog').addEventListener('click',e=>{if(e.target===e.currentTarget)$('documentViewerDialog').close()});
+
+document.addEventListener('click',e=>{
+  const closeBtn=e.target.closest?.('#teamsFileViewerClose');
+  if(closeBtn){e.preventDefault();e.stopPropagation();closeTeamsFileViewer();}
+});
+document.addEventListener('touchend',e=>{
+  const closeBtn=e.target.closest?.('#teamsFileViewerClose');
+  if(!closeBtn)return;
+  e.preventDefault();e.stopPropagation();closeTeamsFileViewer();
+},{passive:false});
 
 
 try{
@@ -5339,7 +5386,22 @@ try{
 </script>
 
 <div id="bbBuildVersion" style="text-align:center;color:#8a96a8;font-size:10px;padding:10px 8px 18px">
-  BowenBuilder build 2026-08-31-teams-files-scroll-preserved
+  BowenBuilder build 2026-08-31-teams-files-no-jump-v2
+</div>
+
+
+<div id="teamsFileViewerOverlay" class="teams-viewer-overlay hidden" aria-hidden="true">
+  <div class="teams-viewer-head">
+    <div class="teams-viewer-title-wrap">
+      <div id="teamsFileViewerTitle" class="teams-viewer-title">File</div>
+      <div id="teamsFileViewerMeta" class="teams-viewer-meta">Microsoft Teams / SharePoint · Read only</div>
+    </div>
+    <button id="teamsFileViewerClose" class="teams-viewer-close" type="button" aria-label="Close file">×</button>
+  </div>
+  <div id="teamsFileViewerBody" class="teams-viewer-body"></div>
+  <div class="teams-viewer-actions">
+    <a id="teamsFileViewerOpen" class="secondary hidden" href="#" target="_blank" rel="noopener">Open in Microsoft 365</a>
+  </div>
 </div>
 
 
