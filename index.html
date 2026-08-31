@@ -5408,6 +5408,30 @@ function aiExtractOptions(text){
   return result.join('\n');
 }
 
+function aiExtractLocationAddress(text){
+  const lines=String(text||'').split('\n').map(x=>x.trim()).filter(Boolean);
+
+  // Permit forms can contain several addresses. For BowenBuilder, the permit's
+  // LOCATION ADDRESS field is authoritative, so always look for it first.
+  for(let i=0;i<lines.length;i++){
+    const line=lines[i];
+    const sameLine=line.match(/\bLOCATION\s+ADDRESS\b\s*[:#-]?\s*(.+)$/i);
+    if(sameLine && sameLine[1]){
+      const candidate=sameLine[1].trim();
+      if(/^\d{1,6}\s+/.test(candidate)) return candidate;
+    }
+
+    if(/^LOCATION\s+ADDRESS\s*[:#-]?\s*$/i.test(line)){
+      for(let j=i+1;j<Math.min(lines.length,i+4);j++){
+        const candidate=lines[j].trim();
+        if(/^\d{1,6}\s+/.test(candidate)) return candidate;
+      }
+    }
+  }
+
+  return '';
+}
+
 function aiExtractFields(raw){
   const text=aiCleanText(raw);
 
@@ -5417,7 +5441,7 @@ function aiExtractFields(raw){
   ]);
   if(/^\d/.test(lot)) lot='Lot '+lot;
 
-  const address=aiFirstMatch(text,[
+  const address=aiExtractLocationAddress(text) || aiFirstMatch(text,[
     /(?:PROPERTY\s+ADDRESS|SITE\s+ADDRESS|ADDRESS)\s*[:#-]\s*([^\n]+)/i,
     /\b(\d{1,6}\s+[A-Za-z0-9 .'-]+\s(?:Street|St|Road|Rd|Drive|Dr|Lane|Ln|Court|Ct|Way|Avenue|Ave|Boulevard|Blvd|Trail|Trl|Place|Pl)\b[^\n]*)/i
   ]);
@@ -5449,7 +5473,27 @@ async function aiReadPdf(file){
   for(let p=1;p<=pdf.numPages;p++){
     const page=await pdf.getPage(p);
     const content=await page.getTextContent();
-    output += content.items.map(x=>x.str).join(' ')+'\n';
+
+    // Rebuild approximate visual rows instead of flattening the whole page.
+    // This is important on permit forms where LOCATION ADDRESS is a specific
+    // field in the top-left and other mailing/owner addresses also appear.
+    const items=content.items
+      .filter(x=>String(x.str||'').trim())
+      .map(x=>({str:String(x.str||'').trim(),x:Number(x.transform?.[4]||0),y:Number(x.transform?.[5]||0)}))
+      .sort((a,b)=>Math.abs(b.y-a.y)>2 ? b.y-a.y : a.x-b.x);
+
+    const rows=[];
+    for(const item of items){
+      let row=rows.find(r=>Math.abs(r.y-item.y)<=2.5);
+      if(!row){row={y:item.y,items:[]};rows.push(row);}
+      row.items.push(item);
+    }
+    rows.sort((a,b)=>b.y-a.y);
+    for(const row of rows){
+      row.items.sort((a,b)=>a.x-b.x);
+      output += row.items.map(x=>x.str).join(' ').replace(/\s+/g,' ').trim()+'\n';
+    }
+    output+='\n';
   }
   return output;
 }
