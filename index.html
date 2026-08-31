@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="2026-08-31-teams-folders-no-jump">
+<meta name="bowenbuilder-version" content="2026-08-31-teams-linked-deco-hlp-lgp">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -1522,6 +1522,25 @@ button.teams-file-row:hover{border-color:#bdccdd}
 .teams-files-back:disabled{opacity:.45;cursor:default}
 @media(max-width:700px){.teams-files-head{align-items:stretch}.teams-files-actions{width:100%}.teams-files-actions button{flex:1}.teams-file-row{padding:11px}.teams-file-row-icon{width:38px;height:38px}}
 
+
+/* Lot document links stored as read-only Microsoft Teams references. */
+.teams-doc-link-field{border:1px solid var(--border);border-radius:14px;padding:12px;background:#fff;display:grid;gap:9px}
+.teams-doc-link-head{display:grid;gap:3px}
+.teams-doc-link-head .muted{font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.teams-doc-link-actions{display:flex;gap:8px;flex-wrap:wrap}
+.teams-doc-link-actions button{flex:1;min-width:120px}
+
+/* Teams document picker shown while the lot form is temporarily closed. */
+.teams-picker-overlay{position:fixed;inset:0;z-index:1000001;background:#eef3f8;display:flex;flex-direction:column;width:100vw;height:100dvh;overflow:hidden}
+.teams-picker-overlay.hidden{display:none!important}
+.teams-picker-head{flex:0 0 auto;background:#fff;border-bottom:1px solid var(--border);padding:max(10px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) 10px max(12px,env(safe-area-inset-left));display:grid;gap:10px}
+.teams-picker-title-row{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.teams-picker-title{font-weight:850;color:#10233c}
+.teams-picker-sub{font-size:12px;color:var(--muted)}
+.teams-picker-actions{display:flex;gap:8px}
+.teams-picker-actions button{flex:1}
+.teams-picker-body{flex:1 1 auto;min-height:0;overflow:auto;-webkit-overflow-scrolling:touch;padding:12px max(12px,env(safe-area-inset-right)) max(18px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left))}
+
 /* Teams file viewer: fixed overlay instead of native <dialog> to prevent iPhone Safari scroll jumps. */
 .teams-viewer-overlay{
   position:fixed;
@@ -1803,12 +1822,35 @@ button.teams-file-row:hover{border-color:#bdccdd}
 <label>Redlined Plan<input id="redlinedPlanFile" type="file" accept="application/pdf,image/*"><span class="muted">Upload PDF/image for in-app viewing.</span></label>
   <label>Schedule Inspection Link<input id="permitUrl" type="url" placeholder="https://..."></label>
   <label>Color Rendering<input id="renderingFile" type="file" accept="image/*"></label>
-  <label>Deco Sheet Link<input id="decoUrl" type="url"></label>
+  <div class="teams-doc-link-field">
+    <div class="teams-doc-link-head"><strong>Deco Sheet</strong><span id="decoTeamsSelection" class="muted">Not linked</span></div>
+    <div class="teams-doc-link-actions">
+      <button class="secondary" type="button" data-pick-lot-teams-doc="deco">Select from Teams</button>
+      <button class="secondary hidden" type="button" data-clear-lot-teams-doc="deco">Clear</button>
+    </div>
+    <input id="decoUrl" type="hidden">
+  </div>
   <label>Included Options<textarea id="includedOptions" rows="4"></textarea></label>
   <div class="two">
-<label>HLP File<input id="hlpFile" type="file" accept="application/pdf,image/*"></label>
-<label>LGP File<input id="lgpFile" type="file" accept="application/pdf,image/*"></label>
-</div>
+    <div class="teams-doc-link-field">
+      <div class="teams-doc-link-head"><strong>HLP</strong><span id="hlpTeamsSelection" class="muted">Not linked</span></div>
+      <div class="teams-doc-link-actions">
+        <button class="secondary" type="button" data-pick-lot-teams-doc="hlp">Select from Teams</button>
+        <button class="secondary hidden" type="button" data-clear-lot-teams-doc="hlp">Clear</button>
+      </div>
+      <input id="hlpUrl" type="hidden">
+      <input id="hlpFile" type="file" accept="application/pdf,image/*" hidden>
+    </div>
+    <div class="teams-doc-link-field">
+      <div class="teams-doc-link-head"><strong>LGP</strong><span id="lgpTeamsSelection" class="muted">Not linked</span></div>
+      <div class="teams-doc-link-actions">
+        <button class="secondary" type="button" data-pick-lot-teams-doc="lgp">Select from Teams</button>
+        <button class="secondary hidden" type="button" data-clear-lot-teams-doc="lgp">Clear</button>
+      </div>
+      <input id="lgpUrl" type="hidden">
+      <input id="lgpFile" type="file" accept="application/pdf,image/*" hidden>
+    </div>
+  </div>
   <div class="actions"><button id="lotCancel" class="secondary" type="button">Cancel</button><button class="primary" type="submit">Save Lot</button></div>
 </form></dialog>
 
@@ -2065,6 +2107,48 @@ let teamsFilesState={level:'teams',team:null,channel:null,driveId:'',folderId:''
 let teamsFilesLoaded=false;
 let teamsPreviewObjectUrl='';
 let teamsFilesPageScrollY=0;
+
+let lotTeamsPickerState={target:'',level:'teams',team:null,channel:null,driveId:'',folderId:'',folderStack:[]};
+
+function encodeTeamsDocumentRef(ref){
+  return 'bowenteams:'+encodeURIComponent(JSON.stringify({
+    driveId:String(ref?.driveId||''),
+    itemId:String(ref?.itemId||''),
+    name:String(ref?.name||''),
+    webUrl:String(ref?.webUrl||'')
+  }));
+}
+function parseTeamsDocumentRef(value){
+  const raw=String(value||'');
+  if(!raw.startsWith('bowenteams:'))return null;
+  try{
+    const data=JSON.parse(decodeURIComponent(raw.slice('bowenteams:'.length)));
+    if(!data?.driveId||!data?.itemId)return null;
+    return data;
+  }catch(_){return null}
+}
+function lotTeamsDocInputId(kind){
+  return kind==='deco'?'decoUrl':kind==='hlp'?'hlpUrl':'lgpUrl';
+}
+function lotTeamsDocSelectionId(kind){
+  return kind==='deco'?'decoTeamsSelection':kind==='hlp'?'hlpTeamsSelection':'lgpTeamsSelection';
+}
+function lotTeamsDocTitle(kind){
+  return kind==='deco'?'Deco Sheet':kind==='hlp'?'HLP':'LGP';
+}
+function refreshLotTeamsDocField(kind){
+  const input=$(lotTeamsDocInputId(kind));
+  const label=$(lotTeamsDocSelectionId(kind));
+  if(!input||!label)return;
+  const ref=parseTeamsDocumentRef(input.value);
+  label.textContent=ref?.name||((input.value||'').trim()?'Existing external link':'Not linked');
+  document.querySelectorAll(`[data-clear-lot-teams-doc="${kind}"]`).forEach(btn=>{
+    btn.classList.toggle('hidden',!(input.value||'').trim());
+  });
+}
+function refreshAllLotTeamsDocFields(){
+  ['deco','hlp','lgp'].forEach(refreshLotTeamsDocField);
+}
 
 function openTeamsFileViewerShell(name){
   teamsFilesPageScrollY=window.scrollY||window.pageYOffset||0;
@@ -2860,6 +2944,17 @@ async function openLotDocument(title,path){
  $('documentViewerDialog').showModal();
 }
 function wireLotDocumentButtons(){document.querySelectorAll('[data-lot-document]').forEach(b=>b.onclick=()=>openLotDocument(b.dataset.documentTitle||'Document',b.dataset.lotDocument))}
+
+async function openLotTeamsDocument(title,rawRef){
+  const ref=parseTeamsDocumentRef(rawRef);
+  if(!ref){alert('This Teams document link is not valid. Edit the lot and select the file again.');return}
+  await openTeamsDriveItemFromDrive(ref.driveId,ref.itemId,ref.name||title,ref.webUrl||'');
+}
+function wireLotTeamsDocumentButtons(){
+  document.querySelectorAll('[data-lot-teams-document]').forEach(b=>{
+    b.onclick=()=>openLotTeamsDocument(b.dataset.documentTitle||'Document',b.dataset.lotTeamsDocument);
+  });
+}
 function ensureLotCalendarVisible(){
  const btn=$('lotCalendarBtn');
  if(btn){
@@ -2901,9 +2996,11 @@ function showLot(preserveScroll=false){
  });
  joinLotPresence(currentLot);
  $('lotsView').classList.add('hidden');$('lotView').classList.remove('hidden');$('heroTitle').textContent=l.lot_name;$('heroSub').textContent='Live BowenBuilder lot information and schedule.';$('lotTitle').textContent=l.lot_name;$('lotSubtitle').textContent=[l.plan_name,l.county].filter(Boolean).join(' · ');
- const links=[['Schedule Inspection',l.permit_url],['Deco Sheet',l.deco_url]].filter(x=>safe(x[1]));
+ const links=[['Schedule Inspection',l.permit_url]].filter(x=>safe(x[1]));
  const storedDocs=[['Plans',l.plans_file_path],['Redlined Plan',l.redlined_plan_file_path],['HLP',l.hlp_file_path],['LGP',l.lgp_file_path]].filter(x=>x[1]);
- $('lotInfo').innerHTML=`<div class="info-grid"><div class="info"><small>Address</small><strong>${esc(l.address||'Not added')}</strong></div><div class="info"><small>Permit Number</small><strong>${esc(l.permit_number||'Not added')}</strong></div><div class="info"><small>Plan</small><strong>${esc(l.plan_name||'Not added')}</strong></div><div class="info"><small>Included Options</small><div class="included-options-detail">${includedOptionsBullets(l.included_options)}</div></div><div class="info"><small>County</small><strong>${esc(l.county||'Not added')}</strong></div></div>${(links.length||storedDocs.length)?`<div class="resource-row">${storedDocs.map(x=>`<button type="button" class="document-resource" data-lot-document="${esc(x[1])}" data-document-title="${esc(x[0])}">${esc(x[0])} ▣</button>`).join('')}${links.filter(x=>!storedDocs.some(d=>d[0]===x[0])).map(x=>`<a href="${safe(x[1])}" target="_blank">${x[0]} ↗</a>`).join('')}</div>`:''}${l.color_rendering_url?`<div class="card" style="margin-top:14px"><small class="muted">Color Rendering</small><div style="margin-top:8px"><img src="${l.color_rendering_url}" alt="${esc(l.lot_name)} color rendering" style="max-width:100%;max-height:320px;border-radius:14px;cursor:zoom-in" id="liveRendering"></div></div>`:''}`;
+ const teamsDocs=[['Deco Sheet',l.deco_url],['HLP',l.hlp_url],['LGP',l.lgp_url]].filter(x=>parseTeamsDocumentRef(x[1]));
+ const externalLegacyDocs=[['Deco Sheet',l.deco_url],['HLP',l.hlp_url],['LGP',l.lgp_url]].filter(x=>x[1]&&!parseTeamsDocumentRef(x[1])&&safe(x[1]));
+ $('lotInfo').innerHTML=`<div class="info-grid"><div class="info"><small>Address</small><strong>${esc(l.address||'Not added')}</strong></div><div class="info"><small>Permit Number</small><strong>${esc(l.permit_number||'Not added')}</strong></div><div class="info"><small>Plan</small><strong>${esc(l.plan_name||'Not added')}</strong></div><div class="info"><small>Included Options</small><div class="included-options-detail">${includedOptionsBullets(l.included_options)}</div></div><div class="info"><small>County</small><strong>${esc(l.county||'Not added')}</strong></div></div>${(links.length||storedDocs.length||teamsDocs.length||externalLegacyDocs.length)?`<div class="resource-row">${storedDocs.filter(x=>!teamsDocs.some(t=>t[0]===x[0])).map(x=>`<button type="button" class="document-resource" data-lot-document="${esc(x[1])}" data-document-title="${esc(x[0])}">${esc(x[0])} ▣</button>`).join('')}${teamsDocs.map(x=>`<button type="button" class="document-resource" data-lot-teams-document="${esc(x[1])}" data-document-title="${esc(x[0])}">${esc(x[0])} ▣</button>`).join('')}${links.map(x=>`<a href="${safe(x[1])}" target="_blank">${x[0]} ↗</a>`).join('')}${externalLegacyDocs.filter(x=>!storedDocs.some(d=>d[0]===x[0])).map(x=>`<a href="${safe(x[1])}" target="_blank">${x[0]} ↗</a>`).join('')}</div>`:''}${l.color_rendering_url?`<div class="card" style="margin-top:14px"><small class="muted">Color Rendering</small><div style="margin-top:8px"><img src="${l.color_rendering_url}" alt="${esc(l.lot_name)} color rendering" style="max-width:100%;max-height:320px;border-radius:14px;cursor:zoom-in" id="liveRendering"></div></div>`:''}`;
  const editAllowed=canEditSubdivision(l.subdivision_id);
  $('editLot').classList.toggle('hidden',!editAllowed);
  $('addSchedule').classList.toggle('hidden',!editAllowed);
@@ -2913,6 +3010,7 @@ function showLot(preserveScroll=false){
  if($('addPunchout'))$('addPunchout').classList.toggle('hidden',!canPunchoutAdd(l.subdivision_id));
 
  wireLotDocumentButtons();
+ wireLotTeamsDocumentButtons();
  const liveRendering=$('liveRendering');
  if(liveRendering){
    liveRendering.onclick=()=>openRenderingViewer(l.color_rendering_url);
@@ -4276,6 +4374,11 @@ function cleanupTeamsPreviewObjectUrl(){
 
 async function openTeamsDriveItem(itemId,name){
   if(!teamsFilesState.driveId)return;
+  return openTeamsDriveItemFromDrive(teamsFilesState.driveId,itemId,name);
+}
+
+async function openTeamsDriveItemFromDrive(driveId,itemId,name,knownWebUrl=''){
+  if(!driveId||!itemId)return;
   cleanupTeamsPreviewObjectUrl();
   openTeamsFileViewerShell(name);
   try{
@@ -4283,16 +4386,16 @@ async function openTeamsDriveItem(itemId,name){
     if(!token)throw new Error('Microsoft Teams file permission is not active. Sign out and back in with Microsoft.');
     const ext=fileExtension(name);
 
-    let openUrl='';
-    try{
-      const meta=await microsoftGraphJson(`/drives/${encodeURIComponent(teamsFilesState.driveId)}/items/${encodeURIComponent(itemId)}?$select=webUrl`);
+    let openUrl=knownWebUrl||'';
+    if(!openUrl)try{
+      const meta=await microsoftGraphJson(`/drives/${encodeURIComponent(driveId)}/items/${encodeURIComponent(itemId)}?$select=webUrl`);
       openUrl=meta?.webUrl||'';
     }catch(_){ }
     $('teamsFileViewerOpen').href=openUrl||'#';
     $('teamsFileViewerOpen').classList.toggle('hidden',!openUrl);
 
     if(['jpg','jpeg','png','gif','webp'].includes(ext) || ext==='pdf'){
-      const r=await fetch(`https://graph.microsoft.com/v1.0/drives/${encodeURIComponent(teamsFilesState.driveId)}/items/${encodeURIComponent(itemId)}/content`,{headers:{Authorization:`Bearer ${token}`}});
+      const r=await fetch(`https://graph.microsoft.com/v1.0/drives/${encodeURIComponent(driveId)}/items/${encodeURIComponent(itemId)}/content`,{headers:{Authorization:`Bearer ${token}`}});
       if(!r.ok)throw new Error(`Microsoft could not load this file (${r.status}).`);
       const blob=await r.blob();
       teamsPreviewObjectUrl=URL.createObjectURL(blob);
@@ -4300,7 +4403,7 @@ async function openTeamsDriveItem(itemId,name){
       else $('teamsFileViewerBody').innerHTML=`<img src="${teamsPreviewObjectUrl}" alt="${esc(name)}">`;
     }else{
       let preview=null;
-      try{preview=await microsoftGraphJson(`/drives/${encodeURIComponent(teamsFilesState.driveId)}/items/${encodeURIComponent(itemId)}/preview`,{method:'POST',body:'{}'});}catch(_){ }
+      try{preview=await microsoftGraphJson(`/drives/${encodeURIComponent(driveId)}/items/${encodeURIComponent(itemId)}/preview`,{method:'POST',body:'{}'});}catch(_){ }
       if(preview?.getUrl){
         $('teamsFileViewerBody').innerHTML=`<iframe src="${esc(preview.getUrl)}" title="${esc(name)}" allowfullscreen></iframe>`;
       }else{
@@ -4310,6 +4413,178 @@ async function openTeamsDriveItem(itemId,name){
   }catch(err){
     $('teamsFileViewerBody').innerHTML=`<div class="card" style="margin:18px"><strong>Could not open file.</strong><div class="muted">${esc(err?.message||String(err))}</div></div>`;
   }
+}
+
+
+function lotTeamsPickerOverlay(show){
+  const overlay=$('lotTeamsDocumentPicker');
+  if(!overlay)return;
+  overlay.classList.toggle('hidden',!show);
+  overlay.setAttribute('aria-hidden',show?'false':'true');
+}
+function lotTeamsPickerStatus(message,isError=false){
+  const el=$('lotTeamsPickerStatus');
+  if(!el)return;
+  el.textContent=message||'';
+  el.classList.toggle('hidden',!message);
+  el.style.color=isError?'#b42318':'';
+}
+function updateLotTeamsPickerBack(){
+  const btn=$('lotTeamsPickerBack');
+  if(btn)btn.disabled=lotTeamsPickerState.level==='teams';
+}
+function renderLotTeamsPickerBreadcrumbs(){
+  const root=$('lotTeamsPickerBreadcrumbs');
+  if(!root)return;
+  updateLotTeamsPickerBack();
+  const parts=[{label:'Teams',action:'teams'}];
+  if(lotTeamsPickerState.team)parts.push({label:lotTeamsPickerState.team.displayName||'Team',action:'team'});
+  if(lotTeamsPickerState.channel)parts.push({label:lotTeamsPickerState.channel.displayName||'Channel',action:'channel'});
+  lotTeamsPickerState.folderStack.forEach((f,i)=>parts.push({label:f.name,action:`folder:${i}`}));
+  root.innerHTML=parts.map((p,i)=>{
+    const last=i===parts.length-1;
+    return `${i?' <span class="muted">›</span> ':''}<button type="button" class="teams-files-crumb${last?' current':''}" data-picker-crumb="${esc(p.action)}" ${last?'disabled':''}>${esc(p.label)}</button>`;
+  }).join('');
+  root.querySelectorAll('[data-picker-crumb]:not([disabled])').forEach(btn=>btn.onclick=()=>navigateLotTeamsPickerBreadcrumb(btn.dataset.pickerCrumb));
+}
+function renderLotTeamsPickerRows(rows,kind){
+  const grid=$('lotTeamsPickerGrid');
+  if(!grid)return;
+  if(!rows?.length){grid.innerHTML='<div class="teams-files-status">Nothing found here.</div>';return}
+  if(kind==='teams'){
+    grid.innerHTML=rows.map(t=>`<button class="teams-file-row" type="button" data-picker-team="${esc(t.id)}" data-picker-team-name="${esc(t.displayName||'Team')}"><span class="teams-file-row-icon">👥</span><span class="teams-file-row-main"><span class="teams-file-row-name">${esc(t.displayName||'Team')}</span><span class="teams-file-row-meta">Microsoft Team</span></span><span class="teams-file-row-arrow">›</span></button>`).join('');
+    grid.querySelectorAll('[data-picker-team]').forEach(b=>b.onclick=()=>loadLotTeamsPickerChannels(b.dataset.pickerTeam,b.dataset.pickerTeamName));
+    return;
+  }
+  if(kind==='channels'){
+    grid.innerHTML=rows.map(c=>`<button class="teams-file-row" type="button" data-picker-channel="${esc(c.id)}" data-picker-channel-name="${esc(c.displayName||'Channel')}"><span class="teams-file-row-icon">#</span><span class="teams-file-row-main"><span class="teams-file-row-name">${esc(c.displayName||'Channel')}</span><span class="teams-file-row-meta">Teams channel files</span></span><span class="teams-file-row-arrow">›</span></button>`).join('');
+    grid.querySelectorAll('[data-picker-channel]').forEach(b=>b.onclick=()=>loadLotTeamsPickerChannelRoot(b.dataset.pickerChannel,b.dataset.pickerChannelName));
+    return;
+  }
+  grid.innerHTML=rows.map(item=>{
+    const isFolder=!!item.folder;
+    const meta=isFolder?`${item.folder?.childCount??''} item${item.folder?.childCount===1?'':'s'}`:[teamsFilesFormatBytes(item.size),item.lastModifiedDateTime?new Date(item.lastModifiedDateTime).toLocaleDateString():null].filter(Boolean).join(' · ');
+    return `<button class="teams-file-row" type="button" data-picker-item="${esc(item.id)}" data-picker-name="${esc(item.name||'File')}" data-picker-folder="${isFolder?'1':'0'}" data-picker-web-url="${esc(item.webUrl||'')}"><span class="teams-file-row-icon">${teamsFilesIcon(item)}</span><span class="teams-file-row-main"><span class="teams-file-row-name">${esc(item.name||'File')}</span><span class="teams-file-row-meta">${esc(isFolder?meta:'Select this file · '+meta)}</span></span><span class="teams-file-row-arrow">${isFolder?'›':'✓'}</span></button>`;
+  }).join('');
+  grid.querySelectorAll('[data-picker-item]').forEach(b=>b.onclick=()=>{
+    if(b.dataset.pickerFolder==='1')openLotTeamsPickerFolder(b.dataset.pickerItem,b.dataset.pickerName);
+    else selectLotTeamsDocument(b.dataset.pickerItem,b.dataset.pickerName,b.dataset.pickerWebUrl||'');
+  });
+}
+async function openLotTeamsDocumentPicker(kind){
+  lotTeamsPickerState={target:kind,level:'teams',team:null,channel:null,driveId:'',folderId:'',folderStack:[]};
+  $('lotTeamsPickerTitle').textContent=`Select ${lotTeamsDocTitle(kind)} from Teams`;
+  try{$('lotDialog').close()}catch(_){}
+  lotTeamsPickerOverlay(true);
+  await loadLotTeamsPickerTeams();
+}
+function closeLotTeamsDocumentPicker(){
+  lotTeamsPickerOverlay(false);
+  requestAnimationFrame(()=>{
+    if(!$('lotDialog').open)$('lotDialog').showModal();
+    refreshAllLotTeamsDocFields();
+  });
+}
+async function loadLotTeamsPickerTeams(){
+  lotTeamsPickerState.level='teams';
+  lotTeamsPickerState.team=null;lotTeamsPickerState.channel=null;lotTeamsPickerState.driveId='';lotTeamsPickerState.folderId='';lotTeamsPickerState.folderStack=[];
+  renderLotTeamsPickerBreadcrumbs();
+  lotTeamsPickerStatus('Loading your Microsoft Teams…');
+  $('lotTeamsPickerGrid').innerHTML='';
+  try{
+    const data=await microsoftGraphJson('/me/joinedTeams?$select=id,displayName,description');
+    const rows=(data?.value||[]).sort((a,b)=>String(a.displayName||'').localeCompare(String(b.displayName||'')));
+    lotTeamsPickerStatus(rows.length?'':'No Microsoft Teams were found for this account.');
+    renderLotTeamsPickerRows(rows,'teams');
+  }catch(err){lotTeamsPickerStatus(err?.message||String(err),true)}
+}
+async function loadLotTeamsPickerChannels(teamId,teamName){
+  lotTeamsPickerState.level='channels';
+  lotTeamsPickerState.team={id:teamId,displayName:teamName};
+  lotTeamsPickerState.channel=null;lotTeamsPickerState.driveId='';lotTeamsPickerState.folderId='';lotTeamsPickerState.folderStack=[];
+  renderLotTeamsPickerBreadcrumbs();
+  lotTeamsPickerStatus('Loading channels…');
+  $('lotTeamsPickerGrid').innerHTML='';
+  try{
+    const data=await microsoftGraphJson(`/teams/${encodeURIComponent(teamId)}/channels?$select=id,displayName,description,membershipType`);
+    const rows=(data?.value||[]).sort((a,b)=>String(a.displayName||'').localeCompare(String(b.displayName||'')));
+    lotTeamsPickerStatus(rows.length?'':'No channels were found in this Team.');
+    renderLotTeamsPickerRows(rows,'channels');
+  }catch(err){lotTeamsPickerStatus(err?.message||String(err),true)}
+}
+async function loadLotTeamsPickerChannelRoot(channelId,channelName){
+  lotTeamsPickerState.level='files';
+  lotTeamsPickerState.channel={id:channelId,displayName:channelName};
+  lotTeamsPickerState.folderStack=[];
+  renderLotTeamsPickerBreadcrumbs();
+  lotTeamsPickerStatus('Opening channel files…');
+  $('lotTeamsPickerGrid').innerHTML='';
+  try{
+    const folder=await microsoftGraphJson(`/teams/${encodeURIComponent(lotTeamsPickerState.team.id)}/channels/${encodeURIComponent(channelId)}/filesFolder`);
+    const driveId=folder?.parentReference?.driveId;
+    if(!driveId||!folder?.id)throw new Error('Microsoft did not return a file folder for this channel.');
+    lotTeamsPickerState.driveId=driveId;lotTeamsPickerState.folderId=folder.id;
+    await loadLotTeamsPickerFolderChildren(folder.id);
+  }catch(err){lotTeamsPickerStatus(err?.message||String(err),true)}
+}
+async function loadLotTeamsPickerFolderChildren(folderId){
+  renderLotTeamsPickerBreadcrumbs();
+  lotTeamsPickerStatus('Loading files…');
+  $('lotTeamsPickerGrid').innerHTML='';
+  try{
+    let url=`/drives/${encodeURIComponent(lotTeamsPickerState.driveId)}/items/${encodeURIComponent(folderId)}/children?$select=id,name,size,lastModifiedDateTime,folder,file,webUrl,parentReference&$top=200`;
+    let all=[];
+    while(url){
+      const data=await microsoftGraphJson(url.replace('https://graph.microsoft.com/v1.0',''));
+      all.push(...(data?.value||[]));
+      url=data?.['@odata.nextLink']||'';
+    }
+    all.sort((a,b)=>Number(!a.folder)-Number(!b.folder)||String(a.name||'').localeCompare(String(b.name||'')));
+    lotTeamsPickerStatus(all.length?'':'This folder is empty.');
+    renderLotTeamsPickerRows(all,'items');
+  }catch(err){lotTeamsPickerStatus(err?.message||String(err),true)}
+}
+async function openLotTeamsPickerFolder(itemId,name){
+  lotTeamsPickerState.folderId=itemId;
+  lotTeamsPickerState.folderStack.push({id:itemId,name});
+  await loadLotTeamsPickerFolderChildren(itemId);
+}
+async function navigateLotTeamsPickerBreadcrumb(action){
+  if(action==='teams')return loadLotTeamsPickerTeams();
+  if(action==='team'&&lotTeamsPickerState.team)return loadLotTeamsPickerChannels(lotTeamsPickerState.team.id,lotTeamsPickerState.team.displayName);
+  if(action==='channel'&&lotTeamsPickerState.channel)return loadLotTeamsPickerChannelRoot(lotTeamsPickerState.channel.id,lotTeamsPickerState.channel.displayName);
+  if(action?.startsWith('folder:')){
+    const idx=Number(action.split(':')[1]);
+    const target=lotTeamsPickerState.folderStack[idx];
+    if(!target)return;
+    lotTeamsPickerState.folderStack=lotTeamsPickerState.folderStack.slice(0,idx+1);
+    lotTeamsPickerState.folderId=target.id;
+    return loadLotTeamsPickerFolderChildren(target.id);
+  }
+}
+async function goBackLotTeamsPicker(){
+  if(lotTeamsPickerState.level==='teams')return;
+  if(lotTeamsPickerState.level==='channels')return loadLotTeamsPickerTeams();
+  if(lotTeamsPickerState.level==='files'&&lotTeamsPickerState.folderStack.length){
+    lotTeamsPickerState.folderStack.pop();
+    if(lotTeamsPickerState.folderStack.length){
+      const parent=lotTeamsPickerState.folderStack[lotTeamsPickerState.folderStack.length-1];
+      lotTeamsPickerState.folderId=parent.id;
+      return loadLotTeamsPickerFolderChildren(parent.id);
+    }
+    return loadLotTeamsPickerChannelRoot(lotTeamsPickerState.channel.id,lotTeamsPickerState.channel.displayName);
+  }
+  if(lotTeamsPickerState.level==='files'&&lotTeamsPickerState.team){
+    return loadLotTeamsPickerChannels(lotTeamsPickerState.team.id,lotTeamsPickerState.team.displayName);
+  }
+}
+function selectLotTeamsDocument(itemId,name,webUrl){
+  const kind=lotTeamsPickerState.target;
+  const input=$(lotTeamsDocInputId(kind));
+  if(!input)return;
+  input.value=encodeTeamsDocumentRef({driveId:lotTeamsPickerState.driveId,itemId,name,webUrl});
+  refreshLotTeamsDocField(kind);
+  closeLotTeamsDocumentPicker();
 }
 
 async function microsoftProviderToken(){
@@ -5042,6 +5317,7 @@ function openLotDialogLive(id=''){
     $('county').value='Barrow County, GA';
   }
 
+  refreshAllLotTeamsDocFields();
   $('lotDialog').showModal();
 }
 
@@ -5613,6 +5889,22 @@ $('aiUseDraft').onclick=()=>{
 
 if($('aiTeamsBack'))$('aiTeamsBack').onclick=()=>aiTeamsGoBack();
 if($('aiTeamsRefresh'))$('aiTeamsRefresh').onclick=()=>aiTeamsLoadTeams();
+
+document.querySelectorAll('[data-pick-lot-teams-doc]').forEach(btn=>{
+  btn.onclick=()=>openLotTeamsDocumentPicker(btn.dataset.pickLotTeamsDoc);
+});
+document.querySelectorAll('[data-clear-lot-teams-doc]').forEach(btn=>{
+  btn.onclick=()=>{
+    const kind=btn.dataset.clearLotTeamsDoc;
+    const input=$(lotTeamsDocInputId(kind));
+    if(input)input.value='';
+    refreshLotTeamsDocField(kind);
+  };
+});
+if($('lotTeamsPickerClose'))$('lotTeamsPickerClose').onclick=()=>closeLotTeamsDocumentPicker();
+if($('lotTeamsPickerBack'))$('lotTeamsPickerBack').onclick=()=>goBackLotTeamsPicker();
+if($('lotTeamsPickerRefresh'))$('lotTeamsPickerRefresh').onclick=()=>loadLotTeamsPickerTeams();
+
 if($('teamsFilesBack'))$('teamsFilesBack').onclick=()=>goBackTeamsFiles();
 if($('teamsFilesRefresh'))$('teamsFilesRefresh').onclick=()=>loadTeamsFilesTeams(true);
 $('documentViewerX').onclick=()=>$('documentViewerDialog').close();
@@ -5663,9 +5955,30 @@ try{
 </script>
 
 <div id="bbBuildVersion" style="text-align:center;color:#8a96a8;font-size:10px;padding:10px 8px 18px">
-  BowenBuilder build 2026-08-31-teams-folders-no-jump
-</div>
+  BowenBuilder build 2026-08-31-teams-linked-deco-hlp-lgp</div>
 
+
+
+<div id="lotTeamsDocumentPicker" class="teams-picker-overlay hidden" aria-hidden="true">
+  <div class="teams-picker-head">
+    <div class="teams-picker-title-row">
+      <div>
+        <div id="lotTeamsPickerTitle" class="teams-picker-title">Select document from Teams</div>
+        <div class="teams-picker-sub">Read-only · choose the file BowenBuilder should link to this lot.</div>
+      </div>
+      <button id="lotTeamsPickerClose" class="xbtn" type="button" aria-label="Cancel">×</button>
+    </div>
+    <div class="teams-picker-actions">
+      <button id="lotTeamsPickerBack" class="secondary" type="button" disabled>‹ Back</button>
+      <button id="lotTeamsPickerRefresh" class="secondary" type="button">Teams Home</button>
+    </div>
+    <div id="lotTeamsPickerBreadcrumbs" class="teams-files-breadcrumbs"></div>
+  </div>
+  <div class="teams-picker-body">
+    <div id="lotTeamsPickerStatus" class="teams-files-status hidden" style="margin-bottom:10px"></div>
+    <div id="lotTeamsPickerGrid" class="teams-files-list"></div>
+  </div>
+</div>
 
 <div id="teamsFileViewerOverlay" class="teams-viewer-overlay hidden" aria-hidden="true">
   <div class="teams-viewer-head">
