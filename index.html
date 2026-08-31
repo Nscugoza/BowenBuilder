@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="2026-08-31-rendering-overlay-close-v2">
+<meta name="bowenbuilder-version" content="2026-08-31-teams-files-readonly">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -1500,6 +1500,26 @@ button.danger:hover{filter:brightness(.96)}
   box-shadow:0 4px 18px rgba(0,0,0,.25);
 }
 
+
+/* Read-only Microsoft Teams / SharePoint file browser */
+.teams-files-shell{display:grid;gap:12px}
+.teams-files-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
+.teams-files-breadcrumbs{display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:13px}
+.teams-files-crumb{border:0;background:transparent;color:#174f86;font-weight:800;padding:3px 0;cursor:pointer}
+.teams-files-crumb.current{color:#475467;cursor:default}
+.teams-files-status{padding:12px 14px;border:1px solid var(--border);border-radius:14px;background:#fff;color:var(--muted);font-size:14px}
+.teams-files-list{display:grid;gap:9px}
+.teams-file-row{display:flex;align-items:center;gap:12px;width:100%;text-align:left;border:1px solid var(--border);border-radius:14px;padding:12px 13px;background:#fff;color:var(--text);box-shadow:0 5px 16px rgba(24,50,82,.04)}
+button.teams-file-row{cursor:pointer}
+button.teams-file-row:hover{border-color:#bdccdd}
+.teams-file-row-icon{width:42px;height:42px;border-radius:12px;background:#eef4fb;display:grid;place-items:center;font-size:20px;flex:0 0 auto}
+.teams-file-row-main{min-width:0;flex:1}
+.teams-file-row-name{font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.teams-file-row-meta{font-size:12px;color:var(--muted);margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.teams-file-row-arrow{color:#8a96a8;font-size:22px;flex:0 0 auto}
+.teams-files-refresh{white-space:nowrap}
+@media(max-width:700px){.teams-files-head{align-items:stretch}.teams-files-refresh{width:100%}.teams-file-row{padding:11px}.teams-file-row-icon{width:38px;height:38px}}
+
 </style>
 </head>
 <body>
@@ -1588,8 +1608,18 @@ button.danger:hover{filter:brightness(.96)}
         <div id="punchoutList" class="punchout-list"></div>
       </div>
       <div id="filesPanel" class="hidden">
-        <div class="card" style="margin-bottom:12px"><strong>Microsoft 365 Files</strong><div class="muted">Demo view of Teams / SharePoint documents for this lot.</div></div>
-        <div class="files-grid" id="filesGrid"></div>
+        <div class="teams-files-shell">
+          <div class="card teams-files-head">
+            <div>
+              <strong>Teams Files</strong>
+              <div class="muted">Read-only access to Microsoft Teams / SharePoint files available to your Microsoft account.</div>
+            </div>
+            <button id="teamsFilesRefresh" class="secondary teams-files-refresh" type="button">↻ Refresh</button>
+          </div>
+          <div id="teamsFilesBreadcrumbs" class="teams-files-breadcrumbs"></div>
+          <div id="teamsFilesStatus" class="teams-files-status">Open Files to load your Microsoft Teams.</div>
+          <div id="filesGrid" class="teams-files-list"></div>
+        </div>
       </div>
     </section>
 
@@ -1948,6 +1978,10 @@ let adminMemberships=[];
 let currentMembershipPermissions=[];
 let activeAdminPanel='contacts';
 
+let teamsFilesState={level:'teams',team:null,channel:null,driveId:'',folderId:'',folderName:'',folderStack:[]};
+let teamsFilesLoaded=false;
+let teamsPreviewObjectUrl='';
+
 const DEFAULT_LOT_CHECKLIST_ITEMS=[
   'Install Temp Pole',
   'Call in Temp Pole Inspection',
@@ -2173,7 +2207,13 @@ async function leaveLotPresence(){
 
 async function signIn(){
  const redirectTo=location.origin+location.pathname;
- const {error}=await db.auth.signInWithOAuth({provider:'azure',options:{scopes:'openid email profile',redirectTo}});
+ const {error}=await db.auth.signInWithOAuth({
+   provider:'azure',
+   options:{
+     scopes:'openid email profile https://graph.microsoft.com/Mail.Send https://graph.microsoft.com/Files.Read.All https://graph.microsoft.com/Channel.ReadBasic.All https://graph.microsoft.com/Team.ReadBasic.All',
+     redirectTo
+   }
+ });
  if(error) alert(error.message);
 }
 
@@ -3881,7 +3921,290 @@ function overviewScheduleItemMessage(item,planUrl='',includePlans=false,renderin
   };
 }
 
-function emailOverviewScheduleItem(itemId){
+
+
+function teamsFilesSetStatus(message,isError=false){
+  const el=$('teamsFilesStatus');
+  if(!el)return;
+  el.textContent=message||'';
+  el.classList.toggle('hidden',!message);
+  el.style.color=isError?'#b42318':'';
+}
+
+function teamsFilesIcon(item){
+  if(item?.folder)return '📁';
+  const ext=fileExtension(item?.name||'');
+  if(ext==='pdf')return '📕';
+  if(['jpg','jpeg','png','gif','webp','heic'].includes(ext))return '🖼️';
+  if(['doc','docx'].includes(ext))return '📘';
+  if(['xls','xlsx','csv'].includes(ext))return '📗';
+  if(['ppt','pptx'].includes(ext))return '📙';
+  return '📄';
+}
+
+function teamsFilesFormatBytes(bytes){
+  const n=Number(bytes||0);
+  if(!n)return '';
+  if(n<1024)return `${n} B`;
+  if(n<1024*1024)return `${(n/1024).toFixed(1)} KB`;
+  return `${(n/1024/1024).toFixed(1)} MB`;
+}
+
+async function microsoftGraphJson(path,options={}){
+  const token=await microsoftProviderToken();
+  if(!token)throw new Error('Microsoft Teams file permission is not active for this login. Sign out of BowenBuilder and sign back in with Microsoft, then approve the requested permissions.');
+  const response=await fetch(`https://graph.microsoft.com/v1.0${path}`,{
+    ...options,
+    headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json',...(options.headers||{})}
+  });
+  if(response.status===204)return null;
+  let payload=null;
+  try{payload=await response.json()}catch(_){ }
+  if(!response.ok){
+    if(response.status===401||response.status===403){
+      throw new Error('Microsoft needs a fresh BowenBuilder sign-in for Teams Files. Sign out, sign back in with Microsoft, and approve the requested read-only permissions.');
+    }
+    throw new Error(payload?.error?.message||`Microsoft Graph request failed (${response.status}).`);
+  }
+  return payload;
+}
+
+function renderTeamsFilesBreadcrumbs(){
+  const root=$('teamsFilesBreadcrumbs');
+  if(!root)return;
+  const parts=[{label:'Teams',action:'teams'}];
+  if(teamsFilesState.team)parts.push({label:teamsFilesState.team.displayName||'Team',action:'team'});
+  if(teamsFilesState.channel)parts.push({label:teamsFilesState.channel.displayName||'Channel',action:'channel'});
+  for(let i=0;i<teamsFilesState.folderStack.length;i++)parts.push({label:teamsFilesState.folderStack[i].name,action:`folder:${i}`});
+  root.innerHTML=parts.map((p,i)=>{
+    const last=i===parts.length-1;
+    return `${i?' <span class="muted">›</span> ':''}<button type="button" class="teams-files-crumb${last?' current':''}" data-teams-crumb="${esc(p.action)}" ${last?'disabled':''}>${esc(p.label)}</button>`;
+  }).join('');
+  root.querySelectorAll('[data-teams-crumb]:not([disabled])').forEach(b=>b.onclick=()=>navigateTeamsBreadcrumb(b.dataset.teamsCrumb));
+}
+
+async function navigateTeamsBreadcrumb(action){
+  if(action==='teams')return loadTeamsFilesTeams();
+  if(action==='team' && teamsFilesState.team)return loadTeamsChannels(teamsFilesState.team.id,teamsFilesState.team.displayName);
+  if(action==='channel' && teamsFilesState.channel)return loadTeamsChannelRoot(teamsFilesState.team.id,teamsFilesState.channel.id,teamsFilesState.channel.displayName);
+  if(action?.startsWith('folder:')){
+    const idx=Number(action.split(':')[1]);
+    const target=teamsFilesState.folderStack[idx];
+    if(!target)return;
+    teamsFilesState.folderStack=teamsFilesState.folderStack.slice(0,idx+1);
+    teamsFilesState.folderId=target.id;
+    teamsFilesState.folderName=target.name;
+    return loadTeamsFolderChildren(teamsFilesState.driveId,target.id,false);
+  }
+}
+
+function renderTeamsFileRows(rows,kind){
+  const grid=$('filesGrid');
+  if(!grid)return;
+  if(!rows?.length){grid.innerHTML='<div class="teams-files-status">Nothing found here.</div>';return;}
+  if(kind==='teams'){
+    grid.innerHTML=rows.map(t=>`<button class="teams-file-row" type="button" data-team-id="${esc(t.id)}" data-team-name="${esc(t.displayName||'Team')}"><span class="teams-file-row-icon">👥</span><span class="teams-file-row-main"><span class="teams-file-row-name">${esc(t.displayName||'Team')}</span><span class="teams-file-row-meta">Microsoft Team</span></span><span class="teams-file-row-arrow">›</span></button>`).join('');
+    grid.querySelectorAll('[data-team-id]').forEach(b=>b.onclick=()=>loadTeamsChannels(b.dataset.teamId,b.dataset.teamName));
+    return;
+  }
+  if(kind==='channels'){
+    grid.innerHTML=rows.map(c=>`<button class="teams-file-row" type="button" data-channel-id="${esc(c.id)}" data-channel-name="${esc(c.displayName||'Channel')}"><span class="teams-file-row-icon">#</span><span class="teams-file-row-main"><span class="teams-file-row-name">${esc(c.displayName||'Channel')}</span><span class="teams-file-row-meta">Teams channel files</span></span><span class="teams-file-row-arrow">›</span></button>`).join('');
+    grid.querySelectorAll('[data-channel-id]').forEach(b=>b.onclick=()=>loadTeamsChannelRoot(teamsFilesState.team.id,b.dataset.channelId,b.dataset.channelName));
+    return;
+  }
+  grid.innerHTML=rows.map(item=>{
+    const isFolder=!!item.folder;
+    const meta=isFolder?`${item.folder?.childCount??''} item${item.folder?.childCount===1?'':'s'}`:[teamsFilesFormatBytes(item.size),item.lastModifiedDateTime?new Date(item.lastModifiedDateTime).toLocaleDateString():null].filter(Boolean).join(' · ');
+    return `<button class="teams-file-row" type="button" data-drive-item="${esc(item.id)}" data-drive-name="${esc(item.name||'File')}" data-drive-folder="${isFolder?'1':'0'}"><span class="teams-file-row-icon">${teamsFilesIcon(item)}</span><span class="teams-file-row-main"><span class="teams-file-row-name">${esc(item.name||'File')}</span><span class="teams-file-row-meta">${esc(meta)}</span></span><span class="teams-file-row-arrow">›</span></button>`;
+  }).join('');
+  grid.querySelectorAll('[data-drive-item]').forEach(b=>b.onclick=()=>{
+    if(b.dataset.driveFolder==='1')openTeamsFolder(b.dataset.driveItem,b.dataset.driveName);
+    else openTeamsDriveItem(b.dataset.driveItem,b.dataset.driveName);
+  });
+}
+
+async function loadTeamsFilesTeams(force=false){
+  teamsFilesState={level:'teams',team:null,channel:null,driveId:'',folderId:'',folderName:'',folderStack:[]};
+  renderTeamsFilesBreadcrumbs();
+  teamsFilesSetStatus('Loading your Microsoft Teams…');
+  $('filesGrid').innerHTML='';
+  try{
+    const data=await microsoftGraphJson('/me/joinedTeams?$select=id,displayName,description');
+    const teams=(data?.value||[]).sort((a,b)=>String(a.displayName||'').localeCompare(String(b.displayName||'')));
+    teamsFilesLoaded=true;
+    teamsFilesSetStatus(teams.length?'':'No Microsoft Teams were found for this account.');
+    renderTeamsFileRows(teams,'teams');
+  }catch(err){
+    teamsFilesSetStatus(err?.message||String(err),true);
+  }
+}
+
+async function loadTeamsChannels(teamId,teamName){
+  teamsFilesState.level='channels';
+  teamsFilesState.team={id:teamId,displayName:teamName};
+  teamsFilesState.channel=null;teamsFilesState.driveId='';teamsFilesState.folderId='';teamsFilesState.folderStack=[];
+  renderTeamsFilesBreadcrumbs();
+  teamsFilesSetStatus('Loading channels…');
+  $('filesGrid').innerHTML='';
+  try{
+    const data=await microsoftGraphJson(`/teams/${encodeURIComponent(teamId)}/channels?$select=id,displayName,description,membershipType`);
+    const channels=(data?.value||[]).sort((a,b)=>String(a.displayName||'').localeCompare(String(b.displayName||'')));
+    teamsFilesSetStatus(channels.length?'':'No channels were found in this Team.');
+    renderTeamsFileRows(channels,'channels');
+  }catch(err){teamsFilesSetStatus(err?.message||String(err),true);}
+}
+
+async function loadTeamsChannelRoot(teamId,channelId,channelName){
+  teamsFilesState.level='files';
+  teamsFilesState.channel={id:channelId,displayName:channelName};
+  teamsFilesState.folderStack=[];
+  renderTeamsFilesBreadcrumbs();
+  teamsFilesSetStatus('Opening channel files…');
+  $('filesGrid').innerHTML='';
+  try{
+    const folder=await microsoftGraphJson(`/teams/${encodeURIComponent(teamId)}/channels/${encodeURIComponent(channelId)}/filesFolder`);
+    const driveId=folder?.parentReference?.driveId;
+    if(!driveId||!folder?.id)throw new Error('Microsoft did not return a file folder for this channel.');
+    teamsFilesState.driveId=driveId;teamsFilesState.folderId=folder.id;teamsFilesState.folderName=folder.name||channelName;
+    await loadTeamsFolderChildren(driveId,folder.id,false);
+  }catch(err){teamsFilesSetStatus(err?.message||String(err),true);}
+}
+
+async function loadTeamsFolderChildren(driveId,folderId,updateBreadcrumb=true){
+  if(updateBreadcrumb)renderTeamsFilesBreadcrumbs();
+  teamsFilesSetStatus('Loading files…');
+  $('filesGrid').innerHTML='';
+  try{
+    let url=`/drives/${encodeURIComponent(driveId)}/items/${encodeURIComponent(folderId)}/children?$select=id,name,size,lastModifiedDateTime,folder,file,webUrl,parentReference&$top=200`;
+    let all=[];
+    while(url){
+      const data=await microsoftGraphJson(url.replace('https://graph.microsoft.com/v1.0',''));
+      all.push(...(data?.value||[]));
+      url=data?.['@odata.nextLink']||'';
+    }
+    all.sort((a,b)=>Number(!a.folder)-Number(!b.folder)||String(a.name||'').localeCompare(String(b.name||'')));
+    teamsFilesSetStatus(all.length?'':'This folder is empty.');
+    renderTeamsFileRows(all,'items');
+  }catch(err){teamsFilesSetStatus(err?.message||String(err),true);}
+}
+
+async function openTeamsFolder(itemId,name){
+  teamsFilesState.folderId=itemId;teamsFilesState.folderName=name;
+  teamsFilesState.folderStack.push({id:itemId,name});
+  renderTeamsFilesBreadcrumbs();
+  await loadTeamsFolderChildren(teamsFilesState.driveId,itemId,false);
+}
+
+function cleanupTeamsPreviewObjectUrl(){
+  if(teamsPreviewObjectUrl){try{URL.revokeObjectURL(teamsPreviewObjectUrl)}catch(_){ }teamsPreviewObjectUrl='';}
+}
+
+async function openTeamsDriveItem(itemId,name){
+  if(!teamsFilesState.driveId)return;
+  teamsFilesSetStatus(`Opening ${name}…`);
+  cleanupTeamsPreviewObjectUrl();
+  try{
+    const token=await microsoftProviderToken();
+    if(!token)throw new Error('Microsoft Teams file permission is not active. Sign out and back in with Microsoft.');
+    const ext=fileExtension(name);
+    $('documentViewerTitle').textContent=name;
+    $('documentViewerMeta').textContent='Microsoft Teams / SharePoint · Read only';
+    $('documentViewerOpen').textContent='Open in Microsoft 365';
+
+    let openUrl='';
+    try{
+      const meta=await microsoftGraphJson(`/drives/${encodeURIComponent(teamsFilesState.driveId)}/items/${encodeURIComponent(itemId)}?$select=webUrl`);
+      openUrl=meta?.webUrl||'';
+    }catch(_){ }
+    $('documentViewerOpen').href=openUrl||'#';
+    $('documentViewerOpen').classList.toggle('hidden',!openUrl);
+
+    if(['jpg','jpeg','png','gif','webp'].includes(ext) || ext==='pdf'){
+      const r=await fetch(`https://graph.microsoft.com/v1.0/drives/${encodeURIComponent(teamsFilesState.driveId)}/items/${encodeURIComponent(itemId)}/content`,{headers:{Authorization:`Bearer ${token}`}});
+      if(!r.ok)throw new Error(`Microsoft could not load this file (${r.status}).`);
+      const blob=await r.blob();
+      teamsPreviewObjectUrl=URL.createObjectURL(blob);
+      if(ext==='pdf')$('documentViewerBody').innerHTML=`<iframe src="${teamsPreviewObjectUrl}#view=FitH" title="${esc(name)}"></iframe>`;
+      else $('documentViewerBody').innerHTML=`<img src="${teamsPreviewObjectUrl}" alt="${esc(name)}">`;
+    }else{
+      let preview=null;
+      try{preview=await microsoftGraphJson(`/drives/${encodeURIComponent(teamsFilesState.driveId)}/items/${encodeURIComponent(itemId)}/preview`,{method:'POST',body:'{}'});}catch(_){ }
+      if(preview?.getUrl){
+        $('documentViewerBody').innerHTML=`<iframe src="${esc(preview.getUrl)}" title="${esc(name)}" allowfullscreen></iframe>`;
+      }else{
+        $('documentViewerBody').innerHTML='<div class="card" style="margin:18px"><strong>Preview not available inside BowenBuilder.</strong><div class="muted">Use Open in Microsoft 365 to view this file.</div></div>';
+      }
+    }
+    $('documentViewerDialog').showModal();
+    teamsFilesSetStatus('');
+  }catch(err){teamsFilesSetStatus(err?.message||String(err),true);}
+}
+
+async function microsoftProviderToken(){
+  const {data:{session}}=await db.auth.getSession();
+  const live=session?.provider_token||'';
+  if(live){
+    try{localStorage.setItem('bowenbuilder_ms_provider_token',live)}catch(_){ }
+    return live;
+  }
+  try{return localStorage.getItem('bowenbuilder_ms_provider_token')||''}catch(_){return ''}
+}
+
+try{
+  db.auth.onAuthStateChange((event,session)=>{
+    try{
+      if(session?.provider_token)localStorage.setItem('bowenbuilder_ms_provider_token',session.provider_token);
+      if(event==='SIGNED_OUT')localStorage.removeItem('bowenbuilder_ms_provider_token');
+    }catch(_){ }
+  });
+}catch(_){ }
+
+async function sendMicrosoftGraphEmail({to,subject,body}){
+  const recipients=(to||[]).map(x=>String(x||'').trim()).filter(Boolean);
+  if(!recipients.length){
+    throw new Error('No email recipient is assigned to this schedule item.');
+  }
+
+  const token=await microsoftProviderToken();
+  if(!token){
+    throw new Error('Microsoft email permission is not active for this login. Sign out of BowenBuilder and sign back in with Microsoft, then approve the requested permission.');
+  }
+
+  const response=await fetch('https://graph.microsoft.com/v1.0/me/sendMail',{
+    method:'POST',
+    headers:{
+      'Authorization':`Bearer ${token}`,
+      'Content-Type':'application/json'
+    },
+    body:JSON.stringify({
+      message:{
+        subject:subject||'BowenBuilder Schedule',
+        body:{
+          contentType:'Text',
+          content:body||''
+        },
+        toRecipients:recipients.map(address=>({
+          emailAddress:{address}
+        }))
+      }
+    })
+  });
+
+  if(response.status===202)return true;
+
+  let detail='';
+  try{
+    const payload=await response.json();
+    detail=payload?.error?.message||'';
+  }catch(_){}
+
+  if(response.status===401 || response.status===403){
+    throw new Error('Microsoft needs a fresh BowenBuilder sign-in with Mail.Send permission. Sign out, sign back in with Microsoft, and approve the permission.');
+  }
+  throw new Error(detail||`Microsoft could not send the email (${response.status}).`);
+}
+
+async function emailOverviewScheduleItem(itemId){
   const item=items.find(i=>i.id===itemId);
   if(!item)return;
 
@@ -3902,32 +4225,29 @@ function emailOverviewScheduleItem(itemId){
   if(!msg)return;
 
   const recipients=mappedRecipientsForWork([item.name]);
-  const to=recipients.map(x=>encodeURIComponent(x)).join(',');
-  const href=`mailto:${to}?subject=${encodeURIComponent(msg.subject)}&body=${encodeURIComponent(msg.body)}`;
-
-  // IMPORTANT for iPhone: launch Mail directly inside the original tap handler.
-  // Show E immediately on the Overview card.
-  const markDate=msg.dateKey;
-  if(markDate){
-    const idx=calendarCalledInMarks.findIndex(
-      x=>x.lot_id===item.lot_id && x.calendar_date===markDate
-    );
-    if(idx>=0)calendarCalledInMarks[idx]={...calendarCalledInMarks[idx],email_sent:true};
-    else calendarCalledInMarks.push({
-      lot_id:item.lot_id,
-      calendar_date:markDate,
-      called_in:false,
-      email_sent:true,
-      text_sent:false
-    });
-    refreshOverviewCommunicationBadges(item.id);
+  if(!recipients.length){
+    alert('No email recipient is assigned to this schedule item in Admin → Schedule Contacts.');
+    return;
   }
 
-  window.location.href=href;
+  try{
+    await sendMicrosoftGraphEmail({
+      to:recipients,
+      subject:msg.subject,
+      body:msg.body
+    });
 
-  // Record E afterward without blocking the app launch or rerendering the page.
-  if(markDate){
-    void markCalendarCommunicationSilent('email',markDate,item.lot_id);
+    // Only mark E after Microsoft Graph accepts the message.
+    const markDate=msg.dateKey;
+    if(markDate){
+      setCalendarCommunicationLocal('email',markDate,item.lot_id);
+      refreshOverviewCommunicationBadges(item.id);
+      void markCalendarCommunicationSilent('email',markDate,item.lot_id);
+    }
+    alert('Email sent ✓');
+  }catch(err){
+    console.error('Microsoft Graph email failed:',err);
+    alert(err?.message||String(err));
   }
 }
 
@@ -4103,7 +4423,7 @@ function setCalendarCommunicationLocal(kind,dateKey,lotId=currentLot){
   }
 }
 
-function emailSelectedCalendarDate(){
+async function emailSelectedCalendarDate(){
  try{
    if(!scheduleSelectedDate){
      alert('Select a calendar date first.');
@@ -4130,20 +4450,25 @@ function emailSelectedCalendarDate(){
    }
 
    const recipients=mappedRecipientsForWork(workNames);
-   const to=recipients.join(',');
-   const href=`mailto:${to}?subject=${encodeURIComponent(msg.subject)}&body=${encodeURIComponent(msg.body)}`;
+   if(!recipients.length){
+     alert('No email recipient is assigned for the scheduled work on this date in Admin → Schedule Contacts.');
+     return;
+   }
 
-   // Match the working Overview behavior: mark locally first, then launch.
+   await sendMicrosoftGraphEmail({
+     to:recipients,
+     subject:msg.subject,
+     body:msg.body
+   });
+
+   // Only mark E after Microsoft Graph returns 202 Accepted.
    setCalendarCommunicationLocal('email',scheduleSelectedDate,currentLot);
    renderScheduleCalendar();
-
-   launchCalendarComposer(href);
-
-   // Persist E after Mail is launched.
    void markCalendarCommunicationSilent('email',scheduleSelectedDate,currentLot);
+   alert('Email sent ✓');
  }catch(err){
-   console.error('Calendar Email Date failed:',err);
-   alert(`Email Date could not open: ${err?.message||err}`);
+   console.error('Calendar Microsoft Graph email failed:',err);
+   alert(err?.message||String(err));
  }
 }
 
@@ -4669,6 +4994,10 @@ document.querySelectorAll('.lot-tab').forEach(b=>b.onclick=()=>{
   $('punchoutPanel').classList.toggle('hidden',b.dataset.lottab!=='punchout');
   $('filesPanel').classList.toggle('hidden',b.dataset.lottab!=='files');
   if(b.dataset.lottab==='punchout' && currentLot) renderPunchout(currentLot);
+  if(b.dataset.lottab==='files'){
+    if(!teamsFilesLoaded)loadTeamsFilesTeams();
+    else renderTeamsFilesBreadcrumbs();
+  }
 });
 document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{
  if(b.dataset.view==='subdivisions'){
@@ -4923,9 +5252,10 @@ $('aiUseDraft').onclick=()=>{
   $('includedOptions').value=options;
 };
 
-$('documentViewerX').onclick=()=>$('documentViewerDialog').close();
-$('documentViewerClose').onclick=()=>$('documentViewerDialog').close();
-$('documentViewerDialog').addEventListener('click',e=>{if(e.target===e.currentTarget)$('documentViewerDialog').close()});
+if($('teamsFilesRefresh'))$('teamsFilesRefresh').onclick=()=>loadTeamsFilesTeams(true);
+$('documentViewerX').onclick=()=>{cleanupTeamsPreviewObjectUrl();$('documentViewerDialog').close()};
+$('documentViewerClose').onclick=()=>{cleanupTeamsPreviewObjectUrl();$('documentViewerDialog').close()};
+$('documentViewerDialog').addEventListener('click',e=>{if(e.target===e.currentTarget){cleanupTeamsPreviewObjectUrl();$('documentViewerDialog').close()}});
 
 
 try{
@@ -4961,7 +5291,7 @@ try{
 </script>
 
 <div id="bbBuildVersion" style="text-align:center;color:#8a96a8;font-size:10px;padding:10px 8px 18px">
-  BowenBuilder build 2026-08-28-current
+  BowenBuilder build 2026-08-31-teams-files-readonly
 </div>
 
 
