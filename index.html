@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="2026-08-31-rendering-overlay-fix">
+<meta name="bowenbuilder-version" content="2026-08-31-rendering-overlay-close-v2">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -4496,24 +4496,28 @@ function closeRenderingViewer(){
   if(img)img.src='';
 }
 
-const renderingCloseBtn=$('closeRenderingViewer');
-if(renderingCloseBtn){
-  renderingCloseBtn.onclick=e=>{
-    e.preventDefault();
-    e.stopPropagation();
-    closeRenderingViewer();
-    return false;
-  };
-  renderingCloseBtn.ontouchend=e=>{
-    e.preventDefault();
-    e.stopPropagation();
-    closeRenderingViewer();
-    return false;
-  };
-}
-$('renderingViewerDialog')?.addEventListener('click',e=>{
-  if(e.target===$('renderingViewerDialog'))closeRenderingViewer();
-});
+// The rendering viewer markup is parsed after this script on iPhone Safari,
+ // so bind through document delegation instead of looking up the X button now.
+ document.addEventListener('click',e=>{
+   const closeBtn=e.target.closest?.('#closeRenderingViewer');
+   if(closeBtn){
+     e.preventDefault();
+     e.stopPropagation();
+     closeRenderingViewer();
+     return;
+   }
+   if(e.target?.id==='renderingViewerDialog'){
+     closeRenderingViewer();
+   }
+ });
+
+ document.addEventListener('touchend',e=>{
+   const closeBtn=e.target.closest?.('#closeRenderingViewer');
+   if(!closeBtn)return;
+   e.preventDefault();
+   e.stopPropagation();
+   closeRenderingViewer();
+ },{passive:false});
 
 let pendingRenderingData='';
 
