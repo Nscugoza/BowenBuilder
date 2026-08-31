@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="2026-08-28-current">
+<meta name="bowenbuilder-version" content="2026-08-31-lot-save-rls-fix">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -4495,39 +4495,53 @@ $('lotForm').onsubmit=async e=>{
     payload.color_rendering_url=pendingRenderingData;
   }
 
-  let result;
+  // Avoid chaining .single() onto lot writes. With RLS, the write can succeed
+  // even when the returned row is not visible to the chained SELECT.
+  const makeUuid=()=>{
+    if(globalThis.crypto?.randomUUID)return globalThis.crypto.randomUUID();
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{
+      const r=Math.random()*16|0;
+      const v=c==='x'?r:(r&0x3|0x8);
+      return v.toString(16);
+    });
+  };
+
+  const lotId=editId||makeUuid();
+  let writeError=null;
+
   if(editId){
-    result=await db.from('lots').update(payload).eq('id',editId).select().single();
+    const {error}=await db.from('lots').update(payload).eq('id',editId);
+    writeError=error;
   }else{
-    result=await db.from('lots').insert(payload).select().single();
+    const {error}=await db.from('lots').insert({...payload,id:lotId});
+    writeError=error;
   }
 
-  if(result.error){
-    alert(result.error.message);
+  if(writeError){
+    alert(writeError.message);
     return;
   }
 
   try{
-    const lotId=result.data.id;
     const patch={};
     if(plansUpload)patch.plans_file_path=await uploadLotDocument(lotId,'plans',plansUpload,existingLot?.plans_file_path||'');
     if(redlinedPlanUpload)patch.redlined_plan_file_path=await uploadLotDocument(lotId,'redlined-plan',redlinedPlanUpload,existingLot?.redlined_plan_file_path||'');
     if(hlpUpload)patch.hlp_file_path=await uploadLotDocument(lotId,'hlp',hlpUpload,existingLot?.hlp_file_path||'');
     if(lgpUpload)patch.lgp_file_path=await uploadLotDocument(lotId,'lgp',lgpUpload,existingLot?.lgp_file_path||'');
     if(Object.keys(patch).length){
-      const {data:updated,error:docErr}=await db.from('lots').update(patch).eq('id',lotId).select().single();
+      const {error:docErr}=await db.from('lots').update(patch).eq('id',lotId);
       if(docErr)throw docErr;
-      result.data=updated;
     }
   }catch(err){
     alert(`Lot saved, but a document upload failed: ${err?.message||err}`);
   }
 
+  const savedSubdivision=currentSubdivision;
   $('lotDialog').close();
   await load();
 
-  currentSubdivision=result.data.subdivision_id;
-  currentLot=result.data.id;
+  currentSubdivision=savedSubdivision;
+  currentLot=lotId;
   showLot();
 };
 
