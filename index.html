@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="2026-08-31-teams-files-scroll-preserved">
+<meta name="bowenbuilder-version" content="2026-08-31-teams-files-no-jump-fixed">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -1982,6 +1982,51 @@ let teamsFilesState={level:'teams',team:null,channel:null,driveId:'',folderId:''
 let teamsFilesLoaded=false;
 let teamsPreviewObjectUrl='';
 let teamsFilesPageScrollY=0;
+let teamsFilesViewerScrollLocked=false;
+let teamsFilesBodyStyleSnapshot=null;
+
+function lockTeamsFilesPageScroll(){
+  if(teamsFilesViewerScrollLocked)return;
+  teamsFilesPageScrollY=window.scrollY||window.pageYOffset||0;
+  teamsFilesBodyStyleSnapshot={
+    position:document.body.style.position,
+    top:document.body.style.top,
+    left:document.body.style.left,
+    right:document.body.style.right,
+    width:document.body.style.width,
+    overflow:document.body.style.overflow
+  };
+  document.body.style.position='fixed';
+  document.body.style.top=`-${teamsFilesPageScrollY}px`;
+  document.body.style.left='0';
+  document.body.style.right='0';
+  document.body.style.width='100%';
+  document.body.style.overflow='hidden';
+  teamsFilesViewerScrollLocked=true;
+}
+
+function unlockTeamsFilesPageScroll(){
+  if(!teamsFilesViewerScrollLocked)return;
+  const snap=teamsFilesBodyStyleSnapshot||{};
+  document.body.style.position=snap.position||'';
+  document.body.style.top=snap.top||'';
+  document.body.style.left=snap.left||'';
+  document.body.style.right=snap.right||'';
+  document.body.style.width=snap.width||'';
+  document.body.style.overflow=snap.overflow||'';
+  teamsFilesViewerScrollLocked=false;
+  teamsFilesBodyStyleSnapshot=null;
+  requestAnimationFrame(()=>{
+    window.scrollTo({top:teamsFilesPageScrollY,left:0,behavior:'auto'});
+    requestAnimationFrame(()=>window.scrollTo({top:teamsFilesPageScrollY,left:0,behavior:'auto'}));
+  });
+}
+
+function closeTeamsFileViewer(){
+  cleanupTeamsPreviewObjectUrl();
+  try{$('documentViewerDialog').close()}catch(_){ }
+  unlockTeamsFilesPageScroll();
+}
 
 const DEFAULT_LOT_CHECKLIST_ITEMS=[
   'Install Temp Pole',
@@ -4137,9 +4182,9 @@ async function openTeamsDriveItem(itemId,name){
         $('documentViewerBody').innerHTML='<div class="card" style="margin:18px"><strong>Preview not available inside BowenBuilder.</strong><div class="muted">Use Open in Microsoft 365 to view this file.</div></div>';
       }
     }
+    lockTeamsFilesPageScroll();
     $('documentViewerDialog').showModal();
     teamsFilesSetStatus('');
-    requestAnimationFrame(()=>window.scrollTo({top:teamsFilesPageScrollY,left:0,behavior:'auto'}));
   }catch(err){teamsFilesSetStatus(err?.message||String(err),true);}
 }
 
@@ -5256,9 +5301,9 @@ $('aiUseDraft').onclick=()=>{
 };
 
 if($('teamsFilesRefresh'))$('teamsFilesRefresh').onclick=()=>loadTeamsFilesTeams(true);
-$('documentViewerX').onclick=()=>{cleanupTeamsPreviewObjectUrl();$('documentViewerDialog').close();requestAnimationFrame(()=>window.scrollTo({top:teamsFilesPageScrollY,left:0,behavior:'auto'}))};
-$('documentViewerClose').onclick=()=>{cleanupTeamsPreviewObjectUrl();$('documentViewerDialog').close();requestAnimationFrame(()=>window.scrollTo({top:teamsFilesPageScrollY,left:0,behavior:'auto'}))};
-$('documentViewerDialog').addEventListener('click',e=>{if(e.target===e.currentTarget){cleanupTeamsPreviewObjectUrl();$('documentViewerDialog').close();requestAnimationFrame(()=>window.scrollTo({top:teamsFilesPageScrollY,left:0,behavior:'auto'}))}});
+$('documentViewerX').onclick=()=>closeTeamsFileViewer();
+$('documentViewerClose').onclick=()=>closeTeamsFileViewer();
+$('documentViewerDialog').addEventListener('click',e=>{if(e.target===e.currentTarget)closeTeamsFileViewer()});
 
 
 try{
