@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="2026-08-31-rendering-in-app">
+<meta name="bowenbuilder-version" content="2026-08-31-rendering-close-fix">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -1482,11 +1482,14 @@ button.danger:hover{filter:brightness(.96)}
 }
 .rendering-viewer-close{
   position:fixed;
-  z-index:20;
+  z-index:99999;
   top:max(12px,env(safe-area-inset-top));
-  right:14px;
-  width:46px;
-  height:46px;
+  right:max(14px,env(safe-area-inset-right));
+  width:52px;
+  height:52px;
+  pointer-events:auto;
+  touch-action:manipulation;
+  -webkit-tap-highlight-color:transparent;
   border:0;
   border-radius:50%;
   background:rgba(255,255,255,.92);
@@ -4487,7 +4490,17 @@ function closeRenderingViewer(){
   if(img)img.src='';
 }
 
-$('closeRenderingViewer')?.addEventListener('click',closeRenderingViewer);
+const renderingCloseBtn=$('closeRenderingViewer');
+if(renderingCloseBtn){
+  const closeFromTap=e=>{
+    e.preventDefault();
+    e.stopPropagation();
+    closeRenderingViewer();
+  };
+  renderingCloseBtn.addEventListener('pointerup',closeFromTap);
+  renderingCloseBtn.addEventListener('touchend',closeFromTap,{passive:false});
+  renderingCloseBtn.addEventListener('click',closeFromTap);
+}
 $('renderingViewerDialog')?.addEventListener('click',e=>{
   if(e.target===$('renderingViewerDialog'))closeRenderingViewer();
 });
