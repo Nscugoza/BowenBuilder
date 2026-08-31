@@ -1517,8 +1517,10 @@ button.teams-file-row:hover{border-color:#bdccdd}
 .teams-file-row-name{font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .teams-file-row-meta{font-size:12px;color:var(--muted);margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .teams-file-row-arrow{color:#8a96a8;font-size:22px;flex:0 0 auto}
-.teams-files-refresh{white-space:nowrap}
-@media(max-width:700px){.teams-files-head{align-items:stretch}.teams-files-refresh{width:100%}.teams-file-row{padding:11px}.teams-file-row-icon{width:38px;height:38px}}
+.teams-files-actions{display:flex;gap:8px;flex-wrap:wrap}
+.teams-files-refresh,.teams-files-back{white-space:nowrap}
+.teams-files-back:disabled{opacity:.45;cursor:default}
+@media(max-width:700px){.teams-files-head{align-items:stretch}.teams-files-actions{width:100%}.teams-files-actions button{flex:1}.teams-file-row{padding:11px}.teams-file-row-icon{width:38px;height:38px}}
 
 /* Teams file viewer: fixed overlay instead of native <dialog> to prevent iPhone Safari scroll jumps. */
 .teams-viewer-overlay{
@@ -1676,7 +1678,10 @@ button.teams-file-row:hover{border-color:#bdccdd}
               <strong>Teams Files</strong>
               <div class="muted">Read-only access to Microsoft Teams / SharePoint files available to your Microsoft account.</div>
             </div>
-            <button id="teamsFilesRefresh" class="secondary teams-files-refresh" type="button">↻ Refresh</button>
+            <div class="teams-files-actions">
+              <button id="teamsFilesBack" class="secondary teams-files-back" type="button" disabled>‹ Back</button>
+              <button id="teamsFilesRefresh" class="secondary teams-files-refresh" type="button">↻ Refresh</button>
+            </div>
           </div>
           <div id="teamsFilesBreadcrumbs" class="teams-files-breadcrumbs"></div>
           <div id="teamsFilesStatus" class="teams-files-status">Open Files to load your Microsoft Teams.</div>
@@ -4081,9 +4086,46 @@ async function microsoftGraphJson(path,options={}){
   return payload;
 }
 
+function updateTeamsFilesBackButton(){
+  const btn=$('teamsFilesBack');
+  if(!btn)return;
+  const canGoBack=teamsFilesState.level!=='teams';
+  btn.disabled=!canGoBack;
+}
+
+async function goBackTeamsFiles(){
+  if(teamsFilesState.level==='teams')return;
+  const preservedScrollY=beginTeamsFilesNavigation();
+  try{
+    if(teamsFilesState.level==='channels'){
+      await loadTeamsFilesTeams();
+      return;
+    }
+    if(teamsFilesState.level==='files' && teamsFilesState.folderStack.length){
+      if(teamsFilesState.folderStack.length===1){
+        await loadTeamsChannelRoot(teamsFilesState.team.id,teamsFilesState.channel.id,teamsFilesState.channel.displayName);
+        return;
+      }
+      teamsFilesState.folderStack.pop();
+      const target=teamsFilesState.folderStack[teamsFilesState.folderStack.length-1];
+      teamsFilesState.folderId=target.id;
+      teamsFilesState.folderName=target.name;
+      renderTeamsFilesBreadcrumbs();
+      await loadTeamsFolderChildren(teamsFilesState.driveId,target.id,false);
+      return;
+    }
+    if(teamsFilesState.level==='files' && teamsFilesState.team){
+      await loadTeamsChannels(teamsFilesState.team.id,teamsFilesState.team.displayName);
+    }
+  }finally{
+    restoreTeamsFilesNavigation(preservedScrollY);
+  }
+}
+
 function renderTeamsFilesBreadcrumbs(){
   const root=$('teamsFilesBreadcrumbs');
   if(!root)return;
+  updateTeamsFilesBackButton();
   const parts=[{label:'Teams',action:'teams'}];
   if(teamsFilesState.team)parts.push({label:teamsFilesState.team.displayName||'Team',action:'team'});
   if(teamsFilesState.channel)parts.push({label:teamsFilesState.channel.displayName||'Channel',action:'channel'});
@@ -5372,6 +5414,7 @@ $('aiUseDraft').onclick=()=>{
   $('includedOptions').value=options;
 };
 
+if($('teamsFilesBack'))$('teamsFilesBack').onclick=()=>goBackTeamsFiles();
 if($('teamsFilesRefresh'))$('teamsFilesRefresh').onclick=()=>loadTeamsFilesTeams(true);
 $('documentViewerX').onclick=()=>$('documentViewerDialog').close();
 $('documentViewerClose').onclick=()=>$('documentViewerDialog').close();
