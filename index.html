@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="2026-09-01-admin-online-last-seen-fixed">
+<meta name="bowenbuilder-version" content="2026-09-01-admin-online-last-seen-realtime-fixed">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -2133,6 +2133,7 @@ let appPresenceChannel=null;
 let appPresenceUsers=[];
 let adminPresenceProfiles=[];
 let lastSeenHeartbeatTimer=null;
+let adminPresenceRenderTimer=null;
 let currentUserProfile=null;
 let currentUserEmail='';
 const ADMIN_EMAIL='nick@bowenhomes.com';
@@ -2413,7 +2414,24 @@ function flattenAppPresenceState(state){
 function syncAppPresenceState(){
   if(!appPresenceChannel)return;
   appPresenceUsers=flattenAppPresenceState(appPresenceChannel.presenceState());
-  if(isBowenBuilderAdmin() && !$('adminOnlinePanel')?.classList.contains('hidden'))renderAdminOnlineUsers();
+  if(isBowenBuilderAdmin()){
+    const byId=new Map((adminPresenceProfiles||[]).map(p=>[String(p.id),p]));
+    appPresenceUsers.forEach(p=>{
+      const id=String(p.user_id||'');
+      if(!id)return;
+      const existing=byId.get(id)||{
+        id,
+        full_name:p.name||'User',
+        email:'',
+        last_seen_at:null
+      };
+      existing.full_name=existing.full_name||p.name||'User';
+      existing.last_seen_at=new Date().toISOString();
+      byId.set(id,existing);
+    });
+    adminPresenceProfiles=[...byId.values()];
+    if(!$('adminOnlinePanel')?.classList.contains('hidden'))renderAdminOnlineUsers();
+  }
 }
 function formatLastSeen(value){
   if(!value)return 'Never recorded';
@@ -2437,15 +2455,28 @@ async function loadAdminPresenceProfiles(){
   if(!isBowenBuilderAdmin())return;
   const {data,error}=await db.rpc('bowenbuilder_admin_presence_users');
   if(error){
-    console.warn('Could not load last seen profiles',error);
+    console.warn('Could not load last seen users',error);
     return;
   }
-  adminPresenceProfiles=(data||[]).map(r=>({
+  const rows=(data||[]).map(r=>({
     id:r.id,
     full_name:r.full_name||'',
     email:r.email||'',
     last_seen_at:r.last_seen_at||null
   }));
+  const byId=new Map(rows.map(r=>[String(r.id),r]));
+  appPresenceUsers.forEach(p=>{
+    const id=String(p.user_id||'');
+    if(id && !byId.has(id)){
+      byId.set(id,{
+        id,
+        full_name:p.name||'User',
+        email:'',
+        last_seen_at:new Date().toISOString()
+      });
+    }
+  });
+  adminPresenceProfiles=[...byId.values()];
 }
 function renderAdminOnlineUsers(){
   if(!isBowenBuilderAdmin())return;
@@ -2495,6 +2526,14 @@ function renderAdminOnlineUsers(){
     </div>`;
   }).join('') || '<div class="muted">No users found.</div>';
 }
+function startAdminPresenceRenderTimer(){
+  if(adminPresenceRenderTimer)clearInterval(adminPresenceRenderTimer);
+  adminPresenceRenderTimer=setInterval(()=>{
+    if(isBowenBuilderAdmin() && !$('adminOnlinePanel')?.classList.contains('hidden')){
+      renderAdminOnlineUsers();
+    }
+  },15000);
+}
 async function updateMyLastSeen(){
   if(!currentAuthUserId)return;
   try{
@@ -2517,12 +2556,18 @@ async function startAppPresence(){
   });
   appPresenceChannel
     .on('presence',{event:'sync'},syncAppPresenceState)
-    .on('presence',{event:'join'},syncAppPresenceState)
+    .on('presence',{event:'join'},async()=>{
+      syncAppPresenceState();
+      if(isBowenBuilderAdmin()){
+        await loadAdminPresenceProfiles();
+        if(!$('adminOnlinePanel')?.classList.contains('hidden'))renderAdminOnlineUsers();
+      }
+    })
     .on('presence',{event:'leave'},async()=>{
       syncAppPresenceState();
-      if(isBowenBuilderAdmin() && !$('adminOnlinePanel')?.classList.contains('hidden')){
+      if(isBowenBuilderAdmin()){
         await loadAdminPresenceProfiles();
-        renderAdminOnlineUsers();
+        if(!$('adminOnlinePanel')?.classList.contains('hidden'))renderAdminOnlineUsers();
       }
     })
     .subscribe(async status=>{
@@ -5498,7 +5543,7 @@ document.addEventListener('visibilitychange',()=>{
 });
 window.addEventListener('pagehide',()=>{updateMyLastSeen();});
 
-$('logout').onclick=async()=>{await updateMyLastSeen();if(lastSeenHeartbeatTimer)clearInterval(lastSeenHeartbeatTimer);if(realtimeChannel)await db.removeChannel(realtimeChannel);if(presenceChannel)await db.removeChannel(presenceChannel);if(appPresenceChannel)await db.removeChannel(appPresenceChannel);await db.auth.signOut();location.reload()};
+$('logout').onclick=async()=>{await updateMyLastSeen();if(lastSeenHeartbeatTimer)clearInterval(lastSeenHeartbeatTimer);if(adminPresenceRenderTimer)clearInterval(adminPresenceRenderTimer);if(realtimeChannel)await db.removeChannel(realtimeChannel);if(presenceChannel)await db.removeChannel(presenceChannel);if(appPresenceChannel)await db.removeChannel(appPresenceChannel);await db.auth.signOut();location.reload()};
 $('backToSubs').onclick=showSubs;$('backToLots').onclick=showLots;
 function dateInputValue(v){
  if(!v) return '';
@@ -5825,6 +5870,7 @@ if(session){
   startRealtimeUpdates();
   await startAppPresence();
   startLastSeenHeartbeat();
+  if(isBowenBuilderAdmin())startAdminPresenceRenderTimer();
   await load();
 }else{
   $('login').classList.remove('hidden');
