@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="2026-09-01-admin-online-users">
+<meta name="bowenbuilder-version" content="2026-09-01-admin-online-last-seen">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -1624,6 +1624,9 @@ button.teams-file-row:hover{border-color:#bdccdd}
 .admin-online-meta{font-size:12px;color:var(--muted);margin-top:3px}
 .admin-online-status{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:800;white-space:nowrap}
 .admin-online-dot{width:9px;height:9px;border-radius:50%;background:#12b76a;box-shadow:0 0 0 3px rgba(18,183,106,.12)}
+
+.admin-offline-dot{width:9px;height:9px;border-radius:50%;background:#98a2b3;box-shadow:0 0 0 3px rgba(152,162,179,.12)}
+.admin-last-seen{font-size:12px;color:var(--muted);margin-top:3px}
 </style>
 </head>
 <body>
@@ -1826,7 +1829,7 @@ button.teams-file-row:hover{border-color:#bdccdd}
       <div id="adminOnlinePanel" class="hidden">
         <div class="card admin-note">
           <strong>Online Now</strong>
-          <div class="muted" style="margin-top:5px">Shows people who currently have BowenBuilder open and connected.</div>
+          <div class="muted" style="margin-top:5px">Shows everyone with BowenBuilder access, who is online now, and when each person was last online.</div>
         </div>
         <div class="toolbar" style="margin-top:12px">
           <div id="adminOnlineSummary" class="muted">Checking who is online…</div>
@@ -2128,6 +2131,8 @@ let realtimeChannel=null;
 let presenceChannel=null;
 let appPresenceChannel=null;
 let appPresenceUsers=[];
+let adminPresenceProfiles=[];
+let lastSeenHeartbeatTimer=null;
 let currentUserProfile=null;
 let currentUserEmail='';
 const ADMIN_EMAIL='nick@bowenhomes.com';
@@ -2410,20 +2415,99 @@ function syncAppPresenceState(){
   appPresenceUsers=flattenAppPresenceState(appPresenceChannel.presenceState());
   if(isBowenBuilderAdmin() && !$('adminOnlinePanel')?.classList.contains('hidden'))renderAdminOnlineUsers();
 }
+function formatLastSeen(value){
+  if(!value)return 'Never recorded';
+  const d=new Date(value);
+  if(Number.isNaN(d.getTime()))return 'Unknown';
+  const diff=Math.max(0,Date.now()-d.getTime());
+  const mins=Math.floor(diff/60000);
+  if(mins<1)return 'Just now';
+  if(mins<60)return `${mins} minute${mins===1?'':'s'} ago`;
+  const hours=Math.floor(mins/60);
+  if(hours<24)return `${hours} hour${hours===1?'':'s'} ago`;
+  const days=Math.floor(hours/24);
+  if(days<7)return `${days} day${days===1?'':'s'} ago`;
+  return d.toLocaleString(undefined,{
+    month:'short',day:'numeric',
+    year:d.getFullYear()!==new Date().getFullYear()?'numeric':undefined,
+    hour:'numeric',minute:'2-digit'
+  });
+}
+async function loadAdminPresenceProfiles(){
+  if(!isBowenBuilderAdmin())return;
+  const {data,error}=await db.from('profiles')
+    .select('id,full_name,email,last_seen_at')
+    .order('full_name',{ascending:true});
+  if(error){
+    console.warn('Could not load last seen profiles',error);
+    return;
+  }
+  adminPresenceProfiles=data||[];
+}
 function renderAdminOnlineUsers(){
   if(!isBowenBuilderAdmin())return;
   const list=$('adminOnlineList'),summary=$('adminOnlineSummary');
   if(!list||!summary)return;
-  const users=appPresenceUsers;
-  summary.textContent=`${users.length} ${users.length===1?'person':'people'} online`;
-  list.innerHTML=users.map(p=>`<div class="admin-online-card">
-    <div class="admin-online-person">
-      <div class="admin-online-name">${esc(p.name||'User')}${p.user_id===currentAuthUserId?' (You)':''}</div>
-      <div class="admin-online-meta">${esc(p.location||'BowenBuilder')}</div>
-    </div>
-    <div class="admin-online-status"><span class="admin-online-dot"></span>Online</div>
-  </div>`).join('') || '<div class="muted">No one is currently online.</div>';
+
+  const onlineById=new Map(appPresenceUsers.map(p=>[String(p.user_id),p]));
+  const profilesById=new Map((adminPresenceProfiles||[]).map(p=>[String(p.id),p]));
+
+  appPresenceUsers.forEach(p=>{
+    if(!profilesById.has(String(p.user_id))){
+      profilesById.set(String(p.user_id),{
+        id:p.user_id,
+        full_name:p.name||'User',
+        email:'',
+        last_seen_at:null
+      });
+    }
+  });
+
+  const rows=[...profilesById.values()].map(profile=>{
+    const live=onlineById.get(String(profile.id));
+    return {profile,live,online:!!live};
+  }).sort((a,b)=>{
+    if(a.online!==b.online)return a.online?-1:1;
+    const an=String(a.profile.full_name||a.profile.email||'');
+    const bn=String(b.profile.full_name||b.profile.email||'');
+    return an.localeCompare(bn);
+  });
+
+  const onlineCount=rows.filter(r=>r.online).length;
+  summary.textContent=`${onlineCount} online · ${rows.length} total user${rows.length===1?'':'s'}`;
+
+  list.innerHTML=rows.map(({profile,live,online})=>{
+    const name=profile.full_name||profile.email||'User';
+    const isYou=String(profile.id)===String(currentAuthUserId);
+    return `<div class="admin-online-card">
+      <div class="admin-online-person">
+        <div class="admin-online-name">${esc(name)}${isYou?' (You)':''}</div>
+        ${profile.email && profile.email!==name?`<div class="admin-online-meta">${esc(profile.email)}</div>`:''}
+        <div class="admin-last-seen">${online?esc(live?.location||'BowenBuilder'):`Last online: ${esc(formatLastSeen(profile.last_seen_at))}`}</div>
+      </div>
+      <div class="admin-online-status">
+        <span class="${online?'admin-online-dot':'admin-offline-dot'}"></span>
+        ${online?'Online':'Offline'}
+      </div>
+    </div>`;
+  }).join('') || '<div class="muted">No users found.</div>';
 }
+async function updateMyLastSeen(){
+  if(!currentAuthUserId)return;
+  try{
+    await db.from('profiles')
+      .update({last_seen_at:new Date().toISOString()})
+      .eq('id',currentAuthUserId);
+  }catch(err){
+    console.warn('Could not update last seen',err);
+  }
+}
+function startLastSeenHeartbeat(){
+  if(lastSeenHeartbeatTimer)clearInterval(lastSeenHeartbeatTimer);
+  updateMyLastSeen();
+  lastSeenHeartbeatTimer=setInterval(()=>updateMyLastSeen(),60*1000);
+}
+
 async function startAppPresence(){
   if(!currentUserProfile?.id || appPresenceChannel)return;
   appPresenceChannel=db.channel('bowenbuilder-online-users',{
@@ -3916,7 +4000,7 @@ function showAdminPanel(panel='contacts'){
  else if(permissions)renderAdminUserPermissions();
  else{
    syncAppPresenceState();
-   renderAdminOnlineUsers();
+   loadAdminPresenceProfiles().then(()=>renderAdminOnlineUsers());
  }
  updateAppPresenceLocation();
 }
@@ -5395,7 +5479,18 @@ async function saveSchedule(e){
 }
 $('msLogin').onclick=signIn;
 $('loginForm').onsubmit=e=>{e.preventDefault();signIn()};
-$('logout').onclick=async()=>{if(realtimeChannel)await db.removeChannel(realtimeChannel);if(presenceChannel)await db.removeChannel(presenceChannel);if(appPresenceChannel)await db.removeChannel(appPresenceChannel);await db.auth.signOut();location.reload()};
+
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='visible'){
+    updateMyLastSeen();
+    updateAppPresenceLocation();
+  }else{
+    updateMyLastSeen();
+  }
+});
+window.addEventListener('pagehide',()=>{updateMyLastSeen();});
+
+$('logout').onclick=async()=>{await updateMyLastSeen();if(lastSeenHeartbeatTimer)clearInterval(lastSeenHeartbeatTimer);if(realtimeChannel)await db.removeChannel(realtimeChannel);if(presenceChannel)await db.removeChannel(presenceChannel);if(appPresenceChannel)await db.removeChannel(appPresenceChannel);await db.auth.signOut();location.reload()};
 $('backToSubs').onclick=showSubs;$('backToLots').onclick=showLots;
 function dateInputValue(v){
  if(!v) return '';
@@ -5712,7 +5807,7 @@ document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{
 $('adminContactsTab').onclick=()=>showAdminPanel('contacts');
 $('adminPermissionsTab').onclick=()=>showAdminPanel('permissions');
 $('adminOnlineTab').onclick=()=>showAdminPanel('online');
-$('adminOnlineRefresh').onclick=()=>{syncAppPresenceState();renderAdminOnlineUsers();};
+$('adminOnlineRefresh').onclick=async()=>{syncAppPresenceState();await loadAdminPresenceProfiles();renderAdminOnlineUsers();};
 $('adminContactSearch').oninput=()=>renderAdminContacts();
 $('adminUserSearch').oninput=()=>renderAdminUserPermissions();
 const {data:{session}}=await db.auth.getSession();
@@ -5721,6 +5816,7 @@ if(session){
   await loadCurrentProfile();
   startRealtimeUpdates();
   await startAppPresence();
+  startLastSeenHeartbeat();
   await load();
 }else{
   $('login').classList.remove('hidden');
