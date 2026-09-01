@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="2026-08-31-teams-linked-deco-hlp-lgp">
+<meta name="bowenbuilder-version" content="2026-09-01-schedule-contact-custom-messages-info-fields">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -1603,6 +1603,19 @@ button.teams-file-row:hover{border-color:#bdccdd}
 }
 @media(max-width:700px){.teams-viewer-actions>a{width:100%;text-align:center}.teams-viewer-actions{justify-content:stretch}}
 
+
+.admin-custom-message-wrap{display:grid;gap:8px;margin-top:10px}
+.admin-custom-message-wrap textarea{min-height:104px;resize:vertical}
+.admin-custom-message-help{font-size:12px;color:var(--muted);line-height:1.35}
+.admin-custom-message-help code{font-size:11px;background:#f2f4f7;border-radius:6px;padding:2px 4px}
+
+.admin-info-fields{display:grid;gap:10px;margin-top:12px}
+.admin-info-field-group{border:1px solid var(--border);border-radius:12px;padding:10px;background:#f8fafc}
+.admin-info-field-title{font-weight:800;margin-bottom:8px}
+.admin-info-field-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px 10px}
+.admin-info-field-grid label{display:flex;align-items:center;gap:7px;font-size:13px;font-weight:600}
+.admin-info-field-grid input{width:auto;margin:0}
+@media(max-width:520px){.admin-info-field-grid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -3543,7 +3556,7 @@ function normalizeEmailList(value){
 async function loadScheduleContacts(){
   const {data,error}=await db
     .from('schedule_item_contacts')
-    .select('schedule_item,email_addresses,phone_numbers,include_plans_email,include_plans_text,include_rendering_email,include_rendering_text,updated_at')
+    .select('schedule_item,email_addresses,phone_numbers,include_plans_email,include_plans_text,include_rendering_email,include_rendering_text,email_message,text_message,email_info_fields,text_info_fields,updated_at')
     .order('schedule_item');
   if(error){
     scheduleContacts=[];
@@ -3796,6 +3809,47 @@ function showAdminPanel(panel='contacts'){
  $('adminPermissionsTab').classList.toggle('active',!contacts);
  if(contacts)renderAdminContacts(); else renderAdminUserPermissions();
 }
+
+const SCHEDULE_AUTO_INFO_FIELDS=[
+  ['address','Address'],
+  ['subdivision','Subdivision'],
+  ['plan','Plan Name'],
+  ['permit','Permit Number'],
+  ['date','Requested Schedule Date'],
+  ['work','Scheduled Work'],
+  ['options','Included Options']
+];
+function normalizeScheduleInfoFields(value){
+  if(Array.isArray(value))return new Set(value.map(String));
+  if(value && typeof value==='object'){
+    return new Set(Object.keys(value).filter(k=>value[k]!==false));
+  }
+  // Null/undefined means legacy/default behavior: include everything.
+  return new Set(SCHEDULE_AUTO_INFO_FIELDS.map(x=>x[0]));
+}
+function scheduleInfoFieldChecked(row,channel,key){
+  const raw=channel==='email'?row?.email_info_fields:row?.text_info_fields;
+  return normalizeScheduleInfoFields(raw).has(key);
+}
+function scheduleInfoFieldListFromCard(scheduleItem,channel){
+  const attr=channel==='email'?'data-admin-email-info':'data-admin-text-info';
+  return [...document.querySelectorAll(`[${attr}]`)]
+    .filter(x=>x.getAttribute(attr)===scheduleItem && x.checked)
+    .map(x=>x.dataset.infoField)
+    .filter(Boolean);
+}
+function scheduleInfoPrefsForItem(item,channel){
+  const contact=scheduleContactForItemName(item?.name);
+  const raw=channel==='email'?contact?.email_info_fields:contact?.text_info_fields;
+  return normalizeScheduleInfoFields(raw);
+}
+function scheduleInfoPrefsForSelectedDate(channel){
+  const arr=selectedDateScheduleItems();
+  // When several trades share a day, keep the full combined automatic message.
+  if(arr.length!==1)return normalizeScheduleInfoFields(null);
+  return scheduleInfoPrefsForItem(arr[0],channel);
+}
+
 async function renderAdminContacts(){
   const notice=$('adminContactNotice');
   const list=$('adminContactList');
@@ -3841,6 +3895,34 @@ async function renderAdminContacts(){
             Include Color Rendering in Text
           </label>
         </div>
+        <div class="admin-info-fields">
+          <div class="admin-info-field-group">
+            <div class="admin-info-field-title">Automatic Email Includes</div>
+            <div class="admin-info-field-grid">
+              ${SCHEDULE_AUTO_INFO_FIELDS.map(([key,label])=>`<label><input type="checkbox" data-admin-email-info="${esc(name)}" data-info-field="${key}" ${scheduleInfoFieldChecked(row,'email',key)?'checked':''}>${esc(label)}</label>`).join('')}
+            </div>
+          </div>
+          <div class="admin-info-field-group">
+            <div class="admin-info-field-title">Automatic Text Includes</div>
+            <div class="admin-info-field-grid">
+              ${SCHEDULE_AUTO_INFO_FIELDS.map(([key,label])=>`<label><input type="checkbox" data-admin-text-info="${esc(name)}" data-info-field="${key}" ${scheduleInfoFieldChecked(row,'text',key)?'checked':''}>${esc(label)}</label>`).join('')}
+            </div>
+          </div>
+          <div class="admin-custom-message-help">These checkboxes only control BowenBuilder's automatic message. If a custom message is entered below, the custom message is used instead.</div>
+        </div>
+        <div class="admin-custom-message-wrap">
+          <label>Custom Email Message
+            <textarea data-admin-email-message="${esc(name)}" placeholder="Leave blank to use BowenBuilder's automatic schedule email.">${esc(row?.email_message||'')}</textarea>
+          </label>
+          <label>Custom Text Message
+            <textarea data-admin-text-message="${esc(name)}" placeholder="Leave blank to use BowenBuilder's automatic schedule text.">${esc(row?.text_message||'')}</textarea>
+          </label>
+          <div class="admin-custom-message-help">
+            Blank = keep the current automatic message with all lot information. Optional placeholders:
+            <code>{lot}</code> <code>{address}</code> <code>{subdivision}</code> <code>{plan}</code>
+            <code>{permit}</code> <code>{date}</code> <code>{work}</code> <code>{options}</code>.
+          </div>
+        </div>
         <div class="admin-contact-status muted" data-admin-contact-status="${esc(name)}"></div>
       </label>
       <button class="primary admin-contact-save" type="button" data-admin-contact-save="${esc(name)}">Save</button>
@@ -3865,9 +3947,13 @@ async function saveAdminScheduleContact(scheduleItem){
     .find(x=>x.dataset.adminRenderingEmail===scheduleItem);
   const renderingTextInput=[...document.querySelectorAll('[data-admin-rendering-text]')]
     .find(x=>x.dataset.adminRenderingText===scheduleItem);
+  const emailMessageInput=[...document.querySelectorAll('[data-admin-email-message]')]
+    .find(x=>x.dataset.adminEmailMessage===scheduleItem);
+  const textMessageInput=[...document.querySelectorAll('[data-admin-text-message]')]
+    .find(x=>x.dataset.adminTextMessage===scheduleItem);
   const status=[...document.querySelectorAll('[data-admin-contact-status]')]
     .find(x=>x.dataset.adminContactStatus===scheduleItem);
-  if(!input || !phoneInput || !plansEmailInput || !plansTextInput || !renderingEmailInput || !renderingTextInput)return;
+  if(!input || !phoneInput || !plansEmailInput || !plansTextInput || !renderingEmailInput || !renderingTextInput || !emailMessageInput || !textMessageInput)return;
 
   const emails=normalizeEmailList(input.value);
   const phones=normalizePhoneList(phoneInput.value);
@@ -3875,6 +3961,10 @@ async function saveAdminScheduleContact(scheduleItem){
   const includePlansText=!!plansTextInput.checked;
   const includeRenderingEmail=!!renderingEmailInput.checked;
   const includeRenderingText=!!renderingTextInput.checked;
+  const emailMessage=String(emailMessageInput.value||'').trim();
+  const textMessage=String(textMessageInput.value||'').trim();
+  const emailInfoFields=scheduleInfoFieldListFromCard(scheduleItem,'email');
+  const textInfoFields=scheduleInfoFieldListFromCard(scheduleItem,'text');
   const invalid=emails.find(x=>!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(x));
   if(invalid){
     if(status){status.textContent=`Check email address: ${invalid}`;status.style.color='#b42318';}
@@ -3891,10 +3981,7 @@ async function saveAdminScheduleContact(scheduleItem){
 
   const {data:{user}}=await db.auth.getUser();
   let error=null;
-  if(!emails.length && !phones.length && !includePlansEmail && !includePlansText && !includeRenderingEmail && !includeRenderingText){
-    ({error}=await db.from('schedule_item_contacts').delete().eq('schedule_item',scheduleItem));
-  }else{
-    ({error}=await db.from('schedule_item_contacts').upsert({
+  ({error}=await db.from('schedule_item_contacts').upsert({
       schedule_item:scheduleItem,
       email_addresses:emails.join(', '),
       phone_numbers:phones.join(', '),
@@ -3902,16 +3989,20 @@ async function saveAdminScheduleContact(scheduleItem){
       include_plans_text:includePlansText,
       include_rendering_email:includeRenderingEmail,
       include_rendering_text:includeRenderingText,
+      email_message:emailMessage,
+      text_message:textMessage,
+      email_info_fields:emailInfoFields,
+      text_info_fields:textInfoFields,
       updated_at:new Date().toISOString(),
       updated_by:user?.id||null
     },{onConflict:'schedule_item'}));
-  }
+
 
   if(error){
     if(status){status.textContent=error.message;status.style.color='#b42318';}
     return;
   }
-  if(status){status.textContent=(emails.length||phones.length||includePlansEmail||includePlansText||includeRenderingEmail||includeRenderingText)?'Saved ✓':'Mapping cleared ✓';status.style.color='#067647';}
+  if(status){status.textContent='Saved ✓';status.style.color='#067647';}
   await loadScheduleContacts();
 }
 
@@ -4026,6 +4117,47 @@ function scheduleContactForItemName(name){
   return scheduleContacts.find(r=>r.schedule_item===String(name||'').trim())||null;
 }
 
+function scheduleMessageTemplateValues(item,lot,sub,dateLabel,work){
+  const optionLines=includedOptionsLinesForMessage(lot);
+  return {
+    lot:lot?.lot_name||'Lot',
+    address:lot?.address||'',
+    subdivision:sub?.name||'',
+    plan:lot?.plan_name||'',
+    permit:lot?.permit_number||'',
+    date:dateLabel||'',
+    work:work||item?.name||'Schedule Item',
+    options:optionLines.map(x=>`- ${x}`).join('\n')
+  };
+}
+function applyScheduleMessageTemplate(template,values){
+  let out=String(template||'');
+  Object.entries(values||{}).forEach(([key,value])=>{
+    out=out.replace(new RegExp(`\\{${key}\\}`,'gi'),String(value??''));
+  });
+  return out.trim();
+}
+function customScheduleMessageForItem(item,channel,autoMessage){
+  const contact=scheduleContactForItemName(item?.name);
+  const template=String(channel==='email'?contact?.email_message||'':contact?.text_message||'').trim();
+  if(!template)return channel==='email'?autoMessage?.body:autoMessage?.textBody;
+
+  const lot=lots.find(l=>l.id===item?.lot_id)||activeLotInfo();
+  const sub=subdivisions.find(s=>s.id===lot?.subdivision_id)||activeSubdivisionInfo();
+  const dateKey=dateInputValue(item?.starts_at);
+  const d=dateKey?dateFromKey(dateKey):null;
+  const dateLabel=d?d.toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric',year:'numeric'}):dateKey;
+  return applyScheduleMessageTemplate(
+    template,
+    scheduleMessageTemplateValues(item,lot,sub,dateLabel,item?.name||'Schedule Item')
+  );
+}
+function selectedDateCustomMessage(channel,autoMessage){
+  const arr=selectedDateScheduleItems();
+  if(arr.length!==1)return channel==='email'?autoMessage?.body:autoMessage?.textBody;
+  return customScheduleMessageForItem(arr[0],channel,autoMessage);
+}
+
 function overviewCommunicationMarks(item){
   try{
     if(!item)return {email:false,text:false};
@@ -4079,34 +4211,34 @@ function overviewScheduleItemMessage(item,planUrl='',includePlans=false,renderin
   const dateLabel=d?d.toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric',year:'numeric'}):dateKey;
   const work=item.name||'Schedule Item';
   const optionLines=includedOptionsLinesForMessage(lot);
+  const emailPrefs=scheduleInfoPrefsForItem(item,'email');
+  const textPrefs=scheduleInfoPrefsForItem(item,'text');
 
   const detailLines=[`${lot?.lot_name||'Lot'} Schedule`];
-  if(lot?.address)detailLines.push(lot.address);
-  if(sub?.name)detailLines.push(sub.name);
-  if(lot?.plan_name)detailLines.push(`Plan: ${lot.plan_name}`);
-  if(lot?.permit_number)detailLines.push(`Permit Number: ${lot.permit_number}`);
-  if(dateLabel)detailLines.push(`Requested Schedule Date: ${dateLabel}`);
-  detailLines.push('');
-  detailLines.push('Scheduled Work:');
-  detailLines.push(`- ${work}${item.crew?' — '+item.crew:''}`);
-
-  if(optionLines.length){
+  if(emailPrefs.has('address') && lot?.address)detailLines.push(lot.address);
+  if(emailPrefs.has('subdivision') && sub?.name)detailLines.push(sub.name);
+  if(emailPrefs.has('plan') && lot?.plan_name)detailLines.push(`Plan: ${lot.plan_name}`);
+  if(emailPrefs.has('permit') && lot?.permit_number)detailLines.push(`Permit Number: ${lot.permit_number}`);
+  if(emailPrefs.has('date') && dateLabel)detailLines.push(`Requested Schedule Date: ${dateLabel}`);
+  if(emailPrefs.has('work')){
+    detailLines.push('');
+    detailLines.push('Scheduled Work:');
+    detailLines.push(`- ${work}${item.crew?' — '+item.crew:''}`);
+  }
+  if(emailPrefs.has('options') && optionLines.length){
     detailLines.push('');
     detailLines.push('Included Options:');
     optionLines.forEach(x=>detailLines.push(`- ${x}`));
   }
 
-  const textLines=[
-    `${lot?.lot_name||'Lot'} Schedule`,
-    `Scheduled Work: ${work}`
-  ];
-  if(lot?.address)textLines.push(lot.address);
-  if(sub?.name)textLines.push(sub.name);
-  if(lot?.plan_name)textLines.push(`Plan: ${lot.plan_name}`);
-  if(lot?.permit_number)textLines.push(`Permit Number: ${lot.permit_number}`);
-  if(dateLabel)textLines.push(`Requested Schedule Date: ${dateLabel}`);
-
-  if(optionLines.length){
+  const textLines=[`${lot?.lot_name||'Lot'} Schedule`];
+  if(textPrefs.has('work'))textLines.push(`Scheduled Work: ${work}`);
+  if(textPrefs.has('address') && lot?.address)textLines.push(lot.address);
+  if(textPrefs.has('subdivision') && sub?.name)textLines.push(sub.name);
+  if(textPrefs.has('plan') && lot?.plan_name)textLines.push(`Plan: ${lot.plan_name}`);
+  if(textPrefs.has('permit') && lot?.permit_number)textLines.push(`Permit Number: ${lot.permit_number}`);
+  if(textPrefs.has('date') && dateLabel)textLines.push(`Requested Schedule Date: ${dateLabel}`);
+  if(textPrefs.has('options') && optionLines.length){
     textLines.push('Included Options:');
     optionLines.forEach(x=>textLines.push(`- ${x}`));
   }
@@ -4127,7 +4259,6 @@ function overviewScheduleItemMessage(item,planUrl='',includePlans=false,renderin
     dateKey
   };
 }
-
 
 
 let teamsFilesStableMinHeight=0;
@@ -4681,7 +4812,7 @@ async function emailOverviewScheduleItem(itemId){
     await sendMicrosoftGraphEmail({
       to:recipients,
       subject:msg.subject,
-      body:msg.body
+      body:customScheduleMessageForItem(item,'email',msg)
     });
 
     // Only mark E after Microsoft Graph accepts the message.
@@ -4721,7 +4852,7 @@ function textOverviewScheduleItem(itemId){
   const phones=mappedPhonesForWork([item.name]);
   const recipient=phones.join(',');
   const separator=/iPad|iPhone|iPod/.test(navigator.userAgent)?'&':'?';
-  const href=`sms:${recipient}${separator}body=${encodeURIComponent(msg.textBody)}`;
+  const href=`sms:${recipient}${separator}body=${encodeURIComponent(customScheduleMessageForItem(item,'text',msg))}`;
 
   // IMPORTANT for iPhone: launch Messages directly inside the original tap handler.
   // Show T immediately on the Overview card.
@@ -4770,28 +4901,31 @@ function selectedDateMessage(planUrl='',includePlans=false,renderingUrl='',inclu
  const workNames=arr.map(i=>i.name||'Schedule Item');
  const workSubject=workNames.length?workNames.join(', '):dateLabel;
  const optionLines=includedOptionsLinesForMessage(lot);
+ const emailPrefs=scheduleInfoPrefsForSelectedDate('email');
+ const textPrefs=scheduleInfoPrefsForSelectedDate('text');
 
- const detailLines=[];
- detailLines.push(`${lot?.lot_name||'Lot'} Schedule`);
- if(lot?.address)detailLines.push(lot.address);
- if(sub?.name)detailLines.push(sub.name);
- if(lot?.plan_name)detailLines.push(`Plan: ${lot.plan_name}`);
- if(lot?.permit_number)detailLines.push(`Permit Number: ${lot.permit_number}`);
- detailLines.push(`Requested Schedule Date: ${dateLabel}`);
- detailLines.push('');
- detailLines.push('Scheduled Work:');
+ const detailLines=[`${lot?.lot_name||'Lot'} Schedule`];
+ if(emailPrefs.has('address') && lot?.address)detailLines.push(lot.address);
+ if(emailPrefs.has('subdivision') && sub?.name)detailLines.push(sub.name);
+ if(emailPrefs.has('plan') && lot?.plan_name)detailLines.push(`Plan: ${lot.plan_name}`);
+ if(emailPrefs.has('permit') && lot?.permit_number)detailLines.push(`Permit Number: ${lot.permit_number}`);
+ if(emailPrefs.has('date'))detailLines.push(`Requested Schedule Date: ${dateLabel}`);
 
- if(arr.length){
-   arr.forEach(i=>{
-     const parts=[i.name||'Schedule Item'];
-     if(i.crew)parts.push(i.crew);
-     detailLines.push(`- ${parts.join(' — ')}`);
-   });
- }else{
-   detailLines.push('No schedule items are currently listed for this date.');
+ if(emailPrefs.has('work')){
+   detailLines.push('');
+   detailLines.push('Scheduled Work:');
+   if(arr.length){
+     arr.forEach(i=>{
+       const parts=[i.name||'Schedule Item'];
+       if(i.crew)parts.push(i.crew);
+       detailLines.push(`- ${parts.join(' — ')}`);
+     });
+   }else{
+     detailLines.push('No schedule items are currently listed for this date.');
+   }
  }
 
- if(optionLines.length){
+ if(emailPrefs.has('options') && optionLines.length){
    detailLines.push('');
    detailLines.push('Included Options:');
    optionLines.forEach(x=>detailLines.push(`- ${x}`));
@@ -4804,16 +4938,15 @@ function selectedDateMessage(planUrl='',includePlans=false,renderingUrl='',inclu
 
  const subject=`${lot?.lot_name||'Lot'} - ${workSubject}`;
 
- const textLines=[];
- textLines.push(`${lot?.lot_name||'Lot'} Schedule`);
- textLines.push(`Scheduled Work: ${workNames.length?workNames.join(', '):'None listed'}`);
- if(lot?.address)textLines.push(lot.address);
- if(sub?.name)textLines.push(sub.name);
- if(lot?.plan_name)textLines.push(`Plan: ${lot.plan_name}`);
- if(lot?.permit_number)textLines.push(`Permit Number: ${lot.permit_number}`);
- textLines.push(`Requested Schedule Date: ${dateLabel}`);
+ const textLines=[`${lot?.lot_name||'Lot'} Schedule`];
+ if(textPrefs.has('work'))textLines.push(`Scheduled Work: ${workNames.length?workNames.join(', '):'None listed'}`);
+ if(textPrefs.has('address') && lot?.address)textLines.push(lot.address);
+ if(textPrefs.has('subdivision') && sub?.name)textLines.push(sub.name);
+ if(textPrefs.has('plan') && lot?.plan_name)textLines.push(`Plan: ${lot.plan_name}`);
+ if(textPrefs.has('permit') && lot?.permit_number)textLines.push(`Permit Number: ${lot.permit_number}`);
+ if(textPrefs.has('date'))textLines.push(`Requested Schedule Date: ${dateLabel}`);
 
- if(optionLines.length){
+ if(textPrefs.has('options') && optionLines.length){
    textLines.push('Included Options:');
    optionLines.forEach(x=>textLines.push(`- ${x}`));
  }
@@ -4905,7 +5038,7 @@ async function emailSelectedCalendarDate(){
    await sendMicrosoftGraphEmail({
      to:recipients,
      subject:msg.subject,
-     body:msg.body
+     body:selectedDateCustomMessage('email',msg)
    });
 
    // Only mark E after Microsoft Graph returns 202 Accepted.
@@ -4948,7 +5081,7 @@ function textSelectedCalendarDate(){
    const phones=mappedPhonesForWork(workNames);
    const recipient=phones.join(',');
    const separator=/iPad|iPhone|iPod/.test(navigator.userAgent)?'&':'?';
-   const href=`sms:${recipient}${separator}body=${encodeURIComponent(msg.textBody)}`;
+   const href=`sms:${recipient}${separator}body=${encodeURIComponent(selectedDateCustomMessage('text',msg))}`;
 
    // Match the working Overview behavior: mark locally first, then launch.
    setCalendarCommunicationLocal('text',scheduleSelectedDate,currentLot);
