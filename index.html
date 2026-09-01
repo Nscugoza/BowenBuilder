@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="2026-09-01-admin-online-last-seen">
+<meta name="bowenbuilder-version" content="2026-09-01-admin-online-last-seen-fixed">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -2435,14 +2435,17 @@ function formatLastSeen(value){
 }
 async function loadAdminPresenceProfiles(){
   if(!isBowenBuilderAdmin())return;
-  const {data,error}=await db.from('profiles')
-    .select('id,full_name,email,last_seen_at')
-    .order('full_name',{ascending:true});
+  const {data,error}=await db.rpc('bowenbuilder_admin_presence_users');
   if(error){
     console.warn('Could not load last seen profiles',error);
     return;
   }
-  adminPresenceProfiles=data||[];
+  adminPresenceProfiles=(data||[]).map(r=>({
+    id:r.id,
+    full_name:r.full_name||'',
+    email:r.email||'',
+    last_seen_at:r.last_seen_at||null
+  }));
 }
 function renderAdminOnlineUsers(){
   if(!isBowenBuilderAdmin())return;
@@ -2495,9 +2498,8 @@ function renderAdminOnlineUsers(){
 async function updateMyLastSeen(){
   if(!currentAuthUserId)return;
   try{
-    await db.from('profiles')
-      .update({last_seen_at:new Date().toISOString()})
-      .eq('id',currentAuthUserId);
+    const {error}=await db.rpc('bowenbuilder_touch_last_seen');
+    if(error)console.warn('Could not update last seen',error);
   }catch(err){
     console.warn('Could not update last seen',err);
   }
@@ -2516,7 +2518,13 @@ async function startAppPresence(){
   appPresenceChannel
     .on('presence',{event:'sync'},syncAppPresenceState)
     .on('presence',{event:'join'},syncAppPresenceState)
-    .on('presence',{event:'leave'},syncAppPresenceState)
+    .on('presence',{event:'leave'},async()=>{
+      syncAppPresenceState();
+      if(isBowenBuilderAdmin() && !$('adminOnlinePanel')?.classList.contains('hidden')){
+        await loadAdminPresenceProfiles();
+        renderAdminOnlineUsers();
+      }
+    })
     .subscribe(async status=>{
       if(status==='SUBSCRIBED'){
         await appPresenceChannel.track({
