@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="2026-09-01-admin-persistent-last-seen-realtime">
+<meta name="bowenbuilder-version" content="2026-09-01-punchout-photo-markup">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -1627,6 +1627,117 @@ button.teams-file-row:hover{border-color:#bdccdd}
 
 .admin-offline-dot{width:9px;height:9px;border-radius:50%;background:#98a2b3;box-shadow:0 0 0 3px rgba(152,162,179,.12)}
 .admin-last-seen{font-size:12px;color:var(--muted);margin-top:3px}
+
+.punchout-photo-wrap{
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+  min-width:0;
+}
+.punchout-photo-wrap .punchout-photo{
+  margin:0;
+}
+.punchout-markup-btn{
+  width:100%;
+  padding:8px 10px;
+  border-radius:10px;
+  border:1px solid #d8e4f0;
+  background:#fff;
+  color:#244f7e;
+  font-weight:800;
+  font-size:12px;
+}
+#punchoutMarkupOverlay{
+  position:fixed;
+  inset:0;
+  z-index:10050;
+  background:#0b1118;
+  display:flex;
+  flex-direction:column;
+  min-height:100dvh;
+}
+#punchoutMarkupOverlay.hidden{display:none}
+.punchout-markup-head{
+  flex:0 0 auto;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  padding:max(10px,env(safe-area-inset-top)) 12px 10px;
+  background:#fff;
+  border-bottom:1px solid #dde5ee;
+}
+.punchout-markup-title{
+  font-weight:900;
+  font-size:16px;
+}
+.punchout-markup-canvas-area{
+  flex:1 1 auto;
+  min-height:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  overflow:auto;
+  padding:10px;
+  touch-action:none;
+  -webkit-overflow-scrolling:touch;
+}
+#punchoutMarkupCanvas{
+  display:block;
+  max-width:100%;
+  max-height:100%;
+  width:auto;
+  height:auto;
+  background:#fff;
+  box-shadow:0 4px 24px rgba(0,0,0,.35);
+  touch-action:none;
+}
+.punchout-markup-tools{
+  flex:0 0 auto;
+  background:#fff;
+  border-top:1px solid #dde5ee;
+  padding:10px 10px max(10px,env(safe-area-inset-bottom));
+}
+.punchout-markup-toolrow{
+  display:flex;
+  gap:7px;
+  align-items:center;
+  overflow-x:auto;
+  -webkit-overflow-scrolling:touch;
+  padding-bottom:8px;
+}
+.punchout-markup-tool{
+  flex:0 0 auto;
+  border:1px solid #d8e4f0;
+  background:#fff;
+  color:#244f7e;
+  border-radius:10px;
+  padding:8px 10px;
+  font-weight:800;
+  font-size:12px;
+}
+.punchout-markup-tool.active{
+  background:#244f7e;
+  color:#fff;
+  border-color:#244f7e;
+}
+.punchout-markup-color{
+  width:34px;
+  height:34px;
+  padding:2px;
+  border-radius:10px;
+  border:1px solid #d8e4f0;
+  background:#fff;
+}
+.punchout-markup-range{
+  width:105px;
+  flex:0 0 105px;
+}
+.punchout-markup-actions{
+  display:flex;
+  gap:8px;
+  justify-content:flex-end;
+}
 </style>
 </head>
 <body>
@@ -2029,6 +2140,33 @@ button.teams-file-row:hover{border-color:#bdccdd}
   </form>
 </dialog>
 
+<div id="punchoutMarkupOverlay" class="hidden" aria-hidden="true">
+  <div class="punchout-markup-head">
+    <div class="punchout-markup-title">Mark Up Punchout Photo</div>
+    <button id="punchoutMarkupClose" class="secondary" type="button">Close</button>
+  </div>
+
+  <div class="punchout-markup-canvas-area">
+    <canvas id="punchoutMarkupCanvas"></canvas>
+  </div>
+
+  <div class="punchout-markup-tools">
+    <div class="punchout-markup-toolrow">
+      <button class="punchout-markup-tool active" type="button" data-markup-tool="draw">✏ Draw</button>
+      <button class="punchout-markup-tool" type="button" data-markup-tool="arrow">➜ Arrow</button>
+      <button class="punchout-markup-tool" type="button" data-markup-tool="text">T Text</button>
+      <input id="punchoutMarkupColor" class="punchout-markup-color" type="color" value="#ff0000" aria-label="Markup color">
+      <input id="punchoutMarkupWidth" class="punchout-markup-range" type="range" min="2" max="18" value="6" aria-label="Line width">
+      <button id="punchoutMarkupUndo" class="punchout-markup-tool" type="button">↶ Undo</button>
+      <button id="punchoutMarkupClear" class="punchout-markup-tool" type="button">Clear</button>
+    </div>
+    <div class="punchout-markup-actions">
+      <button id="punchoutMarkupCancel" class="secondary" type="button">Cancel</button>
+      <button id="punchoutMarkupSave" class="primary" type="button">Save Marked-Up Copy</button>
+    </div>
+  </div>
+</div>
+
 
 <dialog id="aiImportDialog">
   <div class="sheet ai-import-sheet">
@@ -2127,6 +2265,7 @@ const SB_URL='https://oztefiymckpyxiewgxtc.supabase.co';
 const SB_KEY='sb_publishable__ItoYGeHKEGTBFiE7JM74w_1F-qERVe';
 const db=window.supabase.createClient(SB_URL,SB_KEY);
 let subdivisions=[],lots=[],items=[],punchouts=[],punchoutPhotos=[],profiles=[],selectedPunchouts=new Set(),currentSubdivision=null,currentLot=null;
+let punchoutMarkupState={itemId:null,photoPath:null,baseImage:null,baseObjectUrl:'',ops:[],tool:'draw',drawing:null,bodyOverflow:''};
 let realtimeChannel=null;
 let presenceChannel=null;
 let appPresenceChannel=null;
@@ -2975,7 +3114,10 @@ async function renderPunchout(lotId){
             <div class="punchout-text">${esc(p.description)}</div>
             <span class="punchout-status ${p.completed?'completed':''}">${status}</span>
           </div>
-          ${urls.some(x=>x.url)?`<div class="punchout-gallery">${urls.filter(x=>x.url).map(x=>`<img class="punchout-photo" src="${x.url}" alt="Punchout photo" data-punchout-photo="${x.url}">`).join('')}</div>`:''}
+          ${urls.some(x=>x.url)?`<div class="punchout-gallery">${urls.filter(x=>x.url).map(x=>`<div class="punchout-photo-wrap">
+            <img class="punchout-photo" src="${x.url}" alt="Punchout photo" data-punchout-photo="${x.url}">
+            ${canPunchoutEdit(subdivisionForLot(p.lot_id))?`<button class="punchout-markup-btn" type="button" data-markup-punchout="${p.id}" data-markup-path="${esc(x.path)}">✏ Mark Up</button>`:''}
+          </div>`).join('')}</div>`:''}
         </div>
       </div>
       <div class="punchout-meta">
@@ -2998,6 +3140,9 @@ async function renderPunchout(lotId){
   root.querySelectorAll('[data-punchout-photo]').forEach(img=>{
     img.onclick=()=>window.open(img.dataset.punchoutPhoto,'_blank');
   });
+  root.querySelectorAll('[data-markup-punchout]').forEach(btn=>{
+    btn.onclick=()=>openPunchoutMarkup(btn.dataset.markupPunchout,btn.dataset.markupPath);
+  });
   root.querySelectorAll('[data-select-punchout]').forEach(cb=>{
     cb.onchange=()=>{
       if(cb.checked) selectedPunchouts.add(cb.dataset.selectPunchout);
@@ -3019,6 +3164,286 @@ async function renderPunchout(lotId){
   });
 
   updatePunchoutShareBar();
+}
+
+
+function punchoutMarkupCanvasPoint(ev){
+  const canvas=$('punchoutMarkupCanvas');
+  const rect=canvas.getBoundingClientRect();
+  return {
+    x:(ev.clientX-rect.left)*(canvas.width/rect.width),
+    y:(ev.clientY-rect.top)*(canvas.height/rect.height)
+  };
+}
+function punchoutMarkupDrawArrow(ctx,op){
+  const {x1,y1,x2,y2,color,width}=op;
+  const angle=Math.atan2(y2-y1,x2-x1);
+  const head=Math.max(16,width*4);
+  ctx.save();
+  ctx.strokeStyle=color;
+  ctx.fillStyle=color;
+  ctx.lineWidth=width;
+  ctx.lineCap='round';
+  ctx.lineJoin='round';
+  ctx.beginPath();
+  ctx.moveTo(x1,y1);
+  ctx.lineTo(x2,y2);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(x2,y2);
+  ctx.lineTo(x2-head*Math.cos(angle-Math.PI/6),y2-head*Math.sin(angle-Math.PI/6));
+  ctx.lineTo(x2-head*Math.cos(angle+Math.PI/6),y2-head*Math.sin(angle+Math.PI/6));
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+function punchoutMarkupRender(extraOp=null){
+  const canvas=$('punchoutMarkupCanvas');
+  const ctx=canvas.getContext('2d');
+  if(!ctx||!punchoutMarkupState.baseImage)return;
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.drawImage(punchoutMarkupState.baseImage,0,0,canvas.width,canvas.height);
+
+  const ops=extraOp?[...punchoutMarkupState.ops,extraOp]:punchoutMarkupState.ops;
+  for(const op of ops){
+    if(op.type==='stroke'){
+      if(!op.points?.length)continue;
+      ctx.save();
+      ctx.strokeStyle=op.color;
+      ctx.lineWidth=op.width;
+      ctx.lineCap='round';
+      ctx.lineJoin='round';
+      ctx.beginPath();
+      ctx.moveTo(op.points[0].x,op.points[0].y);
+      for(let i=1;i<op.points.length;i++)ctx.lineTo(op.points[i].x,op.points[i].y);
+      if(op.points.length===1){
+        ctx.lineTo(op.points[0].x+.01,op.points[0].y+.01);
+      }
+      ctx.stroke();
+      ctx.restore();
+    }else if(op.type==='arrow'){
+      punchoutMarkupDrawArrow(ctx,op);
+    }else if(op.type==='text'){
+      ctx.save();
+      ctx.fillStyle=op.color;
+      ctx.strokeStyle='rgba(255,255,255,.9)';
+      ctx.lineWidth=Math.max(3,op.size*.12);
+      ctx.lineJoin='round';
+      ctx.font=`900 ${op.size}px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif`;
+      ctx.textBaseline='top';
+      ctx.strokeText(op.text,op.x,op.y);
+      ctx.fillText(op.text,op.x,op.y);
+      ctx.restore();
+    }
+  }
+}
+function setPunchoutMarkupTool(tool){
+  punchoutMarkupState.tool=tool;
+  document.querySelectorAll('[data-markup-tool]').forEach(btn=>{
+    btn.classList.toggle('active',btn.dataset.markupTool===tool);
+  });
+}
+async function openPunchoutMarkup(itemId,photoPath){
+  const item=punchouts.find(p=>String(p.id)===String(itemId));
+  if(!item)return;
+  if(!requirePunchoutEditPermission(subdivisionForLot(item.lot_id)))return;
+
+  const saveBtn=$('punchoutMarkupSave');
+  saveBtn.disabled=true;
+  saveBtn.textContent='Loading Photo…';
+
+  punchoutMarkupState.itemId=itemId;
+  punchoutMarkupState.photoPath=photoPath;
+  punchoutMarkupState.ops=[];
+  punchoutMarkupState.drawing=null;
+  setPunchoutMarkupTool('draw');
+
+  const overlay=$('punchoutMarkupOverlay');
+  punchoutMarkupState.bodyOverflow=document.body.style.overflow;
+  document.body.style.overflow='hidden';
+  overlay.classList.remove('hidden');
+  overlay.setAttribute('aria-hidden','false');
+
+  try{
+    const {data,error}=await db.storage.from('punchout-photos').download(photoPath);
+    if(error)throw error;
+
+    if(punchoutMarkupState.baseObjectUrl){
+      URL.revokeObjectURL(punchoutMarkupState.baseObjectUrl);
+      punchoutMarkupState.baseObjectUrl='';
+    }
+    const objectUrl=URL.createObjectURL(data);
+    punchoutMarkupState.baseObjectUrl=objectUrl;
+
+    const img=new Image();
+    img.decoding='async';
+    await new Promise((resolve,reject)=>{
+      img.onload=resolve;
+      img.onerror=()=>reject(new Error('Could not load the punchout photo.'));
+      img.src=objectUrl;
+    });
+    punchoutMarkupState.baseImage=img;
+
+    const maxDim=2048;
+    const scale=Math.min(1,maxDim/Math.max(img.naturalWidth||1,img.naturalHeight||1));
+    const canvas=$('punchoutMarkupCanvas');
+    canvas.width=Math.max(1,Math.round(img.naturalWidth*scale));
+    canvas.height=Math.max(1,Math.round(img.naturalHeight*scale));
+    punchoutMarkupRender();
+
+    saveBtn.disabled=false;
+    saveBtn.textContent='Save Marked-Up Copy';
+  }catch(err){
+    closePunchoutMarkup();
+    alert(err?.message||'Could not open this photo for markup.');
+  }
+}
+function closePunchoutMarkup(){
+  const overlay=$('punchoutMarkupOverlay');
+  overlay.classList.add('hidden');
+  overlay.setAttribute('aria-hidden','true');
+  document.body.style.overflow=punchoutMarkupState.bodyOverflow||'';
+  punchoutMarkupState.itemId=null;
+  punchoutMarkupState.photoPath=null;
+  punchoutMarkupState.baseImage=null;
+  punchoutMarkupState.ops=[];
+  punchoutMarkupState.drawing=null;
+  if(punchoutMarkupState.baseObjectUrl){
+    URL.revokeObjectURL(punchoutMarkupState.baseObjectUrl);
+    punchoutMarkupState.baseObjectUrl='';
+  }
+}
+async function savePunchoutMarkup(){
+  const itemId=punchoutMarkupState.itemId;
+  const item=punchouts.find(p=>String(p.id)===String(itemId));
+  if(!item)return;
+  if(!requirePunchoutEditPermission(subdivisionForLot(item.lot_id)))return;
+  if(!punchoutMarkupState.ops.length){
+    alert('Add some markup before saving.');
+    return;
+  }
+
+  const canvas=$('punchoutMarkupCanvas');
+  const saveBtn=$('punchoutMarkupSave');
+  saveBtn.disabled=true;
+  saveBtn.textContent='Saving…';
+
+  try{
+    const blob=await new Promise((resolve,reject)=>{
+      canvas.toBlob(b=>b?resolve(b):reject(new Error('Could not create marked-up image.')),'image/jpeg',0.92);
+    });
+    const fileId=crypto.randomUUID?crypto.randomUUID():Date.now()+'-'+Math.random().toString(36).slice(2);
+    const photoPath=`${item.lot_id}/${itemId}/markup-${fileId}.jpg`;
+
+    const {error:uploadError}=await db.storage.from('punchout-photos').upload(photoPath,blob,{
+      cacheControl:'3600',
+      upsert:false,
+      contentType:'image/jpeg'
+    });
+    if(uploadError)throw uploadError;
+
+    const {data:photoRow,error:photoError}=await db.from('punchout_photos')
+      .insert({
+        punchout_item_id:itemId,
+        storage_path:photoPath
+      })
+      .select()
+      .single();
+
+    if(photoError){
+      await db.storage.from('punchout-photos').remove([photoPath]);
+      throw photoError;
+    }
+
+    if(photoRow)punchoutPhotos.push(photoRow);
+    closePunchoutMarkup();
+    await renderPunchout(currentLot);
+  }catch(err){
+    saveBtn.disabled=false;
+    saveBtn.textContent='Save Marked-Up Copy';
+    alert(err?.message||'Could not save the marked-up photo.');
+  }
+}
+function initPunchoutMarkupEditor(){
+  const canvas=$('punchoutMarkupCanvas');
+  if(!canvas)return;
+
+  canvas.addEventListener('pointerdown',ev=>{
+    if(!punchoutMarkupState.baseImage)return;
+    ev.preventDefault();
+    try{canvas.setPointerCapture(ev.pointerId)}catch{}
+    const pt=punchoutMarkupCanvasPoint(ev);
+    const color=$('punchoutMarkupColor').value||'#ff0000';
+    const width=Number($('punchoutMarkupWidth').value||6);
+
+    if(punchoutMarkupState.tool==='text'){
+      const value=prompt('Enter text for this photo:');
+      if(value?.trim()){
+        punchoutMarkupState.ops.push({
+          type:'text',
+          text:value.trim(),
+          x:pt.x,
+          y:pt.y,
+          color,
+          size:Math.max(26,width*6)
+        });
+        punchoutMarkupRender();
+      }
+      return;
+    }
+
+    punchoutMarkupState.drawing=punchoutMarkupState.tool==='arrow'
+      ? {type:'arrow',x1:pt.x,y1:pt.y,x2:pt.x,y2:pt.y,color,width}
+      : {type:'stroke',points:[pt],color,width};
+  });
+
+  canvas.addEventListener('pointermove',ev=>{
+    const drawing=punchoutMarkupState.drawing;
+    if(!drawing)return;
+    ev.preventDefault();
+    const pt=punchoutMarkupCanvasPoint(ev);
+    if(drawing.type==='stroke'){
+      drawing.points.push(pt);
+    }else{
+      drawing.x2=pt.x;
+      drawing.y2=pt.y;
+    }
+    punchoutMarkupRender(drawing);
+  });
+
+  const finish=ev=>{
+    const drawing=punchoutMarkupState.drawing;
+    if(!drawing)return;
+    if(ev)ev.preventDefault();
+    if(drawing.type==='stroke' && drawing.points.length){
+      punchoutMarkupState.ops.push(drawing);
+    }else if(drawing.type==='arrow'){
+      const dist=Math.hypot(drawing.x2-drawing.x1,drawing.y2-drawing.y1);
+      if(dist>3)punchoutMarkupState.ops.push(drawing);
+    }
+    punchoutMarkupState.drawing=null;
+    punchoutMarkupRender();
+  };
+  canvas.addEventListener('pointerup',finish);
+  canvas.addEventListener('pointercancel',finish);
+
+  document.querySelectorAll('[data-markup-tool]').forEach(btn=>{
+    btn.onclick=()=>setPunchoutMarkupTool(btn.dataset.markupTool);
+  });
+  $('punchoutMarkupUndo').onclick=()=>{
+    punchoutMarkupState.ops.pop();
+    punchoutMarkupRender();
+  };
+  $('punchoutMarkupClear').onclick=()=>{
+    if(!punchoutMarkupState.ops.length)return;
+    if(confirm('Clear all markup from this editing session?')){
+      punchoutMarkupState.ops=[];
+      punchoutMarkupRender();
+    }
+  };
+  $('punchoutMarkupClose').onclick=closePunchoutMarkup;
+  $('punchoutMarkupCancel').onclick=closePunchoutMarkup;
+  $('punchoutMarkupSave').onclick=savePunchoutMarkup;
 }
 
 function updatePunchoutShareBar(){
@@ -5568,6 +5993,7 @@ document.addEventListener('visibilitychange',()=>{
 });
 window.addEventListener('pagehide',()=>{updateMyLastSeen();});
 
+initPunchoutMarkupEditor();
 $('logout').onclick=async()=>{await updateMyLastSeen();if(lastSeenHeartbeatTimer)clearInterval(lastSeenHeartbeatTimer);if(adminPresenceRenderTimer)clearInterval(adminPresenceRenderTimer);if(realtimeChannel)await db.removeChannel(realtimeChannel);if(presenceChannel)await db.removeChannel(presenceChannel);if(appPresenceChannel)await db.removeChannel(appPresenceChannel);if(adminActivityChannel)await db.removeChannel(adminActivityChannel);await db.auth.signOut();location.reload()};
 $('backToSubs').onclick=showSubs;$('backToLots').onclick=showLots;
 function dateInputValue(v){
