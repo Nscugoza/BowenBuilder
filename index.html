@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="2026-09-01-schedule-contact-custom-messages-info-fields">
+<meta name="bowenbuilder-version" content="2026-09-01-admin-online-users">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -1616,6 +1616,14 @@ button.teams-file-row:hover{border-color:#bdccdd}
 .admin-info-field-grid label{display:flex;align-items:center;gap:7px;font-size:13px;font-weight:600}
 .admin-info-field-grid input{width:auto;margin:0}
 @media(max-width:520px){.admin-info-field-grid{grid-template-columns:1fr}}
+
+.admin-online-list{display:grid;gap:10px}
+.admin-online-card{display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid var(--border);border-radius:14px;padding:12px;background:#fff}
+.admin-online-person{min-width:0}
+.admin-online-name{font-weight:850;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.admin-online-meta{font-size:12px;color:var(--muted);margin-top:3px}
+.admin-online-status{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:800;white-space:nowrap}
+.admin-online-dot{width:9px;height:9px;border-radius:50%;background:#12b76a;box-shadow:0 0 0 3px rgba(18,183,106,.12)}
 </style>
 </head>
 <body>
@@ -1788,6 +1796,7 @@ button.teams-file-row:hover{border-color:#bdccdd}
       <div class="admin-inner-tabs">
         <button id="adminContactsTab" class="admin-inner-tab active" type="button">Schedule Contacts</button>
         <button id="adminPermissionsTab" class="admin-inner-tab" type="button">User Permissions</button>
+        <button id="adminOnlineTab" class="admin-inner-tab" type="button">Online Now</button>
       </div>
 
       <div id="adminContactsPanel">
@@ -1812,6 +1821,18 @@ button.teams-file-row:hover{border-color:#bdccdd}
         </label>
         <div id="adminUserNotice" class="notice hidden" style="margin:12px 0"></div>
         <div id="adminUserPermissionsList" class="admin-user-list"></div>
+      </div>
+
+      <div id="adminOnlinePanel" class="hidden">
+        <div class="card admin-note">
+          <strong>Online Now</strong>
+          <div class="muted" style="margin-top:5px">Shows people who currently have BowenBuilder open and connected.</div>
+        </div>
+        <div class="toolbar" style="margin-top:12px">
+          <div id="adminOnlineSummary" class="muted">Checking who is online…</div>
+          <button id="adminOnlineRefresh" class="secondary" type="button">↻ Refresh</button>
+        </div>
+        <div id="adminOnlineList" class="admin-online-list"></div>
       </div>
     </section>
 
@@ -2105,6 +2126,8 @@ const db=window.supabase.createClient(SB_URL,SB_KEY);
 let subdivisions=[],lots=[],items=[],punchouts=[],punchoutPhotos=[],profiles=[],selectedPunchouts=new Set(),currentSubdivision=null,currentLot=null;
 let realtimeChannel=null;
 let presenceChannel=null;
+let appPresenceChannel=null;
+let appPresenceUsers=[];
 let currentUserProfile=null;
 let currentUserEmail='';
 const ADMIN_EMAIL='nick@bowenhomes.com';
@@ -2357,6 +2380,82 @@ function startRealtimeUpdates(){
     .subscribe();
 }
 
+
+function currentPresenceLocation(){
+  if(!$('adminView').classList.contains('hidden')) return 'Admin';
+  if(!$('scheduleView').classList.contains('hidden')) return 'Calendar';
+  if(!$('lotView').classList.contains('hidden')){
+    const lot=lots.find(l=>l.id===currentLot);
+    return lot?.lot_name ? `${lot.lot_name}` : 'Lot';
+  }
+  if(!$('lotsView').classList.contains('hidden')){
+    const sub=subdivisions.find(s=>s.id===currentSubdivision);
+    return sub?.name || 'Subdivision';
+  }
+  return 'Subdivisions';
+}
+function flattenAppPresenceState(state){
+  const byUser=new Map();
+  Object.values(state||{}).flat().forEach(p=>{
+    if(!p?.user_id)return;
+    const prev=byUser.get(p.user_id);
+    const prevAt=Number(prev?.online_at||0);
+    const nextAt=Number(p.online_at||0);
+    if(!prev || nextAt>=prevAt)byUser.set(p.user_id,p);
+  });
+  return [...byUser.values()].sort((a,b)=>String(a.name||'').localeCompare(String(b.name||'')));
+}
+function syncAppPresenceState(){
+  if(!appPresenceChannel)return;
+  appPresenceUsers=flattenAppPresenceState(appPresenceChannel.presenceState());
+  if(isBowenBuilderAdmin() && !$('adminOnlinePanel')?.classList.contains('hidden'))renderAdminOnlineUsers();
+}
+function renderAdminOnlineUsers(){
+  if(!isBowenBuilderAdmin())return;
+  const list=$('adminOnlineList'),summary=$('adminOnlineSummary');
+  if(!list||!summary)return;
+  const users=appPresenceUsers;
+  summary.textContent=`${users.length} ${users.length===1?'person':'people'} online`;
+  list.innerHTML=users.map(p=>`<div class="admin-online-card">
+    <div class="admin-online-person">
+      <div class="admin-online-name">${esc(p.name||'User')}${p.user_id===currentAuthUserId?' (You)':''}</div>
+      <div class="admin-online-meta">${esc(p.location||'BowenBuilder')}</div>
+    </div>
+    <div class="admin-online-status"><span class="admin-online-dot"></span>Online</div>
+  </div>`).join('') || '<div class="muted">No one is currently online.</div>';
+}
+async function startAppPresence(){
+  if(!currentUserProfile?.id || appPresenceChannel)return;
+  appPresenceChannel=db.channel('bowenbuilder-online-users',{
+    config:{presence:{key:String(currentUserProfile.id)}}
+  });
+  appPresenceChannel
+    .on('presence',{event:'sync'},syncAppPresenceState)
+    .on('presence',{event:'join'},syncAppPresenceState)
+    .on('presence',{event:'leave'},syncAppPresenceState)
+    .subscribe(async status=>{
+      if(status==='SUBSCRIBED'){
+        await appPresenceChannel.track({
+          user_id:String(currentUserProfile.id),
+          name:currentUserProfile.full_name||currentUserEmail||'User',
+          location:currentPresenceLocation(),
+          online_at:Date.now()
+        });
+      }
+    });
+}
+async function updateAppPresenceLocation(){
+  if(!appPresenceChannel || !currentUserProfile?.id)return;
+  try{
+    await appPresenceChannel.track({
+      user_id:String(currentUserProfile.id),
+      name:currentUserProfile.full_name||currentUserEmail||'User',
+      location:currentPresenceLocation(),
+      online_at:Date.now()
+    });
+  }catch{}
+}
+
 function renderPresence(state){
   const root=$('lotPresence');
   if(!root) return;
@@ -2464,6 +2563,7 @@ async function load(){
 }
 function appOn(){ $('login').classList.add('hidden');$('app').classList.remove('hidden');}
 function showSubs(){
+ setTimeout(()=>updateAppPresenceLocation(),0);
  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.view==='subdivisions'));
  leaveLotPresence();
  currentSubdivision=null;currentLot=null;
@@ -2473,6 +2573,7 @@ function showSubs(){
  document.querySelectorAll('[data-sub]').forEach(b=>b.onclick=()=>{currentSubdivision=b.dataset.sub;showLots()});
 }
 function showLots(){
+ setTimeout(()=>updateAppPresenceLocation(),0);
  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.view==='subdivisions'));
  leaveLotPresence();
  $('subdivisionsView').classList.add('hidden');$('lotView').classList.add('hidden');$('scheduleView').classList.add('hidden');$('adminView').classList.add('hidden');$('lotsView').classList.remove('hidden');
@@ -3803,11 +3904,21 @@ async function showAdminView(){
 function showAdminPanel(panel='contacts'){
  activeAdminPanel=panel;
  const contacts=panel==='contacts';
+ const permissions=panel==='permissions';
+ const online=panel==='online';
  $('adminContactsPanel').classList.toggle('hidden',!contacts);
- $('adminPermissionsPanel').classList.toggle('hidden',contacts);
+ $('adminPermissionsPanel').classList.toggle('hidden',!permissions);
+ $('adminOnlinePanel').classList.toggle('hidden',!online);
  $('adminContactsTab').classList.toggle('active',contacts);
- $('adminPermissionsTab').classList.toggle('active',!contacts);
- if(contacts)renderAdminContacts(); else renderAdminUserPermissions();
+ $('adminPermissionsTab').classList.toggle('active',permissions);
+ $('adminOnlineTab').classList.toggle('active',online);
+ if(contacts)renderAdminContacts();
+ else if(permissions)renderAdminUserPermissions();
+ else{
+   syncAppPresenceState();
+   renderAdminOnlineUsers();
+ }
+ updateAppPresenceLocation();
 }
 
 const SCHEDULE_AUTO_INFO_FIELDS=[
@@ -5284,7 +5395,7 @@ async function saveSchedule(e){
 }
 $('msLogin').onclick=signIn;
 $('loginForm').onsubmit=e=>{e.preventDefault();signIn()};
-$('logout').onclick=async()=>{if(realtimeChannel)await db.removeChannel(realtimeChannel);if(presenceChannel)await db.removeChannel(presenceChannel);await db.auth.signOut();location.reload()};
+$('logout').onclick=async()=>{if(realtimeChannel)await db.removeChannel(realtimeChannel);if(presenceChannel)await db.removeChannel(presenceChannel);if(appPresenceChannel)await db.removeChannel(appPresenceChannel);await db.auth.signOut();location.reload()};
 $('backToSubs').onclick=showSubs;$('backToLots').onclick=showLots;
 function dateInputValue(v){
  if(!v) return '';
@@ -5600,6 +5711,8 @@ document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{
 });
 $('adminContactsTab').onclick=()=>showAdminPanel('contacts');
 $('adminPermissionsTab').onclick=()=>showAdminPanel('permissions');
+$('adminOnlineTab').onclick=()=>showAdminPanel('online');
+$('adminOnlineRefresh').onclick=()=>{syncAppPresenceState();renderAdminOnlineUsers();};
 $('adminContactSearch').oninput=()=>renderAdminContacts();
 $('adminUserSearch').oninput=()=>renderAdminUserPermissions();
 const {data:{session}}=await db.auth.getSession();
@@ -5607,6 +5720,7 @@ if(session){
   appOn();
   await loadCurrentProfile();
   startRealtimeUpdates();
+  await startAppPresence();
   await load();
 }else{
   $('login').classList.remove('hidden');
