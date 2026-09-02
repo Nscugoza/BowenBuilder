@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="2026-09-02-subdivision-today-tomorrow">
+<meta name="bowenbuilder-version" content="2026-09-02-email-text-draft-only">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -5668,18 +5668,18 @@ async function sendMicrosoftGraphEmail({to,subject,body}){
 }
 
 async function emailOverviewScheduleItem(itemId){
-  const item=items.find(i=>i.id===itemId);
+  const item=items.find(i=>String(i.id)===String(itemId));
   if(!item)return;
 
-  const contact=scheduleContactForItemName(item.name);
-  const includePlans=!!contact?.include_plans_email;
-  const includeRendering=!!contact?.include_rendering_email;
-  const sameLotCache=overviewShareCache.lotId===item.lot_id;
-
-  const planUrl=(includePlans && sameLotCache)?overviewShareCache.plansUrl:'';
-  const renderingUrl=(includeRendering && sameLotCache)?overviewShareCache.renderingUrl:'';
-  const msg=overviewScheduleItemMessage(
-    item,
+  const includePlans=shouldIncludePlansForItem(item.name,'email');
+  const includeRendering=shouldIncludeRenderingForItem(item.name,'email');
+  const sameLotCache=overviewShareCache && overviewShareCache.lotId===item.lot_id;
+  const planUrl=(includePlans && sameLotCache)?(overviewShareCache.plansUrl||''):'';
+  const renderingUrl=(includeRendering && sameLotCache)?(overviewShareCache.renderingUrl||''):'';
+  const msg=buildScheduleShareMessage(
+    item.lot_id,
+    [item.name],
+    dateInputValue(item.starts_at),
     planUrl,
     includePlans && !!planUrl,
     renderingUrl,
@@ -5688,45 +5688,26 @@ async function emailOverviewScheduleItem(itemId){
   if(!msg)return;
 
   const recipients=mappedRecipientsForWork([item.name]);
-  if(!recipients.length){
-    alert('No email recipient is assigned to this schedule item in Admin → Schedule Contacts.');
-    return;
-  }
+  const to=recipients.join(',');
+  const body=customScheduleMessageForItem(item,'email',msg);
+  const href=`mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(msg.subject)}&body=${encodeURIComponent(body)}`;
 
-  try{
-    await sendMicrosoftGraphEmail({
-      to:recipients,
-      subject:msg.subject,
-      body:customScheduleMessageForItem(item,'email',msg)
-    });
-
-    // Only mark E after Microsoft Graph accepts the message.
-    const markDate=msg.dateKey;
-    if(markDate){
-      setCalendarCommunicationLocal('email',markDate,item.lot_id);
-      refreshOverviewCommunicationBadges(item.id);
-      void markCalendarCommunicationSilent('email',markDate,item.lot_id);
-    }
-    alert('Email sent ✓');
-  }catch(err){
-    console.error('Microsoft Graph email failed:',err);
-    alert(err?.message||String(err));
-  }
+  // Draft only: open the user's email composer. BowenBuilder does not send it.
+  launchCalendarComposer(href);
 }
-
 function textOverviewScheduleItem(itemId){
-  const item=items.find(i=>i.id===itemId);
+  const item=items.find(i=>String(i.id)===String(itemId));
   if(!item)return;
 
-  const contact=scheduleContactForItemName(item.name);
-  const includePlans=!!contact?.include_plans_text;
-  const includeRendering=!!contact?.include_rendering_text;
-  const sameLotCache=overviewShareCache.lotId===item.lot_id;
-
-  const planUrl=(includePlans && sameLotCache)?overviewShareCache.plansUrl:'';
-  const renderingUrl=(includeRendering && sameLotCache)?overviewShareCache.renderingUrl:'';
-  const msg=overviewScheduleItemMessage(
-    item,
+  const includePlans=shouldIncludePlansForItem(item.name,'text');
+  const includeRendering=shouldIncludeRenderingForItem(item.name,'text');
+  const sameLotCache=overviewShareCache && overviewShareCache.lotId===item.lot_id;
+  const planUrl=(includePlans && sameLotCache)?(overviewShareCache.plansUrl||''):'';
+  const renderingUrl=(includeRendering && sameLotCache)?(overviewShareCache.renderingUrl||''):'';
+  const msg=buildScheduleShareMessage(
+    item.lot_id,
+    [item.name],
+    dateInputValue(item.starts_at),
     planUrl,
     includePlans && !!planUrl,
     renderingUrl,
@@ -5739,32 +5720,9 @@ function textOverviewScheduleItem(itemId){
   const separator=/iPad|iPhone|iPod/.test(navigator.userAgent)?'&':'?';
   const href=`sms:${recipient}${separator}body=${encodeURIComponent(customScheduleMessageForItem(item,'text',msg))}`;
 
-  // IMPORTANT for iPhone: launch Messages directly inside the original tap handler.
-  // Show T immediately on the Overview card.
-  const markDate=msg.dateKey;
-  if(markDate){
-    const idx=calendarCalledInMarks.findIndex(
-      x=>x.lot_id===item.lot_id && x.calendar_date===markDate
-    );
-    if(idx>=0)calendarCalledInMarks[idx]={...calendarCalledInMarks[idx],text_sent:true};
-    else calendarCalledInMarks.push({
-      lot_id:item.lot_id,
-      calendar_date:markDate,
-      called_in:false,
-      email_sent:false,
-      text_sent:true
-    });
-    refreshOverviewCommunicationBadges(item.id);
-  }
-
-  window.location.href=href;
-
-  // Record T afterward without blocking the app launch or rerendering the page.
-  if(markDate){
-    void markCalendarCommunicationSilent('text',markDate,item.lot_id);
-  }
+  // Draft only: open Messages. BowenBuilder does not mark this as sent.
+  launchCalendarComposer(href);
 }
-
 function selectedDateScheduleItems(){
  if(!scheduleSelectedDate)return [];
  return subdivisionScheduleItems().filter(x=>itemOccursOn(x,scheduleSelectedDate));
@@ -5889,99 +5847,85 @@ function setCalendarCommunicationLocal(kind,dateKey,lotId=currentLot){
 }
 
 async function emailSelectedCalendarDate(){
- try{
-   if(!scheduleSelectedDate){
-     alert('Select a calendar date first.');
-     return;
-   }
+  try{
+    if(!scheduleSelectedDate){
+      alert('Select a calendar date first.');
+      return;
+    }
 
-   const workNames=selectedWorkNames();
-   const includePlans=shouldIncludePlansForSelectedDate('email');
-   const includeRendering=shouldIncludeRenderingForSelectedDate('email');
-   const sameLotCache=overviewShareCache && overviewShareCache.lotId===currentLot;
+    const workNames=selectedWorkNames();
+    const includePlans=shouldIncludePlansForSelectedDate('email');
+    const includeRendering=shouldIncludeRenderingForSelectedDate('email');
+    const sameLotCache=overviewShareCache && overviewShareCache.lotId===currentLot;
+    const planUrl=(includePlans && sameLotCache)?(overviewShareCache.plansUrl||''):'';
+    const renderingUrl=(includeRendering && sameLotCache)?(overviewShareCache.renderingUrl||''):'';
 
-   const planUrl=(includePlans && sameLotCache)?(overviewShareCache.plansUrl||''):'';
-   const renderingUrl=(includeRendering && sameLotCache)?(overviewShareCache.renderingUrl||''):'';
+    const msg=buildScheduleShareMessage(
+      currentLot,
+      workNames,
+      scheduleSelectedDate,
+      planUrl,
+      includePlans && !!planUrl,
+      renderingUrl,
+      includeRendering && !!renderingUrl
+    );
+    if(!msg){
+      alert('Could not build the email for this date.');
+      return;
+    }
 
-   const msg=selectedDateMessage(
-     planUrl,
-     includePlans && !!planUrl,
-     renderingUrl,
-     includeRendering && !!renderingUrl
-   );
-   if(!msg){
-     alert('Could not build the email for this date.');
-     return;
-   }
+    const recipients=mappedRecipientsForWork(workNames);
+    const to=recipients.join(',');
+    const body=selectedDateCustomMessage('email',msg);
+    const href=`mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(msg.subject)}&body=${encodeURIComponent(body)}`;
 
-   const recipients=mappedRecipientsForWork(workNames);
-   if(!recipients.length){
-     alert('No email recipient is assigned for the scheduled work on this date in Admin → Schedule Contacts.');
-     return;
-   }
-
-   await sendMicrosoftGraphEmail({
-     to:recipients,
-     subject:msg.subject,
-     body:selectedDateCustomMessage('email',msg)
-   });
-
-   // Only mark E after Microsoft Graph returns 202 Accepted.
-   setCalendarCommunicationLocal('email',scheduleSelectedDate,currentLot);
-   renderScheduleCalendar();
-   void markCalendarCommunicationSilent('email',scheduleSelectedDate,currentLot);
-   alert('Email sent ✓');
- }catch(err){
-   console.error('Calendar Microsoft Graph email failed:',err);
-   alert(err?.message||String(err));
- }
+    // Draft only. The user reviews and presses Send in their email app.
+    launchCalendarComposer(href);
+  }catch(err){
+    console.error('Calendar Email Date draft failed:',err);
+    alert(err?.message||String(err));
+  }
 }
-
 function textSelectedCalendarDate(){
- try{
-   if(!scheduleSelectedDate){
-     alert('Select a calendar date first.');
-     return;
-   }
+  try{
+    if(!scheduleSelectedDate){
+      alert('Select a calendar date first.');
+      return;
+    }
 
-   const workNames=selectedWorkNames();
-   const includePlans=shouldIncludePlansForSelectedDate('text');
-   const includeRendering=shouldIncludeRenderingForSelectedDate('text');
-   const sameLotCache=overviewShareCache && overviewShareCache.lotId===currentLot;
+    const workNames=selectedWorkNames();
+    const includePlans=shouldIncludePlansForSelectedDate('text');
+    const includeRendering=shouldIncludeRenderingForSelectedDate('text');
+    const sameLotCache=overviewShareCache && overviewShareCache.lotId===currentLot;
+    const planUrl=(includePlans && sameLotCache)?(overviewShareCache.plansUrl||''):'';
+    const renderingUrl=(includeRendering && sameLotCache)?(overviewShareCache.renderingUrl||''):'';
 
-   const planUrl=(includePlans && sameLotCache)?(overviewShareCache.plansUrl||''):'';
-   const renderingUrl=(includeRendering && sameLotCache)?(overviewShareCache.renderingUrl||''):'';
+    const msg=buildScheduleShareMessage(
+      currentLot,
+      workNames,
+      scheduleSelectedDate,
+      planUrl,
+      includePlans && !!planUrl,
+      renderingUrl,
+      includeRendering && !!renderingUrl
+    );
+    if(!msg){
+      alert('Could not build the text for this date.');
+      return;
+    }
 
-   const msg=selectedDateMessage(
-     planUrl,
-     includePlans && !!planUrl,
-     renderingUrl,
-     includeRendering && !!renderingUrl
-   );
-   if(!msg){
-     alert('Could not build the text for this date.');
-     return;
-   }
+    const phones=mappedPhonesForWork(workNames);
+    const recipient=phones.join(',');
+    const separator=/iPad|iPhone|iPod/.test(navigator.userAgent)?'&':'?';
+    const href=`sms:${recipient}${separator}body=${encodeURIComponent(selectedDateCustomMessage('text',msg))}`;
 
-   const phones=mappedPhonesForWork(workNames);
-   const recipient=phones.join(',');
-   const separator=/iPad|iPhone|iPod/.test(navigator.userAgent)?'&':'?';
-   const href=`sms:${recipient}${separator}body=${encodeURIComponent(selectedDateCustomMessage('text',msg))}`;
-
-   // Match the working Overview behavior: mark locally first, then launch.
-   setCalendarCommunicationLocal('text',scheduleSelectedDate,currentLot);
-   renderScheduleCalendar();
-
-   launchCalendarComposer(href);
-
-   // Persist T after Messages is launched.
-   void markCalendarCommunicationSilent('text',scheduleSelectedDate,currentLot);
- }catch(err){
-   console.error('Calendar Text Date failed:',err);
-   alert(`Text Date could not open: ${err?.message||err}`);
- }
+    // Draft only. The user reviews and presses Send in Messages.
+    launchCalendarComposer(href);
+  }catch(err){
+    console.error('Calendar Text Date draft failed:',err);
+    alert(err?.message||String(err));
+  }
 }
-
 function renderSelectedScheduleDay(){
  const wrap=$('calendarSelectedItems');
  if(!scheduleSelectedDate){
