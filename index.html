@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="2026-09-02-schedule-dropdown-updated-v2">
+<meta name="bowenbuilder-version" content="2026-09-02-linked-trim-communications">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -2157,7 +2157,7 @@ button.teams-file-row:hover{border-color:#bdccdd}
     <option value="Drywall">Drywall</option>
     <option value="Cabinet Install">Cabinet Install</option>
     <option value="Trim Delivery">Trim Delivery</option>
-    <option value="Trim Labor">Trim Labor</option>
+    <option value="Trim Install">Trim Install</option>
     <option value="Inside/Outside Paint">Inside/Outside Paint</option>
     <option value="Sheetrock Skim Coat after Priming">Sheetrock Skim Coat after Priming</option>
     <option value="Vinyl in Bathrooms and Laundry Room">Vinyl in Bathrooms and Laundry Room</option>
@@ -5082,6 +5082,88 @@ function refreshOverviewCommunicationBadges(itemId){
 }
 
 
+
+const LINKED_SCHEDULE_COMMUNICATION_GROUPS=[
+  ['Trim Install','Shoe Mold','Lockout']
+];
+
+function linkedScheduleGroupForName(name){
+  const target=String(name||'').trim().toLowerCase();
+  return LINKED_SCHEDULE_COMMUNICATION_GROUPS.find(group=>
+    group.some(x=>String(x).trim().toLowerCase()===target)
+  )||null;
+}
+
+function linkedScheduleItemsForItem(item){
+  if(!item)return [];
+  const group=linkedScheduleGroupForName(item.name);
+  if(!group)return [item];
+
+  const names=new Set(group.map(x=>String(x).trim().toLowerCase()));
+  return items
+    .filter(x=>
+      String(x.lot_id)===String(item.lot_id) &&
+      names.has(String(x.name||'').trim().toLowerCase()) &&
+      x.status!=='complete'
+    )
+    .sort((a,b)=>{
+      const ad=dateInputValue(a.starts_at)||'9999-12-31';
+      const bd=dateInputValue(b.starts_at)||'9999-12-31';
+      if(ad!==bd)return ad.localeCompare(bd);
+      return String(a.name||'').localeCompare(String(b.name||''));
+    });
+}
+
+function linkedScheduleItemsForSelectedDate(){
+  if(!scheduleSelectedDate)return [];
+  const selected=selectedDateScheduleItems();
+  const byId=new Map(selected.map(i=>[String(i.id),i]));
+
+  selected.forEach(item=>{
+    if(!linkedScheduleGroupForName(item.name))return;
+    linkedScheduleItemsForItem(item).forEach(x=>byId.set(String(x.id),x));
+  });
+
+  return [...byId.values()].sort((a,b)=>{
+    const ad=dateInputValue(a.starts_at)||'9999-12-31';
+    const bd=dateInputValue(b.starts_at)||'9999-12-31';
+    if(ad!==bd)return ad.localeCompare(bd);
+    return String(a.name||'').localeCompare(String(b.name||''));
+  });
+}
+
+function linkedScheduleMessageBody(lotId,linkedItems,fallbackBody){
+  if(!linkedItems || linkedItems.length<=1)return fallbackBody;
+
+  const lot=lots.find(l=>String(l.id)===String(lotId));
+  if(!lot)return fallbackBody;
+  const sub=subdivisions.find(s=>String(s.id)===String(lot.subdivision_id));
+
+  const lines=[`${lot.lot_name||'Lot'} Schedule`];
+  if(lot.address)lines.push(lot.address);
+  if(sub?.name)lines.push(sub.name);
+  if(lot.plan_name)lines.push(`Plan: ${lot.plan_name}`);
+  if(lot.permit_number)lines.push(`Permit Number: ${lot.permit_number}`);
+
+  lines.push('', 'Scheduled Work:');
+  linkedItems.forEach(item=>{
+    const key=dateInputValue(item.starts_at);
+    const pretty=key
+      ? new Date(`${key}T12:00:00`).toLocaleDateString(undefined,{
+          weekday:'long',month:'long',day:'numeric',year:'numeric'
+        })
+      : 'Date not set';
+    lines.push(`- ${item.name}: ${pretty}`);
+  });
+
+  const options=includedOptionsLinesForMessage(lot);
+  if(options.length){
+    lines.push('', 'Included Options:');
+    options.forEach(x=>lines.push(`- ${x}`));
+  }
+  return lines.join('\n');
+}
+
 function includedOptionsLinesForMessage(lot){
   const raw=String(lot?.options||lot?.included_options||'').trim();
   if(!raw)return [];
@@ -5675,11 +5757,15 @@ async function emailOverviewScheduleItem(itemId){
   const item=items.find(i=>String(i.id)===String(itemId));
   if(!item)return;
 
+  const linkedItems=linkedScheduleItemsForItem(item);
+  const workNames=[...new Set(linkedItems.map(x=>x.name))];
+
   const includePlans=shouldIncludePlansForItem(item.name,'email');
   const includeRendering=shouldIncludeRenderingForItem(item.name,'email');
   const sameLotCache=overviewShareCache && overviewShareCache.lotId===item.lot_id;
   const planUrl=(includePlans && sameLotCache)?(overviewShareCache.plansUrl||''):'';
   const renderingUrl=(includeRendering && sameLotCache)?(overviewShareCache.renderingUrl||''):'';
+
   const msg=overviewScheduleItemMessage(
     item,
     planUrl,
@@ -5689,27 +5775,38 @@ async function emailOverviewScheduleItem(itemId){
   );
   if(!msg)return;
 
-  const recipients=mappedRecipientsForWork([item.name]);
+  const recipients=mappedRecipientsForWork(workNames);
   if(!recipients.length){
     alert('No email recipient is assigned to this schedule item in Admin → Schedule Contacts.');
     return;
   }
-  const to=recipients.join(',');
-  const body=customScheduleMessageForItem(item,'email',msg);
-  const href=`mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(msg.subject)}&body=${encodeURIComponent(body)}`;
 
-  // Draft only: open the user's email composer. BowenBuilder does not send it.
+  const to=recipients.join(',');
+  let body=customScheduleMessageForItem(item,'email',msg);
+  body=linkedScheduleMessageBody(item.lot_id,linkedItems,body);
+
+  const lot=lots.find(l=>String(l.id)===String(item.lot_id));
+  const subject=linkedItems.length>1
+    ? `${lot?.lot_name||'Lot'} - Schedule Update`
+    : msg.subject;
+
+  const href=`mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   launchCalendarComposer(href);
 }
+
 function textOverviewScheduleItem(itemId){
   const item=items.find(i=>String(i.id)===String(itemId));
   if(!item)return;
+
+  const linkedItems=linkedScheduleItemsForItem(item);
+  const workNames=[...new Set(linkedItems.map(x=>x.name))];
 
   const includePlans=shouldIncludePlansForItem(item.name,'text');
   const includeRendering=shouldIncludeRenderingForItem(item.name,'text');
   const sameLotCache=overviewShareCache && overviewShareCache.lotId===item.lot_id;
   const planUrl=(includePlans && sameLotCache)?(overviewShareCache.plansUrl||''):'';
   const renderingUrl=(includeRendering && sameLotCache)?(overviewShareCache.renderingUrl||''):'';
+
   const msg=overviewScheduleItemMessage(
     item,
     planUrl,
@@ -5719,14 +5816,21 @@ function textOverviewScheduleItem(itemId){
   );
   if(!msg)return;
 
-  const phones=mappedPhonesForWork([item.name]);
-  const recipient=phones.join(',');
-  const separator=/iPad|iPhone|iPod/.test(navigator.userAgent)?'&':'?';
-  const href=`sms:${recipient}${separator}body=${encodeURIComponent(customScheduleMessageForItem(item,'text',msg))}`;
+  const phones=mappedPhonesForWork(workNames);
+  if(!phones.length){
+    alert('No phone number is assigned to this schedule item in Admin → Schedule Contacts.');
+    return;
+  }
 
-  // Draft only: open Messages. BowenBuilder does not mark this as sent.
+  const recipient=phones.join(',');
+  let body=customScheduleMessageForItem(item,'text',msg);
+  body=linkedScheduleMessageBody(item.lot_id,linkedItems,body);
+
+  const separator=/iPad|iPhone|iPod/.test(navigator.userAgent)?'&':'?';
+  const href=`sms:${recipient}${separator}body=${encodeURIComponent(body)}`;
   launchCalendarComposer(href);
 }
+
 function selectedDateScheduleItems(){
  if(!scheduleSelectedDate)return [];
  return subdivisionScheduleItems().filter(x=>itemOccursOn(x,scheduleSelectedDate));
@@ -5857,7 +5961,9 @@ async function emailSelectedCalendarDate(){
       return;
     }
 
-    const workNames=selectedWorkNames();
+    const linkedItems=linkedScheduleItemsForSelectedDate();
+    const workNames=[...new Set(linkedItems.map(x=>x.name))];
+
     const includePlans=shouldIncludePlansForSelectedDate('email');
     const includeRendering=shouldIncludeRenderingForSelectedDate('email');
     const sameLotCache=overviewShareCache && overviewShareCache.lotId===currentLot;
@@ -5880,17 +5986,24 @@ async function emailSelectedCalendarDate(){
       alert('No email recipient is assigned for the scheduled work on this date in Admin → Schedule Contacts.');
       return;
     }
-    const to=recipients.join(',');
-    const body=selectedDateCustomMessage('email',msg);
-    const href=`mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(msg.subject)}&body=${encodeURIComponent(body)}`;
 
-    // Draft only. The user reviews and presses Send in their email app.
+    const to=recipients.join(',');
+    let body=selectedDateCustomMessage('email',msg);
+    body=linkedScheduleMessageBody(currentLot,linkedItems,body);
+
+    const lot=lots.find(l=>String(l.id)===String(currentLot));
+    const subject=linkedItems.length>1
+      ? `${lot?.lot_name||'Lot'} - Schedule Update`
+      : msg.subject;
+
+    const href=`mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
     launchCalendarComposer(href);
   }catch(err){
     console.error('Calendar Email Date draft failed:',err);
     alert(err?.message||String(err));
   }
 }
+
 function textSelectedCalendarDate(){
   try{
     if(!scheduleSelectedDate){
@@ -5898,7 +6011,9 @@ function textSelectedCalendarDate(){
       return;
     }
 
-    const workNames=selectedWorkNames();
+    const linkedItems=linkedScheduleItemsForSelectedDate();
+    const workNames=[...new Set(linkedItems.map(x=>x.name))];
+
     const includePlans=shouldIncludePlansForSelectedDate('text');
     const includeRendering=shouldIncludeRenderingForSelectedDate('text');
     const sameLotCache=overviewShareCache && overviewShareCache.lotId===currentLot;
@@ -5917,17 +6032,24 @@ function textSelectedCalendarDate(){
     }
 
     const phones=mappedPhonesForWork(workNames);
-    const recipient=phones.join(',');
-    const separator=/iPad|iPhone|iPod/.test(navigator.userAgent)?'&':'?';
-    const href=`sms:${recipient}${separator}body=${encodeURIComponent(selectedDateCustomMessage('text',msg))}`;
+    if(!phones.length){
+      alert('No phone number is assigned for the scheduled work on this date in Admin → Schedule Contacts.');
+      return;
+    }
 
-    // Draft only. The user reviews and presses Send in Messages.
+    const recipient=phones.join(',');
+    let body=selectedDateCustomMessage('text',msg);
+    body=linkedScheduleMessageBody(currentLot,linkedItems,body);
+
+    const separator=/iPad|iPhone|iPod/.test(navigator.userAgent)?'&':'?';
+    const href=`sms:${recipient}${separator}body=${encodeURIComponent(body)}`;
     launchCalendarComposer(href);
   }catch(err){
     console.error('Calendar Text Date draft failed:',err);
     alert(err?.message||String(err));
   }
 }
+
 function renderSelectedScheduleDay(){
  const wrap=$('calendarSelectedItems');
  if(!scheduleSelectedDate){
