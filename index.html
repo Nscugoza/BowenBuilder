@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="2026-09-02-linked-trim-communications">
+<meta name="bowenbuilder-version" content="2026-09-02-linked-trim-communications-fixed">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -5084,7 +5084,7 @@ function refreshOverviewCommunicationBadges(itemId){
 
 
 const LINKED_SCHEDULE_COMMUNICATION_GROUPS=[
-  ['Trim Install','Shoe Mold','Lockout']
+  ['Trim Install','Shoe Mold and Lockout']
 ];
 
 function linkedScheduleGroupForName(name){
@@ -5757,6 +5757,7 @@ async function emailOverviewScheduleItem(itemId){
   const item=items.find(i=>String(i.id)===String(itemId));
   if(!item)return;
 
+  await loadScheduleContacts();
   const linkedItems=linkedScheduleItemsForItem(item);
   const workNames=[...new Set(linkedItems.map(x=>x.name))];
 
@@ -5794,10 +5795,11 @@ async function emailOverviewScheduleItem(itemId){
   launchCalendarComposer(href);
 }
 
-function textOverviewScheduleItem(itemId){
+async function textOverviewScheduleItem(itemId){
   const item=items.find(i=>String(i.id)===String(itemId));
   if(!item)return;
 
+  await loadScheduleContacts();
   const linkedItems=linkedScheduleItemsForItem(item);
   const workNames=[...new Set(linkedItems.map(x=>x.name))];
 
@@ -5961,6 +5963,7 @@ async function emailSelectedCalendarDate(){
       return;
     }
 
+    await loadScheduleContacts();
     const linkedItems=linkedScheduleItemsForSelectedDate();
     const workNames=[...new Set(linkedItems.map(x=>x.name))];
 
@@ -6004,13 +6007,14 @@ async function emailSelectedCalendarDate(){
   }
 }
 
-function textSelectedCalendarDate(){
+async function textSelectedCalendarDate(){
   try{
     if(!scheduleSelectedDate){
       alert('Select a calendar date first.');
       return;
     }
 
+    await loadScheduleContacts();
     const linkedItems=linkedScheduleItemsForSelectedDate();
     const workNames=[...new Set(linkedItems.map(x=>x.name))];
 
