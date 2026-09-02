@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="2026-09-01-punchout-photo-markup">
+<meta name="bowenbuilder-version" content="2026-09-02-subdivision-today-tomorrow">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -1738,6 +1738,80 @@ button.teams-file-row:hover{border-color:#bdccdd}
   gap:8px;
   justify-content:flex-end;
 }
+
+.subdivision-inner-tabs{
+  display:flex;
+  gap:8px;
+  margin:12px 0 14px;
+  overflow-x:auto;
+  -webkit-overflow-scrolling:touch;
+}
+.subdivision-inner-tab{
+  flex:0 0 auto;
+  border:1px solid #d8e4f0;
+  background:#fff;
+  color:#244f7e;
+  border-radius:999px;
+  padding:9px 14px;
+  font-weight:850;
+}
+.subdivision-inner-tab.active{
+  background:#244f7e;
+  color:#fff;
+  border-color:#244f7e;
+}
+.subdivision-agenda{
+  display:grid;
+  gap:16px;
+}
+.subdivision-agenda-section{
+  display:grid;
+  gap:10px;
+}
+.subdivision-agenda-heading{
+  display:flex;
+  align-items:flex-end;
+  justify-content:space-between;
+  gap:12px;
+}
+.subdivision-agenda-heading h3{
+  margin:0;
+}
+.subdivision-agenda-list{
+  display:grid;
+  gap:10px;
+}
+.subdivision-agenda-card{
+  border:1px solid var(--border);
+  border-radius:14px;
+  background:#fff;
+  padding:12px;
+}
+.subdivision-agenda-card h4{
+  margin:5px 0 4px;
+  font-size:15px;
+}
+.subdivision-agenda-card-top{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:10px;
+}
+.subdivision-agenda-lot{
+  font-weight:900;
+  font-size:16px;
+}
+.subdivision-agenda-meta{
+  color:var(--muted);
+  font-size:12px;
+  line-height:1.45;
+}
+.subdivision-agenda-actions{
+  margin-top:10px;
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+}
 </style>
 </head>
 <body>
@@ -1772,8 +1846,26 @@ button.teams-file-row:hover{border-color:#bdccdd}
 
     <section id="lotsView" class="hidden">
       <button id="backToSubs" class="secondary back" type="button">← Subdivisions</button>
-      <div class="toolbar"><div><strong id="subdivisionName"></strong><div class="muted">Lots in this subdivision</div></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button id="aiImportLot" class="secondary" type="button">⬇ Import Lot from Teams</button><button id="addLot" class="primary" type="button">+ Add Lot</button></div></div>
-      <div id="lotsGrid" class="grid"></div>
+
+      <div class="subdivision-inner-tabs" role="tablist" aria-label="Subdivision views">
+        <button id="subdivisionLotsTab" class="subdivision-inner-tab active" type="button">Lots</button>
+        <button id="subdivisionAgendaTab" class="subdivision-inner-tab" type="button">Today & Tomorrow</button>
+      </div>
+
+      <div id="subdivisionLotsPanel">
+        <div class="toolbar"><div><strong id="subdivisionName"></strong><div class="muted">Lots in this subdivision</div></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button id="aiImportLot" class="secondary" type="button">⬇ Import Lot from Teams</button><button id="addLot" class="primary" type="button">+ Add Lot</button></div></div>
+        <div id="lotsGrid" class="grid"></div>
+      </div>
+
+      <div id="subdivisionAgendaPanel" class="hidden">
+        <div class="toolbar">
+          <div>
+            <strong id="subdivisionAgendaName"></strong>
+            <div class="muted">Everything scheduled for today and tomorrow in this subdivision</div>
+          </div>
+        </div>
+        <div id="subdivisionAgenda" class="subdivision-agenda"></div>
+      </div>
     </section>
 
     <section id="lotView" class="hidden">
@@ -2265,6 +2357,7 @@ const SB_URL='https://oztefiymckpyxiewgxtc.supabase.co';
 const SB_KEY='sb_publishable__ItoYGeHKEGTBFiE7JM74w_1F-qERVe';
 const db=window.supabase.createClient(SB_URL,SB_KEY);
 let subdivisions=[],lots=[],items=[],punchouts=[],punchoutPhotos=[],profiles=[],selectedPunchouts=new Set(),currentSubdivision=null,currentLot=null;
+let subdivisionViewMode='lots';
 let punchoutMarkupState={itemId:null,photoPath:null,baseImage:null,baseObjectUrl:'',ops:[],tool:'draw',drawing:null,bodyOverflow:''};
 let realtimeChannel=null;
 let presenceChannel=null;
@@ -2871,14 +2964,109 @@ function showSubs(){
  ['lotsView','lotView','scheduleView','adminView'].forEach(x=>$(x).classList.add('hidden'));
  $('subdivisionsView').classList.remove('hidden');$('heroTitle').textContent='Subdivisions';$('heroSub').textContent='Choose a subdivision to view its lots.';
  $('subdivisionGrid').innerHTML=subdivisions.map(s=>`<button class="card click-card sub-card" data-sub="${s.id}"><div><span class="pill">Subdivision</span><h3>${esc(s.name)}</h3></div><div class="muted">${lots.filter(l=>l.subdivision_id===s.id).length} lots</div></button>`).join('');
- document.querySelectorAll('[data-sub]').forEach(b=>b.onclick=()=>{currentSubdivision=b.dataset.sub;showLots()});
+ document.querySelectorAll('[data-sub]').forEach(b=>b.onclick=()=>{currentSubdivision=b.dataset.sub;subdivisionViewMode='lots';showLots()});
+}
+function subdivisionLocalDateKey(date){
+ const d=new Date(date);
+ const y=d.getFullYear();
+ const m=String(d.getMonth()+1).padStart(2,'0');
+ const day=String(d.getDate()).padStart(2,'0');
+ return `${y}-${m}-${day}`;
+}
+function subdivisionPrettyDate(key){
+ const [y,m,d]=String(key).split('-').map(Number);
+ return new Date(y,m-1,d).toLocaleDateString(undefined,{
+   weekday:'long',month:'long',day:'numeric'
+ });
+}
+function subdivisionItemsForDate(dateKey){
+ const lotIds=new Set(lots.filter(l=>l.subdivision_id===currentSubdivision).map(l=>String(l.id)));
+ return items.filter(i=>{
+   if(!lotIds.has(String(i.lot_id)))return false;
+   const start=dateInputValue(i.starts_at);
+   const end=dateInputValue(i.ends_at)||start;
+   return !!start && start<=dateKey && end>=dateKey;
+ }).sort((a,b)=>{
+   const lotA=lots.find(l=>String(l.id)===String(a.lot_id));
+   const lotB=lots.find(l=>String(l.id)===String(b.lot_id));
+   const n=String(lotA?.lot_name||'').localeCompare(String(lotB?.lot_name||''),undefined,{numeric:true});
+   if(n!==0)return n;
+   return String(a.name||'').localeCompare(String(b.name||''));
+ });
+}
+function renderSubdivisionAgendaDay(title,dateKey){
+ const dayItems=subdivisionItemsForDate(dateKey);
+ const cards=dayItems.length?dayItems.map(i=>{
+   const lot=lots.find(l=>String(l.id)===String(i.lot_id));
+   const sd=dateInputValue(i.starts_at),ed=dateInputValue(i.ends_at)||sd;
+   const dateRange=sd===ed?subdivisionPrettyDate(sd):`${subdivisionPrettyDate(sd)} → ${subdivisionPrettyDate(ed)}`;
+   return `<div class="subdivision-agenda-card">
+     <div class="subdivision-agenda-card-top">
+       <div>
+         <div class="subdivision-agenda-lot">${esc(lot?.lot_name||'Lot')}</div>
+         <h4>${esc(i.name||i.item_type||'Scheduled Work')}</h4>
+       </div>
+       <span class="schedule-status-pill ${esc(i.status||'scheduled')}">${esc(statusDisplay(i.status))}</span>
+     </div>
+     <div class="subdivision-agenda-meta">
+       ${lot?.address?`${esc(lot.address)}<br>`:''}
+       ${i.crew?`Crew: ${esc(i.crew)}<br>`:''}
+       ${esc(dateRange)}
+     </div>
+     <div class="subdivision-agenda-actions">
+       <button class="secondary" type="button" data-agenda-open-lot="${esc(i.lot_id)}">Open Lot</button>
+     </div>
+   </div>`;
+ }).join(''):`<div class="card muted">Nothing scheduled for ${title.toLowerCase()}.</div>`;
+
+ return `<section class="subdivision-agenda-section">
+   <div class="subdivision-agenda-heading">
+     <h3>${esc(title)}</h3>
+     <div class="muted">${esc(subdivisionPrettyDate(dateKey))}</div>
+   </div>
+   <div class="subdivision-agenda-list">${cards}</div>
+ </section>`;
+}
+function renderSubdivisionAgenda(){
+ const root=$('subdivisionAgenda');
+ if(!root)return;
+ const today=new Date();
+ const tomorrow=new Date(today);
+ tomorrow.setDate(today.getDate()+1);
+ const todayKey=subdivisionLocalDateKey(today);
+ const tomorrowKey=subdivisionLocalDateKey(tomorrow);
+
+ root.innerHTML=
+   renderSubdivisionAgendaDay('Today',todayKey)+
+   renderSubdivisionAgendaDay('Tomorrow',tomorrowKey);
+
+ root.querySelectorAll('[data-agenda-open-lot]').forEach(btn=>{
+   btn.onclick=()=>{
+     currentLot=btn.dataset.agendaOpenLot;
+     showLot();
+   };
+ });
+}
+function showSubdivisionPanel(mode='lots'){
+ subdivisionViewMode=mode==='agenda'?'agenda':'lots';
+ const lotsMode=subdivisionViewMode==='lots';
+ $('subdivisionLotsPanel').classList.toggle('hidden',!lotsMode);
+ $('subdivisionAgendaPanel').classList.toggle('hidden',lotsMode);
+ $('subdivisionLotsTab').classList.toggle('active',lotsMode);
+ $('subdivisionAgendaTab').classList.toggle('active',!lotsMode);
+ if(!lotsMode)renderSubdivisionAgenda();
 }
 function showLots(){
  setTimeout(()=>updateAppPresenceLocation(),0);
  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.view==='subdivisions'));
  leaveLotPresence();
  $('subdivisionsView').classList.add('hidden');$('lotView').classList.add('hidden');$('scheduleView').classList.add('hidden');$('adminView').classList.add('hidden');$('lotsView').classList.remove('hidden');
- const s=subdivisions.find(x=>x.id===currentSubdivision);$('heroTitle').textContent=s?.name||'Lots';$('heroSub').textContent='Lots and schedules in this subdivision.';$('subdivisionName').textContent=s?.name||'';
+ const s=subdivisions.find(x=>x.id===currentSubdivision);
+ $('heroTitle').textContent=s?.name||'Lots';
+ $('heroSub').textContent='Lots and schedules in this subdivision.';
+ $('subdivisionName').textContent=s?.name||'';
+ $('subdivisionAgendaName').textContent=s?.name||'';
+
  const arr=lots.filter(l=>l.subdivision_id===currentSubdivision);
  $('lotsGrid').innerHTML=arr.map(l=>`
 <div class="lot-swipe-wrap" data-lot-wrap="${l.id}">
@@ -2895,9 +3083,8 @@ function showLots(){
 </div>`).join('');
 
  wireLotSwipeDelete();
-
+ showSubdivisionPanel(subdivisionViewMode);
 }
-
 
 let pendingDeleteLotId=null;
 
@@ -5995,7 +6182,10 @@ window.addEventListener('pagehide',()=>{updateMyLastSeen();});
 
 initPunchoutMarkupEditor();
 $('logout').onclick=async()=>{await updateMyLastSeen();if(lastSeenHeartbeatTimer)clearInterval(lastSeenHeartbeatTimer);if(adminPresenceRenderTimer)clearInterval(adminPresenceRenderTimer);if(realtimeChannel)await db.removeChannel(realtimeChannel);if(presenceChannel)await db.removeChannel(presenceChannel);if(appPresenceChannel)await db.removeChannel(appPresenceChannel);if(adminActivityChannel)await db.removeChannel(adminActivityChannel);await db.auth.signOut();location.reload()};
-$('backToSubs').onclick=showSubs;$('backToLots').onclick=showLots;
+$('backToSubs').onclick=showSubs;
+$('subdivisionLotsTab').onclick=()=>showSubdivisionPanel('lots');
+$('subdivisionAgendaTab').onclick=()=>showSubdivisionPanel('agenda');
+$('backToLots').onclick=showLots;
 function dateInputValue(v){
  if(!v) return '';
  const d=new Date(v);
