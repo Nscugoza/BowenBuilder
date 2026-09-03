@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="2026-09-02-last-online-fixed-v2">
+<meta name="bowenbuilder-version" content="2026-09-02-schedule-contacts-cc">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -4447,7 +4447,7 @@ function normalizeEmailList(value){
 async function loadScheduleContacts(){
   const {data,error}=await db
     .from('schedule_item_contacts')
-    .select('schedule_item,email_addresses,phone_numbers,include_plans_email,include_plans_text,include_rendering_email,include_rendering_text,email_message,text_message,email_info_fields,text_info_fields,updated_at')
+    .select('schedule_item,email_addresses,cc_email_addresses,phone_numbers,include_plans_email,include_plans_text,include_rendering_email,include_rendering_text,email_message,text_message,email_info_fields,text_info_fields,updated_at')
     .order('schedule_item');
   if(error){
     scheduleContacts=[];
@@ -4483,6 +4483,19 @@ function mappedRecipientsForWork(workNames){
   scheduleContacts.forEach(row=>{
     if(wanted.has(row.schedule_item)){
       normalizeEmailList(row.email_addresses).forEach(email=>{
+        if(!emails.some(x=>x.toLowerCase()===email.toLowerCase())) emails.push(email);
+      });
+    }
+  });
+  return emails;
+}
+
+function mappedCcRecipientsForWork(workNames){
+  const wanted=new Set((workNames||[]).map(x=>String(x||'').trim()));
+  const emails=[];
+  scheduleContacts.forEach(row=>{
+    if(wanted.has(row.schedule_item)){
+      normalizeEmailList(row.cc_email_addresses).forEach(email=>{
         if(!emails.some(x=>x.toLowerCase()===email.toLowerCase())) emails.push(email);
       });
     }
@@ -4776,6 +4789,9 @@ async function renderAdminContacts(){
       <label>Default Email Address(es)
         <input type="text" data-admin-contact-email="${esc(name)}" value="${esc(row?.email_addresses||'')}" placeholder="vendor@company.com, second@company.com">
       </label>
+      <label>CC Email Address(es)
+        <input type="text" data-admin-contact-cc-email="${esc(name)}" value="${esc(row?.cc_email_addresses||'')}" placeholder="superintendent@bowenhomes.com, office@bowenhomes.com">
+      </label>
       <label>Default Phone Number(s)
         <input type="tel" data-admin-contact-phone="${esc(name)}" value="${esc(row?.phone_numbers||'')}" placeholder="770-555-1212">
         <div class="admin-share-options">
@@ -4838,6 +4854,8 @@ async function saveAdminScheduleContact(scheduleItem){
   if(!isBowenBuilderAdmin())return;
   const input=[...document.querySelectorAll('[data-admin-contact-email]')]
     .find(x=>x.dataset.adminContactEmail===scheduleItem);
+  const ccInput=[...document.querySelectorAll('[data-admin-contact-cc-email]')]
+    .find(x=>x.dataset.adminContactCcEmail===scheduleItem);
   const phoneInput=[...document.querySelectorAll('[data-admin-contact-phone]')]
     .find(x=>x.dataset.adminContactPhone===scheduleItem);
   const plansEmailInput=[...document.querySelectorAll('[data-admin-plans-email]')]
@@ -4854,9 +4872,10 @@ async function saveAdminScheduleContact(scheduleItem){
     .find(x=>x.dataset.adminTextMessage===scheduleItem);
   const status=[...document.querySelectorAll('[data-admin-contact-status]')]
     .find(x=>x.dataset.adminContactStatus===scheduleItem);
-  if(!input || !phoneInput || !plansEmailInput || !plansTextInput || !renderingEmailInput || !renderingTextInput || !emailMessageInput || !textMessageInput)return;
+  if(!input || !ccInput || !phoneInput || !plansEmailInput || !plansTextInput || !renderingEmailInput || !renderingTextInput || !emailMessageInput || !textMessageInput)return;
 
   const emails=normalizeEmailList(input.value);
+  const ccEmails=normalizeEmailList(ccInput.value);
   const phones=normalizePhoneList(phoneInput.value);
   const includePlansEmail=!!plansEmailInput.checked;
   const includePlansText=!!plansTextInput.checked;
@@ -4869,6 +4888,11 @@ async function saveAdminScheduleContact(scheduleItem){
   const invalid=emails.find(x=>!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(x));
   if(invalid){
     if(status){status.textContent=`Check email address: ${invalid}`;status.style.color='#b42318';}
+    return;
+  }
+  const invalidCc=ccEmails.find(x=>!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(x));
+  if(invalidCc){
+    if(status){status.textContent=`Check CC email address: ${invalidCc}`;status.style.color='#b42318';}
     return;
   }
   const invalidPhone=phones.find(x=>x.replace(/\D/g,'').length<7);
@@ -4885,6 +4909,7 @@ async function saveAdminScheduleContact(scheduleItem){
   ({error}=await db.from('schedule_item_contacts').upsert({
       schedule_item:scheduleItem,
       email_addresses:emails.join(', '),
+      cc_email_addresses:ccEmails.join(', '),
       phone_numbers:phones.join(', '),
       include_plans_email:includePlansEmail,
       include_plans_text:includePlansText,
@@ -5789,12 +5814,14 @@ async function emailOverviewScheduleItem(itemId){
   if(!msg)return;
 
   const recipients=mappedRecipientsForWork(workNames);
+  const ccRecipients=mappedCcRecipientsForWork(workNames);
   if(!recipients.length){
     alert('No email recipient is assigned to this schedule item in Admin → Schedule Contacts.');
     return;
   }
 
   const to=recipients.join(',');
+  const cc=ccRecipients.join(',');
   let body=customScheduleMessageForItem(item,'email',msg);
   body=linkedScheduleMessageBody(item.lot_id,linkedItems,body);
 
@@ -5803,7 +5830,11 @@ async function emailOverviewScheduleItem(itemId){
     ? `${lot?.lot_name||'Lot'} - Schedule Update`
     : msg.subject;
 
-  const href=`mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  const mailParams=[];
+  if(cc)mailParams.push(`cc=${encodeURIComponent(cc)}`);
+  mailParams.push(`subject=${encodeURIComponent(subject)}`);
+  mailParams.push(`body=${encodeURIComponent(body)}`);
+  const href=`mailto:${encodeURIComponent(to)}?${mailParams.join('&')}`;
   launchCalendarComposer(href);
 }
 
@@ -5997,12 +6028,14 @@ async function emailSelectedCalendarDate(){
     }
 
     const recipients=mappedRecipientsForWork(workNames);
+    const ccRecipients=mappedCcRecipientsForWork(workNames);
     if(!recipients.length){
       alert('No email recipient is assigned for the scheduled work on this date in Admin → Schedule Contacts.');
       return;
     }
 
     const to=recipients.join(',');
+    const cc=ccRecipients.join(',');
     let body=selectedDateCustomMessage('email',msg);
     body=linkedScheduleMessageBody(currentLot,linkedItems,body);
 
@@ -6011,7 +6044,11 @@ async function emailSelectedCalendarDate(){
       ? `${lot?.lot_name||'Lot'} - Schedule Update`
       : msg.subject;
 
-    const href=`mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    const mailParams=[];
+    if(cc)mailParams.push(`cc=${encodeURIComponent(cc)}`);
+    mailParams.push(`subject=${encodeURIComponent(subject)}`);
+    mailParams.push(`body=${encodeURIComponent(body)}`);
+    const href=`mailto:${encodeURIComponent(to)}?${mailParams.join('&')}`;
     launchCalendarComposer(href);
   }catch(err){
     console.error('Calendar Email Date draft failed:',err);
