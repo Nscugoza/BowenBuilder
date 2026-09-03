@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="2026-09-02-linked-trim-communications-fixed">
+<meta name="bowenbuilder-version" content="2026-09-02-last-online-fixed-v2">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -2371,6 +2371,7 @@ let adminPresenceProfiles=[];
 let lastSeenHeartbeatTimer=null;
 let adminPresenceRenderTimer=null;
 let adminActivityChannel=null;
+let adminActivityBackendError='';
 let currentUserProfile=null;
 let currentUserEmail='';
 const ADMIN_EMAIL='nick@bowenhomes.com';
@@ -2692,9 +2693,11 @@ async function loadAdminPresenceProfiles(){
   if(!isBowenBuilderAdmin())return;
   const {data,error}=await db.rpc('bowenbuilder_admin_activity_users');
   if(error){
+    adminActivityBackendError=error.message||'Last Online backend is not configured.';
     console.warn('Could not load activity users',error);
     return;
   }
+  adminActivityBackendError='';
   const rows=(data||[]).map(r=>({
     id:r.id,
     full_name:r.full_name||'',
@@ -2751,7 +2754,11 @@ function renderAdminOnlineUsers(){
   const onlineCount=rows.filter(r=>r.online).length;
   summary.textContent=`${onlineCount} online · ${rows.length} total user${rows.length===1?'':'s'}`;
 
-  list.innerHTML=rows.map(({profile,live,online})=>{
+  const backendWarning=adminActivityBackendError
+    ? `<div class="card" style="border-color:#e0a3a3;background:#fff7f7;margin-bottom:10px"><strong>Last Online setup needs attention</strong><div class="muted" style="margin-top:5px">${esc(adminActivityBackendError)}</div></div>`
+    : '';
+
+  list.innerHTML=backendWarning+rows.map(({profile,live,online})=>{
     const name=profile.full_name||profile.email||'User';
     const isYou=String(profile.id)===String(currentAuthUserId);
     return `<div class="admin-online-card">
@@ -2787,8 +2794,13 @@ async function updateMyLastSeen(){
 function startLastSeenHeartbeat(){
   if(lastSeenHeartbeatTimer)clearInterval(lastSeenHeartbeatTimer);
   updateMyLastSeen();
-  lastSeenHeartbeatTimer=setInterval(()=>updateMyLastSeen(),60*1000);
+  lastSeenHeartbeatTimer=setInterval(()=>updateMyLastSeen(),30*1000);
 }
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='visible')updateMyLastSeen();
+});
+window.addEventListener('focus',()=>updateMyLastSeen());
+window.addEventListener('pagehide',()=>{ updateMyLastSeen(); });
 
 async function startAdminActivityRealtime(){
   if(!isBowenBuilderAdmin() || adminActivityChannel)return;
