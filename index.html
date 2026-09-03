@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="2026-09-02-crew-qr-punchout-photos">
+<meta name="bowenbuilder-version" content="2026-09-02-custom-checklist-swipe-delete">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -4201,58 +4201,85 @@ function renderLotChecklist(){
   }
 
   host.querySelectorAll('[data-checklist-swipe]').forEach(wrap=>{
-    let startX=0,startY=0,dx=0,dragging=false;
+    let startX=0,startY=0,dx=0,dragging=false,horizontal=false,pointerId=null;
     const row=wrap.querySelector('.checklist-row');
     const index=Number(wrap.dataset.checklistSwipe);
+    const deleteArea=wrap.querySelector('.checklist-swipe-delete');
 
-    wrap.addEventListener('touchstart',e=>{
-      if(!e.touches?.length)return;
-      startX=e.touches[0].clientX;
-      startY=e.touches[0].clientY;
+    const closeRow=()=>{
+      row.style.transition='transform .18s ease';
+      row.style.transform='';
+    };
+
+    const revealRow=()=>{
+      row.style.transition='transform .18s ease';
+      row.style.transform='translateX(-92px)';
+    };
+
+    row.addEventListener('pointerdown',e=>{
+      // Keep normal checkbox taps working.
+      if(e.target.closest('input,button,a'))return;
+      pointerId=e.pointerId;
+      startX=e.clientX;
+      startY=e.clientY;
       dx=0;
       dragging=true;
+      horizontal=false;
       row.style.transition='none';
-    },{passive:true});
+      try{ row.setPointerCapture(pointerId); }catch{}
+    });
 
-    wrap.addEventListener('touchmove',e=>{
-      if(!dragging || !e.touches?.length)return;
-      const x=e.touches[0].clientX;
-      const y=e.touches[0].clientY;
-      const moveX=x-startX;
-      const moveY=y-startY;
+    row.addEventListener('pointermove',e=>{
+      if(!dragging || e.pointerId!==pointerId)return;
 
-      // Only treat a clearly horizontal left gesture as a swipe.
-      if(Math.abs(moveY)>Math.abs(moveX) && Math.abs(moveY)>8){
-        dragging=false;
-        row.style.transform='';
-        return;
+      const moveX=e.clientX-startX;
+      const moveY=e.clientY-startY;
+
+      if(!horizontal){
+        if(Math.abs(moveX)<7 && Math.abs(moveY)<7)return;
+        if(Math.abs(moveY)>Math.abs(moveX)){
+          dragging=false;
+          closeRow();
+          return;
+        }
+        horizontal=true;
       }
 
+      // Custom checklist items only slide left.
       dx=Math.min(0,Math.max(-92,moveX));
       row.style.transform=`translateX(${dx}px)`;
-    },{passive:true});
+    });
 
-    wrap.addEventListener('touchend',async()=>{
+    const finishSwipe=e=>{
+      if(e.pointerId!==pointerId)return;
       if(!dragging){
-        row.style.transition='transform .18s ease';
-        row.style.transform='';
+        pointerId=null;
         return;
       }
+
       dragging=false;
-      row.style.transition='transform .18s ease';
+      pointerId=null;
 
-      if(dx<=-70){
-        row.style.transform='translateX(-92px)';
-        await deleteCustomChecklistIndex(index);
-      }else{
-        row.style.transform='';
-      }
-    },{passive:true});
+      // Reveal Delete after a deliberate left swipe.
+      if(horizontal && dx<=-42)revealRow();
+      else closeRow();
+    };
 
-    // Desktop/tap fallback: tapping the revealed red area also uses confirmation.
-    const deleteArea=wrap.querySelector('.checklist-swipe-delete');
+    row.addEventListener('pointerup',finishSwipe);
+    row.addEventListener('pointercancel',e=>{
+      if(e.pointerId!==pointerId)return;
+      dragging=false;
+      pointerId=null;
+      closeRow();
+    });
+
+    // Tapping the revealed red Delete button asks for confirmation.
     if(deleteArea){
-      deleteArea.onclick=()=>deleteCustomChecklistIndex(index);
+      deleteArea.addEventListener('click',async e=>{
+        e.preventDefault();
+        e.stopPropagation();
+        await deleteCustomChecklistIndex(index);
+      });
     }
   });
 }
