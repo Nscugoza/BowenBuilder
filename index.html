@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="2026-09-02-schedule-contacts-cc">
+<meta name="bowenbuilder-version" content="2026-09-02-crew-qr-mvp">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -1812,9 +1812,42 @@ button.teams-file-row:hover{border-color:#bdccdd}
   gap:8px;
   flex-wrap:wrap;
 }
+
+.crew-public{min-height:100vh;background:#f4f7fb;padding:18px}
+.crew-shell{max-width:760px;margin:0 auto}
+.crew-brand{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+.crew-brand .brand-mark{flex:0 0 auto}
+.crew-hero{background:#244f7e;color:#fff;border-radius:18px;padding:20px;margin-bottom:14px}
+.crew-hero h1{margin:0 0 4px;font-size:26px}
+.crew-hero p{margin:0;opacity:.9}
+.crew-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.crew-card{background:#fff;border:1px solid #dfe7ef;border-radius:16px;padding:15px;margin-bottom:12px}
+.crew-card h2,.crew-card h3{margin:0 0 10px}
+.crew-info small{display:block;color:#64748b;margin-bottom:3px}
+.crew-info strong{display:block;white-space:pre-wrap}
+.crew-schedule-item{padding:11px 0;border-top:1px solid #edf1f5}
+.crew-schedule-item:first-child{border-top:0;padding-top:0}
+.crew-resource-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.crew-resource{display:block;text-align:center;text-decoration:none;border:1px solid #cbd8e6;border-radius:12px;padding:12px;font-weight:800;color:#244f7e;background:#fff}
+.crew-qr-canvas-wrap{display:flex;justify-content:center;padding:14px;background:#fff;border-radius:14px}
+.crew-qr-url{font-size:12px;word-break:break-all;background:#f8fafc;padding:9px;border-radius:9px;margin-top:10px}
+@media(max-width:600px){.crew-grid,.crew-resource-grid{grid-template-columns:1fr}.crew-public{padding:12px}.crew-hero{padding:17px}}
+@media print{
+ body>*:not(#crewQrPrintArea){display:none!important}
+ #crewQrPrintArea{display:block!important;position:fixed;inset:0;background:#fff;padding:32px;text-align:center}
+}
+
 </style>
 </head>
 <body>
+
+<section id="crewPublicView" class="crew-public hidden">
+  <div class="crew-shell">
+    <div class="crew-brand"><div class="brand-mark">BB</div><div><strong>BowenBuilder</strong><div class="muted">Bowen & Bowen Homebuilders</div></div></div>
+    <div id="crewPublicContent"><div class="crew-card">Loading job information…</div></div>
+  </div>
+</section>
+
 <section id="login" class="login">
   <form id="loginForm" class="login-card">
     <div class="brand"><div class="brand-mark">BB</div><div><h1>BowenBuilder</h1><p>Bowen & Bowen Homebuilders</p></div></div>
@@ -1878,6 +1911,7 @@ button.teams-file-row:hover{border-color:#bdccdd}
         </div>
         <div class="lot-actions">
           <button id="editLot" class="secondary" type="button">✎ Edit Lot</button>
+          <button id="crewQrBtn" class="secondary hidden" type="button">▦ Crew QR</button>
           <button id="emailLot" class="secondary" type="button">✉ Email Lot</button>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
 <button id="lotCalendarBtn" class="secondary" type="button">▦ Lot Calendar</button>
@@ -2338,7 +2372,24 @@ button.teams-file-row:hover{border-color:#bdccdd}
 <div class="actions"><a id="documentViewerOpen" class="secondary" href="#" target="_blank" rel="noopener">Open Full Screen</a><button id="documentViewerClose" class="primary" type="button">Close</button></div>
 </div>
 </dialog>
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+
+<dialog id="crewQrDialog">
+  <div class="sheet">
+    <div class="dialog-head"><div><h2 style="margin:0">Crew QR Code</h2><div id="crewQrSubtitle" class="muted"></div></div><button id="crewQrX" class="xbtn" type="button">×</button></div>
+    <p class="muted">Anyone with this QR code can open the restricted, read-only Crew View for this lot. No Microsoft sign-in is required.</p>
+    <div class="crew-qr-canvas-wrap"><canvas id="crewQrCanvas" width="280" height="280"></canvas></div>
+    <div id="crewQrUrl" class="crew-qr-url"></div>
+    <div class="actions">
+      <button id="crewQrReset" class="secondary" type="button">Reset QR</button>
+      <button id="crewQrPrint" class="secondary" type="button">Print QR</button>
+      <button id="crewQrOpen" class="primary" type="button">View Crew Page</button>
+    </div>
+  </div>
+</dialog>
+<div id="crewQrPrintArea" class="hidden"></div>
 
 <dialog id="deleteLotDialog">
   <div class="sheet">
@@ -2360,6 +2411,82 @@ const $=id=>document.getElementById(id);
 const SB_URL='https://oztefiymckpyxiewgxtc.supabase.co';
 const SB_KEY='sb_publishable__ItoYGeHKEGTBFiE7JM74w_1F-qERVe';
 const db=window.supabase.createClient(SB_URL,SB_KEY);
+
+const crewTokenFromUrl=()=>new URLSearchParams(location.search).get('crew')||'';
+function crewDateLabel(value){
+  if(!value)return '';
+  const key=String(value).slice(0,10);
+  return new Date(`${key}T12:00:00`).toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric',year:'numeric'});
+}
+function crewOptionsHtml(raw){
+  const vals=String(raw||'').split(/\r?\n|;|,/).map(x=>x.replace(/^[\s•\-*]+/,'').trim()).filter(Boolean);
+  return vals.length?`<ul style="margin:6px 0 0;padding-left:20px">${vals.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:'<span class="muted">None listed</span>';
+}
+function crewExternalResource(label,value){
+  const raw=String(value||'');
+  if(!raw || raw.startsWith('bowenteams:'))return '';
+  const url=safe(raw);
+  return url?`<a class="crew-resource" href="${url}" target="_blank" rel="noopener">${esc(label)} ↗</a>`:'';
+}
+async function showPublicCrewView(token){
+  $('login').classList.add('hidden');
+  $('app').classList.add('hidden');
+  $('crewPublicView').classList.remove('hidden');
+  const box=$('crewPublicContent');
+  const {data,error}=await db.rpc('bowenbuilder_crew_lot',{p_token:token});
+  if(error || !data){
+    box.innerHTML=`<div class="crew-card"><h2>QR code not available</h2><p class="muted">${esc(error?.message||'This Crew QR code is invalid or has been reset.')}</p></div>`;
+    return;
+  }
+  const d=typeof data==='string'?JSON.parse(data):data;
+  const lot=d.lot||{}, schedules=d.schedule||[], punch=d.punchout||[];
+  const resources=[
+    crewExternalResource('Schedule Inspection',lot.permit_url),
+    crewExternalResource('Deco Sheet',lot.deco_url),
+    crewExternalResource('HLP',lot.hlp_url),
+    crewExternalResource('LGP',lot.lgp_url)
+  ].filter(Boolean).join('');
+  box.innerHTML=`
+    <div class="crew-hero"><h1>${esc(lot.lot_name||'Job')}</h1><p>${esc(d.subdivision||'')}${lot.address?' · '+esc(lot.address):''}</p></div>
+    <div class="crew-card"><h2>Job Information</h2><div class="crew-grid">
+      <div class="crew-info"><small>Address</small><strong>${esc(lot.address||'Not added')}</strong></div>
+      <div class="crew-info"><small>Plan</small><strong>${esc(lot.plan_name||'Not added')}</strong></div>
+      <div class="crew-info"><small>Permit Number</small><strong>${esc(lot.permit_number||'Not added')}</strong></div>
+      <div class="crew-info"><small>County</small><strong>${esc(lot.county||'Not added')}</strong></div>
+    </div></div>
+    <div class="crew-card"><h2>Included Options</h2>${crewOptionsHtml(lot.included_options)}</div>
+    ${lot.color_rendering_url?`<div class="crew-card"><h2>Color Rendering</h2><img src="${safe(lot.color_rendering_url)}" alt="Color rendering" style="width:100%;max-height:420px;object-fit:contain;border-radius:12px"></div>`:''}
+    <div class="crew-card"><h2>Schedule</h2>${schedules.length?schedules.map(i=>`<div class="crew-schedule-item"><strong>${esc(i.name||'Scheduled Work')}</strong><div class="muted">${crewDateLabel(i.starts_at)}${i.ends_at&&String(i.ends_at).slice(0,10)!==String(i.starts_at).slice(0,10)?' → '+crewDateLabel(i.ends_at):''}${i.crew?' · '+esc(i.crew):''}</div></div>`).join(''):'<div class="muted">No upcoming work scheduled.</div>'}</div>
+    ${resources?`<div class="crew-card"><h2>Job Resources</h2><div class="crew-resource-grid">${resources}</div><p class="muted" style="margin:10px 0 0">Private BowenBuilder uploads and Microsoft Teams documents stay protected and are not exposed by the public QR page.</p></div>`:''}
+    <div class="crew-card"><h2>Open Punchout</h2>${punch.length?punch.map(p=>`<div class="crew-schedule-item">${esc(p.description)}</div>`).join(''):'<div class="muted">No open punchout items.</div>'}</div>
+    <div class="muted" style="text-align:center;padding:8px">Read-only Crew View · Bowen & Bowen Homebuilders</div>`;
+}
+let crewQrCurrentUrl='';
+async function openCrewQrDialog(){
+  const lot=lots.find(x=>x.id===currentLot); if(!lot)return;
+  let token=lot.crew_access_token;
+  if(!token){
+    const {data,error}=await db.rpc('bowenbuilder_reset_crew_token',{p_lot_id:lot.id});
+    if(error){alert(error.message);return}
+    token=data;
+    lot.crew_access_token=token;
+  }
+  crewQrCurrentUrl=`${location.origin}${location.pathname}?crew=${encodeURIComponent(token)}`;
+  $('crewQrSubtitle').textContent=`${lot.lot_name}${lot.address?' · '+lot.address:''}`;
+  $('crewQrUrl').textContent=crewQrCurrentUrl;
+  const canvas=$('crewQrCanvas');
+  await QRCode.toCanvas(canvas,crewQrCurrentUrl,{width:280,margin:2});
+  $('crewQrDialog').showModal();
+}
+async function resetCrewQr(){
+  const lot=lots.find(x=>x.id===currentLot); if(!lot)return;
+  if(!confirm(`Reset the Crew QR for ${lot.lot_name}? The old QR code will stop working.`))return;
+  const {data,error}=await db.rpc('bowenbuilder_reset_crew_token',{p_lot_id:lot.id});
+  if(error){alert(error.message);return}
+  lot.crew_access_token=data;
+  await openCrewQrDialog();
+}
+
 let subdivisions=[],lots=[],items=[],punchouts=[],punchoutPhotos=[],profiles=[],selectedPunchouts=new Set(),currentSubdivision=null,currentLot=null;
 let subdivisionViewMode='lots';
 let punchoutMarkupState={itemId:null,photoPath:null,baseImage:null,baseObjectUrl:'',ops:[],tool:'draw',drawing:null,bodyOverflow:''};
@@ -3907,6 +4034,7 @@ function showLot(preserveScroll=false){
  $('lotInfo').innerHTML=`<div class="info-grid"><div class="info"><small>Address</small><strong>${esc(l.address||'Not added')}</strong></div><div class="info"><small>Permit Number</small><strong>${esc(l.permit_number||'Not added')}</strong></div><div class="info"><small>Plan</small><strong>${esc(l.plan_name||'Not added')}</strong></div><div class="info"><small>Included Options</small><div class="included-options-detail">${includedOptionsBullets(l.included_options)}</div></div><div class="info"><small>County</small><strong>${esc(l.county||'Not added')}</strong></div></div>${(links.length||storedDocs.length||teamsDocs.length||externalLegacyDocs.length)?`<div class="resource-row">${storedDocs.filter(x=>!teamsDocs.some(t=>t[0]===x[0])).map(x=>`<button type="button" class="document-resource" data-lot-document="${esc(x[1])}" data-document-title="${esc(x[0])}">${esc(x[0])} ▣</button>`).join('')}${teamsDocs.map(x=>`<button type="button" class="document-resource" data-lot-teams-document="${esc(x[1])}" data-document-title="${esc(x[0])}">${esc(x[0])} ▣</button>`).join('')}${links.map(x=>`<a href="${safe(x[1])}" target="_blank">${x[0]} ↗</a>`).join('')}${externalLegacyDocs.filter(x=>!storedDocs.some(d=>d[0]===x[0])).map(x=>`<a href="${safe(x[1])}" target="_blank">${x[0]} ↗</a>`).join('')}</div>`:''}${l.color_rendering_url?`<div class="card" style="margin-top:14px"><small class="muted">Color Rendering</small><div style="margin-top:8px"><img src="${l.color_rendering_url}" alt="${esc(l.lot_name)} color rendering" style="max-width:100%;max-height:320px;border-radius:14px;cursor:zoom-in" id="liveRendering"></div></div>`:''}`;
  const editAllowed=canEditSubdivision(l.subdivision_id);
  $('editLot').classList.toggle('hidden',!editAllowed);
+ $('crewQrBtn').classList.toggle('hidden',!isBowenBuilderAdmin());
  $('addSchedule').classList.toggle('hidden',!editAllowed);
  $('addPunchout').classList.toggle('hidden',!editAllowed);
  renderLotChecklist();
@@ -5727,7 +5855,25 @@ function selectLotTeamsDocument(itemId,name,webUrl){
 }
 
 async function microsoftProviderToken(){
-  const {data:{session}}=await db.auth.getSession();
+  
+$('crewQrBtn').onclick=openCrewQrDialog;
+$('crewQrX').onclick=()=>$('crewQrDialog').close();
+$('crewQrDialog').addEventListener('click',e=>{if(e.target===e.currentTarget)$('crewQrDialog').close()});
+$('crewQrReset').onclick=resetCrewQr;
+$('crewQrOpen').onclick=()=>{if(crewQrCurrentUrl)window.open(crewQrCurrentUrl,'_blank','noopener')};
+$('crewQrPrint').onclick=()=>{
+  const lot=lots.find(x=>x.id===currentLot); if(!lot)return;
+  const png=$('crewQrCanvas').toDataURL('image/png');
+  $('crewQrPrintArea').innerHTML=`<div style="font-family:Arial,sans-serif;text-align:center"><h1 style="margin-bottom:4px">BOWEN & BOWEN HOMEBUILDERS</h1><h2 style="margin:8px 0">${esc(lot.lot_name)}</h2><div style="font-size:18px;margin-bottom:18px">${esc(lot.address||'')}</div><img src="${png}" style="width:340px;height:340px"><h2>SCAN FOR JOB INFORMATION</h2><div>Schedule · Options · Job Information · Punchout</div></div>`;
+  window.print();
+};
+const crewToken=crewTokenFromUrl();
+if(crewToken){
+  await showPublicCrewView(crewToken);
+  return;
+}
+
+const {data:{session}}=await db.auth.getSession();
   const live=session?.provider_token||'';
   if(live){
     try{localStorage.setItem('bowenbuilder_ms_provider_token',live)}catch(_){ }
