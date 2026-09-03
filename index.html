@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="2026-09-02-crew-qr-iphone-fixed">
+<meta name="bowenbuilder-version" content="2026-09-02-crew-qr-rendering-fixed">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -2455,7 +2455,7 @@ async function showPublicCrewView(token){
       <div class="crew-info"><small>County</small><strong>${esc(lot.county||'Not added')}</strong></div>
     </div></div>
     <div class="crew-card"><h2>Included Options</h2>${crewOptionsHtml(lot.included_options)}</div>
-    ${lot.color_rendering_url?`<div class="crew-card"><h2>Color Rendering</h2><img src="${safe(lot.color_rendering_url)}" alt="Color rendering" style="width:100%;max-height:420px;object-fit:contain;border-radius:12px"></div>`:''}
+    ${lot.rendering_signed_url?`<div class="crew-card"><h2>Color Rendering</h2><img src="${safe(lot.rendering_signed_url)}" alt="Color rendering" style="width:100%;max-height:420px;object-fit:contain;border-radius:12px" onerror="this.closest('.crew-card').innerHTML='<h2>Color Rendering</h2><div class=&quot;muted&quot;>Rendering could not be loaded. Scan the QR again to refresh access.</div>'"></div>`:''}
     <div class="crew-card"><h2>Schedule</h2>${schedules.length?schedules.map(i=>`<div class="crew-schedule-item"><strong>${esc(i.name||'Scheduled Work')}</strong><div class="muted">${crewDateLabel(i.starts_at)}${i.ends_at&&String(i.ends_at).slice(0,10)!==String(i.starts_at).slice(0,10)?' → '+crewDateLabel(i.ends_at):''}${i.crew?' · '+esc(i.crew):''}</div></div>`).join(''):'<div class="muted">No upcoming work scheduled.</div>'}</div>
     ${resources?`<div class="crew-card"><h2>Job Resources</h2><div class="crew-resource-grid">${resources}</div><p class="muted" style="margin:10px 0 0">Private BowenBuilder uploads and Microsoft Teams documents stay protected and are not exposed by the public QR page.</p></div>`:''}
     <div class="crew-card"><h2>Open Punchout</h2>${punch.length?punch.map(p=>`<div class="crew-schedule-item">${esc(p.description)}</div>`).join(''):'<div class="muted">No open punchout items.</div>'}</div>
