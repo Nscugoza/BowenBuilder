@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="2026-09-02-crew-qr-click-fixed">
+<meta name="bowenbuilder-version" content="2026-09-02-crew-qr-iphone-fixed">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -2372,7 +2372,7 @@ button.teams-file-row:hover{border-color:#bdccdd}
 <div class="actions"><a id="documentViewerOpen" class="secondary" href="#" target="_blank" rel="noopener">Open Full Screen</a><button id="documentViewerClose" class="primary" type="button">Close</button></div>
 </div>
 </dialog>
-<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 
@@ -2380,7 +2380,7 @@ button.teams-file-row:hover{border-color:#bdccdd}
   <div class="sheet">
     <div class="dialog-head"><div><h2 style="margin:0">Crew QR Code</h2><div id="crewQrSubtitle" class="muted"></div></div><button id="crewQrX" class="xbtn" type="button">×</button></div>
     <p class="muted">Anyone with this QR code can open the restricted, read-only Crew View for this lot. No Microsoft sign-in is required.</p>
-    <div class="crew-qr-canvas-wrap"><canvas id="crewQrCanvas" width="280" height="280"></canvas></div>
+    <div class="crew-qr-canvas-wrap"><div id="crewQrCanvas" style="width:280px;height:280px;display:flex;align-items:center;justify-content:center"></div></div>
     <div id="crewQrUrl" class="crew-qr-url"></div>
     <div class="actions">
       <button id="crewQrReset" class="secondary" type="button">Reset QR</button>
@@ -2474,11 +2474,19 @@ async function openCrewQrDialog(){
   crewQrCurrentUrl=`${location.origin}${location.pathname}?crew=${encodeURIComponent(token)}`;
   $('crewQrSubtitle').textContent=`${lot.lot_name}${lot.address?' · '+lot.address:''}`;
   $('crewQrUrl').textContent=crewQrCurrentUrl;
-  const canvas=$('crewQrCanvas');
-  if(!window.QRCode || typeof QRCode.toCanvas!=='function'){
+  const qrBox=$('crewQrCanvas');
+  if(!window.QRCode){
     throw new Error('QR generator did not load. Refresh the page and try again.');
   }
-  await QRCode.toCanvas(canvas,crewQrCurrentUrl,{width:280,margin:2});
+  qrBox.innerHTML='';
+  new QRCode(qrBox,{
+    text:crewQrCurrentUrl,
+    width:280,
+    height:280,
+    colorDark:'#000000',
+    colorLight:'#ffffff',
+    correctLevel:QRCode.CorrectLevel.M
+  });
   $('crewQrDialog').showModal();
 }
 async function resetCrewQr(){
@@ -6771,7 +6779,14 @@ $('crewQrReset').onclick=()=>resetCrewQr().catch(err=>{
 $('crewQrOpen').onclick=()=>{if(crewQrCurrentUrl)window.open(crewQrCurrentUrl,'_blank','noopener')};
 $('crewQrPrint').onclick=()=>{
   const lot=lots.find(x=>x.id===currentLot); if(!lot)return;
-  const png=$('crewQrCanvas').toDataURL('image/png');
+  const qrHost=$('crewQrCanvas');
+  const qrCanvas=qrHost.querySelector('canvas');
+  const qrImage=qrHost.querySelector('img');
+  const png=qrCanvas?.toDataURL('image/png')||qrImage?.src||'';
+  if(!png){
+    alert('QR image is still loading. Try Print QR again.');
+    return;
+  }
   $('crewQrPrintArea').innerHTML=`<div style="font-family:Arial,sans-serif;text-align:center"><h1 style="margin-bottom:4px">BOWEN & BOWEN HOMEBUILDERS</h1><h2 style="margin:8px 0">${esc(lot.lot_name)}</h2><div style="font-size:18px;margin-bottom:18px">${esc(lot.address||'')}</div><img src="${png}" style="width:340px;height:340px"><h2>SCAN FOR JOB INFORMATION</h2><div>Schedule · Options · Job Information · Punchout</div></div>`;
   window.print();
 };
