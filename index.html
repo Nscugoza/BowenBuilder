@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="2026-09-02-crew-qr-rendering-display-fixed">
+<meta name="bowenbuilder-version" content="2026-09-02-crew-qr-punchout-photos">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -1837,6 +1837,11 @@ button.teams-file-row:hover{border-color:#bdccdd}
  #crewQrPrintArea{display:block!important;position:fixed;inset:0;background:#fff;padding:32px;text-align:center}
 }
 
+
+.crew-punchout-photo-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-top:10px}
+.crew-punchout-photo{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:10px;border:1px solid #dbe4ee;background:#f5f7fa}
+@media(max-width:520px){.crew-punchout-photo-grid{grid-template-columns:1fr 1fr}}
+
 </style>
 </head>
 <body>
@@ -2469,7 +2474,16 @@ async function showPublicCrewView(token){
     ${crewSafeImageSrc(lot.rendering_signed_url)?`<div class="crew-card"><h2>Color Rendering</h2><img src="${crewSafeImageSrc(lot.rendering_signed_url)}" alt="Color rendering" style="width:100%;max-height:420px;object-fit:contain;border-radius:12px" onerror="this.closest('.crew-card').innerHTML='<h2>Color Rendering</h2><div class=&quot;muted&quot;>Rendering could not be loaded.</div>'"></div>`:''}
     <div class="crew-card"><h2>Schedule</h2>${schedules.length?schedules.map(i=>`<div class="crew-schedule-item"><strong>${esc(i.name||'Scheduled Work')}</strong><div class="muted">${crewDateLabel(i.starts_at)}${i.ends_at&&String(i.ends_at).slice(0,10)!==String(i.starts_at).slice(0,10)?' → '+crewDateLabel(i.ends_at):''}${i.crew?' · '+esc(i.crew):''}</div></div>`).join(''):'<div class="muted">No upcoming work scheduled.</div>'}</div>
     ${resources?`<div class="crew-card"><h2>Job Resources</h2><div class="crew-resource-grid">${resources}</div><p class="muted" style="margin:10px 0 0">Private BowenBuilder uploads and Microsoft Teams documents stay protected and are not exposed by the public QR page.</p></div>`:''}
-    <div class="crew-card"><h2>Open Punchout</h2>${punch.length?punch.map(p=>`<div class="crew-schedule-item">${esc(p.description)}</div>`).join(''):'<div class="muted">No open punchout items.</div>'}</div>
+    <div class="crew-card"><h2>Open Punchout</h2>${punch.length?punch.map(p=>{
+      const photos=Array.isArray(p.photos)?p.photos:[];
+      const photoHtml=photos.length
+        ? `<div class="crew-punchout-photo-grid">${photos.map(ph=>{
+            const src=`/api/crew-photo?token=${encodeURIComponent(token)}&path=${encodeURIComponent(ph.storage_path||'')}`;
+            return `<a href="${src}" target="_blank" rel="noopener"><img class="crew-punchout-photo" src="${src}" alt="Punchout photo" loading="lazy"></a>`;
+          }).join('')}</div>`
+        : '';
+      return `<div class="crew-schedule-item"><strong>${esc(p.description)}</strong>${photoHtml}</div>`;
+    }).join(''):'<div class="muted">No open punchout items.</div>'}</div>
     <div class="muted" style="text-align:center;padding:8px">Read-only Crew View · Bowen & Bowen Homebuilders</div>`;
 }
 let crewQrCurrentUrl='';
