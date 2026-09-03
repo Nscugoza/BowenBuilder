@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="2026-09-02-crew-qr-mvp">
+<meta name="bowenbuilder-version" content="2026-09-02-crew-qr-click-fixed">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -2475,6 +2475,9 @@ async function openCrewQrDialog(){
   $('crewQrSubtitle').textContent=`${lot.lot_name}${lot.address?' · '+lot.address:''}`;
   $('crewQrUrl').textContent=crewQrCurrentUrl;
   const canvas=$('crewQrCanvas');
+  if(!window.QRCode || typeof QRCode.toCanvas!=='function'){
+    throw new Error('QR generator did not load. Refresh the page and try again.');
+  }
   await QRCode.toCanvas(canvas,crewQrCurrentUrl,{width:280,margin:2});
   $('crewQrDialog').showModal();
 }
@@ -5856,23 +5859,6 @@ function selectLotTeamsDocument(itemId,name,webUrl){
 
 async function microsoftProviderToken(){
   
-$('crewQrBtn').onclick=openCrewQrDialog;
-$('crewQrX').onclick=()=>$('crewQrDialog').close();
-$('crewQrDialog').addEventListener('click',e=>{if(e.target===e.currentTarget)$('crewQrDialog').close()});
-$('crewQrReset').onclick=resetCrewQr;
-$('crewQrOpen').onclick=()=>{if(crewQrCurrentUrl)window.open(crewQrCurrentUrl,'_blank','noopener')};
-$('crewQrPrint').onclick=()=>{
-  const lot=lots.find(x=>x.id===currentLot); if(!lot)return;
-  const png=$('crewQrCanvas').toDataURL('image/png');
-  $('crewQrPrintArea').innerHTML=`<div style="font-family:Arial,sans-serif;text-align:center"><h1 style="margin-bottom:4px">BOWEN & BOWEN HOMEBUILDERS</h1><h2 style="margin:8px 0">${esc(lot.lot_name)}</h2><div style="font-size:18px;margin-bottom:18px">${esc(lot.address||'')}</div><img src="${png}" style="width:340px;height:340px"><h2>SCAN FOR JOB INFORMATION</h2><div>Schedule · Options · Job Information · Punchout</div></div>`;
-  window.print();
-};
-const crewToken=crewTokenFromUrl();
-if(crewToken){
-  await showPublicCrewView(crewToken);
-  return;
-}
-
 const {data:{session}}=await db.auth.getSession();
   const live=session?.provider_token||'';
   if(live){
@@ -6771,6 +6757,31 @@ $('adminOnlineTab').onclick=()=>showAdminPanel('online');
 $('adminOnlineRefresh').onclick=async()=>{syncAppPresenceState();await loadAdminPresenceProfiles();renderAdminOnlineUsers();};
 $('adminContactSearch').oninput=()=>renderAdminContacts();
 $('adminUserSearch').oninput=()=>renderAdminUserPermissions();
+// Crew QR controls
+$('crewQrBtn').onclick=()=>openCrewQrDialog().catch(err=>{
+  console.error('Crew QR failed:',err);
+  alert(`Crew QR could not open: ${err?.message||err}`);
+});
+$('crewQrX').onclick=()=>$('crewQrDialog').close();
+$('crewQrDialog').addEventListener('click',e=>{if(e.target===e.currentTarget)$('crewQrDialog').close()});
+$('crewQrReset').onclick=()=>resetCrewQr().catch(err=>{
+  console.error('Crew QR reset failed:',err);
+  alert(`Crew QR could not reset: ${err?.message||err}`);
+});
+$('crewQrOpen').onclick=()=>{if(crewQrCurrentUrl)window.open(crewQrCurrentUrl,'_blank','noopener')};
+$('crewQrPrint').onclick=()=>{
+  const lot=lots.find(x=>x.id===currentLot); if(!lot)return;
+  const png=$('crewQrCanvas').toDataURL('image/png');
+  $('crewQrPrintArea').innerHTML=`<div style="font-family:Arial,sans-serif;text-align:center"><h1 style="margin-bottom:4px">BOWEN & BOWEN HOMEBUILDERS</h1><h2 style="margin:8px 0">${esc(lot.lot_name)}</h2><div style="font-size:18px;margin-bottom:18px">${esc(lot.address||'')}</div><img src="${png}" style="width:340px;height:340px"><h2>SCAN FOR JOB INFORMATION</h2><div>Schedule · Options · Job Information · Punchout</div></div>`;
+  window.print();
+};
+
+const crewToken=crewTokenFromUrl();
+if(crewToken){
+  await showPublicCrewView(crewToken);
+  return;
+}
+
 const {data:{session}}=await db.auth.getSession();
 if(session){
   appOn();
