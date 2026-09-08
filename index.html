@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="2026-09-02-custom-checklist-swipe-delete">
+<meta name="bowenbuilder-version" content="2026-09-03-crew-qr-no-schedule-inspection">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -1949,8 +1949,8 @@ button.teams-file-row:hover{border-color:#bdccdd}
         <div id="punchoutShareBar" class="punchout-share-bar hidden">
           <span id="punchoutSelectedCount">0 selected</span>
           <div class="punchout-actions">
-            <button id="textSelectedPunchouts" class="secondary" type="button">Text Selected</button>
-            <button id="emailSelectedPunchouts" class="secondary" type="button">Email Selected</button>
+            <button id="textSelectedPunchouts" class="secondary" type="button">Text Selected PDF</button>
+            <button id="emailSelectedPunchouts" class="secondary" type="button">Email Selected PDF</button>
             <button id="clearSelectedPunchouts" class="secondary" type="button">Clear</button>
           </div>
         </div>
@@ -2378,6 +2378,7 @@ button.teams-file-row:hover{border-color:#bdccdd}
 </div>
 </dialog>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 
@@ -2457,7 +2458,6 @@ async function showPublicCrewView(token){
   const d=typeof data==='string'?JSON.parse(data):data;
   const lot=d.lot||{}, schedules=d.schedule||[], punch=d.punchout||[];
   const resources=[
-    crewExternalResource('Schedule Inspection',lot.permit_url),
     crewExternalResource('Deco Sheet',lot.deco_url),
     crewExternalResource('HLP',lot.hlp_url),
     crewExternalResource('LGP',lot.lgp_url)
@@ -3818,51 +3818,160 @@ function updatePunchoutShareBar(){
   $('punchoutShareBar').classList.toggle('hidden',count===0);
 }
 
-async function buildPunchoutShareText(ids){
+async function punchoutPhotoDataUrl(path){
+  const url=await signedPunchoutUrl(path);
+  if(!url)return '';
+  try{
+    const res=await fetch(url);
+    if(!res.ok)throw new Error('Photo download failed');
+    const blob=await res.blob();
+    return await new Promise((resolve,reject)=>{
+      const reader=new FileReader();
+      reader.onload=()=>resolve(String(reader.result||''));
+      reader.onerror=reject;
+      reader.readAsDataURL(blob);
+    });
+  }catch(err){
+    console.warn('Punchout PDF photo could not load',err);
+    return '';
+  }
+}
+
+async function buildPunchoutPdf(ids){
+  const jsPDF=window.jspdf?.jsPDF;
+  if(!jsPDF)throw new Error('PDF generator did not load. Refresh BowenBuilder and try again.');
+
   const lot=lots.find(l=>l.id===currentLot);
-  const chunks=[];
+  const selected=ids.map(id=>punchouts.find(p=>p.id===id)).filter(Boolean);
+  if(!selected.length)throw new Error('No punchout items selected.');
 
-  for(const id of ids){
-    const p=punchouts.find(x=>x.id===id);
-    if(!p) continue;
+  const doc=new jsPDF({unit:'pt',format:'letter',compress:true});
+  const pageW=doc.internal.pageSize.getWidth();
+  const pageH=doc.internal.pageSize.getHeight();
+  const margin=44;
+  const usableW=pageW-margin*2;
+  let y=44;
 
-    const lines=[
-      p.description,
+  const ensure=(needed)=>{
+    if(y+needed>pageH-44){
+      doc.addPage();
+      y=44;
+    }
+  };
+
+  doc.setFont('helvetica','bold');
+  doc.setFontSize(18);
+  doc.text('BOWEN & BOWEN HOMEBUILDERS',margin,y);
+  y+=25;
+  doc.setFontSize(15);
+  doc.text(lot?.lot_name||'Punchout Items',margin,y);
+  y+=20;
+  doc.setFont('helvetica','normal');
+  doc.setFontSize(10.5);
+  if(lot?.address){doc.text(String(lot.address),margin,y);y+=15;}
+  const sub=subdivisions.find(s=>s.id===lot?.subdivision_id);
+  if(sub?.name){doc.text(String(sub.name),margin,y);y+=15;}
+  doc.text(`Punchout Report · ${new Date().toLocaleDateString()}`,margin,y);
+  y+=24;
+  doc.setDrawColor(210);
+  doc.line(margin,y,pageW-margin,y);
+  y+=22;
+
+  for(let idx=0;idx<selected.length;idx++){
+    const p=selected[idx];
+    ensure(70);
+    doc.setFont('helvetica','bold');
+    doc.setFontSize(12);
+    doc.text(`Item ${idx+1}`,margin,y);
+    y+=17;
+
+    doc.setFont('helvetica','normal');
+    doc.setFontSize(11);
+    const desc=doc.splitTextToSize(String(p.description||''),usableW);
+    doc.text(desc,margin,y);
+    y+=desc.length*14+8;
+
+    doc.setFontSize(9.5);
+    doc.setTextColor(95);
+    const meta=[
       `Status: ${p.completed?'Completed':'Open'}`,
       `Added by: ${profileName(p.created_by)}`,
       ...(p.completed?[`Completed by: ${profileName(p.completed_by)}`]:[])
-    ];
+    ].join(' · ');
+    const metaLines=doc.splitTextToSize(meta,usableW);
+    doc.text(metaLines,margin,y);
+    y+=metaLines.length*12+12;
+    doc.setTextColor(0);
 
-    const photoRows=punchoutPhotos.filter(ph=>ph.punchout_item_id===id);
-    if(photoRows.length){
-      const urls=await Promise.all(photoRows.map(ph=>signedPunchoutUrl(ph.storage_path)));
-      const valid=urls.filter(Boolean);
-      if(valid.length){
-        lines.push('Photos:');
-        valid.forEach((url,i)=>lines.push(`${i+1}. ${url}`));
+    const photoRows=punchoutPhotos.filter(ph=>ph.punchout_item_id===p.id);
+    for(const ph of photoRows){
+      const dataUrl=await punchoutPhotoDataUrl(ph.storage_path);
+      if(!dataUrl)continue;
+      try{
+        const props=doc.getImageProperties(dataUrl);
+        const maxW=usableW;
+        const maxH=330;
+        const scale=Math.min(maxW/props.width,maxH/props.height,1);
+        const w=props.width*scale;
+        const h=props.height*scale;
+        ensure(h+18);
+        doc.addImage(dataUrl,props.fileType||'JPEG',margin,y,w,h,undefined,'FAST');
+        y+=h+14;
+      }catch(err){
+        console.warn('Punchout PDF image skipped',err);
       }
     }
 
-    chunks.push(lines.join('\n'));
+    if(idx<selected.length-1){
+      ensure(25);
+      doc.setDrawColor(225);
+      doc.line(margin,y,pageW-margin,y);
+      y+=20;
+    }
   }
 
-  const header=lot?`${lot.lot_name}${lot.address?' - '+lot.address:''}`:'Punchout Items';
-  return `${header}\n\n${chunks.join('\n\n--------------------\n\n')}`;
+  const filename=`${String(lot?.lot_name||'Lot').replace(/[^a-z0-9_-]+/gi,'-')}-Punchout-${new Date().toISOString().slice(0,10)}.pdf`;
+  return {blob:doc.output('blob'),filename};
 }
 
 async function sharePunchouts(ids,mode){
-  if(!ids.length) return;
-  const body=await buildPunchoutShareText(ids);
-  const lot=lots.find(l=>l.id===currentLot);
-  const subject=ids.length===1
-    ? `${lot?.lot_name||'Lot'} Punchout Item`
-    : `${lot?.lot_name||'Lot'} Punchout Items (${ids.length})`;
+  if(!ids.length)return;
 
-  if(mode==='email'){
-    location.href=`mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-  }else{
-    location.href=`sms:?&body=${encodeURIComponent(body)}`;
+  let pdf;
+  try{
+    pdf=await buildPunchoutPdf(ids);
+  }catch(err){
+    alert(`Punchout PDF could not be created: ${err?.message||err}`);
+    return;
   }
+
+  const file=new File([pdf.blob],pdf.filename,{type:'application/pdf'});
+
+  // On iPhone/iPad, the native Share Sheet can attach the actual PDF to
+  // Mail or Messages. This keeps BowenBuilder draft-only.
+  if(navigator.share && (!navigator.canShare || navigator.canShare({files:[file]}))){
+    try{
+      await navigator.share({
+        files:[file],
+        title:'BowenBuilder Punchout PDF'
+      });
+      return;
+    }catch(err){
+      if(err?.name==='AbortError')return;
+      console.warn('Native PDF share failed',err);
+    }
+  }
+
+  // Desktop/browser fallback: download the PDF so it can be attached manually.
+  const url=URL.createObjectURL(pdf.blob);
+  const a=document.createElement('a');
+  a.href=url;
+  a.download=pdf.filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),30000);
+  alert(`${mode==='email'?'Email':'Text'} cannot attach a PDF automatically in this browser. The Punchout PDF was downloaded so you can attach it.`);
 }
 
 async function togglePunchoutComplete(id){
