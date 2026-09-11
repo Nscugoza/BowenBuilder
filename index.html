@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="2026-09-11-crew-qr-agent-call-buttons">
+<meta name="bowenbuilder-version" content="2026-09-11-subdivision-outstanding-punchout">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -1813,6 +1813,90 @@ button.teams-file-row:hover{border-color:#bdccdd}
   flex-wrap:wrap;
 }
 
+.subdivision-punchout-summary{
+  margin:2px 0 14px;
+  color:var(--muted);
+  font-size:13px;
+}
+.subdivision-punchout{
+  display:grid;
+  gap:16px;
+}
+.subdivision-punchout-lot{
+  background:#fff;
+  border:1px solid var(--border);
+  border-radius:16px;
+  overflow:hidden;
+}
+.subdivision-punchout-lot-head{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:12px;
+  padding:14px 15px;
+  background:#f7f9fc;
+  border-bottom:1px solid var(--border);
+}
+.subdivision-punchout-lot-name{
+  font-weight:900;
+  font-size:17px;
+  line-height:1.2;
+}
+.subdivision-punchout-lot-address{
+  color:var(--muted);
+  font-size:12px;
+  margin-top:4px;
+}
+.subdivision-punchout-count{
+  flex:0 0 auto;
+  border-radius:999px;
+  background:#eef4fb;
+  color:#244f7e;
+  border:1px solid #d8e4f0;
+  font-size:12px;
+  font-weight:850;
+  padding:6px 9px;
+}
+.subdivision-punchout-items{
+  padding:0 15px;
+}
+.subdivision-punchout-item{
+  padding:13px 0;
+  border-bottom:1px solid #edf1f5;
+}
+.subdivision-punchout-item:last-child{
+  border-bottom:0;
+}
+.subdivision-punchout-description{
+  font-weight:800;
+  line-height:1.35;
+  overflow-wrap:anywhere;
+}
+.subdivision-punchout-item-meta{
+  margin-top:6px;
+  color:var(--muted);
+  font-size:12px;
+  line-height:1.4;
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+}
+.subdivision-punchout-photo-count{
+  font-weight:750;
+  color:#244f7e;
+}
+.subdivision-punchout-lot-actions{
+  padding:0 15px 14px;
+}
+.subdivision-punchout-empty{
+  border:1px solid var(--border);
+  border-radius:16px;
+  background:#fff;
+  padding:22px 16px;
+  text-align:center;
+  color:var(--muted);
+}
+
 .crew-public{min-height:100vh;background:#f4f7fb;padding:18px}
 .crew-shell{max-width:760px;margin:0 auto}
 .crew-brand{display:flex;align-items:center;gap:10px;margin-bottom:16px}
@@ -1895,6 +1979,7 @@ button.teams-file-row:hover{border-color:#bdccdd}
       <div class="subdivision-inner-tabs" role="tablist" aria-label="Subdivision views">
         <button id="subdivisionLotsTab" class="subdivision-inner-tab active" type="button">Lots</button>
         <button id="subdivisionAgendaTab" class="subdivision-inner-tab" type="button">Today & Tomorrow</button>
+        <button id="subdivisionPunchoutTab" class="subdivision-inner-tab" type="button">Outstanding Punchout</button>
       </div>
 
       <div id="subdivisionLotsPanel">
@@ -1910,6 +1995,17 @@ button.teams-file-row:hover{border-color:#bdccdd}
           </div>
         </div>
         <div id="subdivisionAgenda" class="subdivision-agenda"></div>
+      </div>
+
+      <div id="subdivisionPunchoutPanel" class="hidden">
+        <div class="toolbar">
+          <div>
+            <strong id="subdivisionPunchoutName"></strong>
+            <div class="muted">All open Punchout items, grouped clearly by lot</div>
+          </div>
+        </div>
+        <div id="subdivisionPunchoutSummary" class="subdivision-punchout-summary"></div>
+        <div id="subdivisionPunchout" class="subdivision-punchout"></div>
       </div>
     </section>
 
@@ -3241,14 +3337,102 @@ function renderSubdivisionAgenda(){
    };
  });
 }
+function subdivisionOpenPunchoutItems(){
+ const lotIds=new Set(lots.filter(l=>l.subdivision_id===currentSubdivision).map(l=>String(l.id)));
+ return punchouts.filter(p=>lotIds.has(String(p.lot_id)) && !p.completed);
+}
+
+function renderSubdivisionPunchout(){
+ const root=$('subdivisionPunchout');
+ const summary=$('subdivisionPunchoutSummary');
+ if(!root)return;
+
+ const openItems=subdivisionOpenPunchoutItems();
+ const grouped=new Map();
+
+ openItems.forEach(p=>{
+   const lot=lots.find(l=>String(l.id)===String(p.lot_id));
+   if(!lot)return;
+   const key=String(lot.id);
+   if(!grouped.has(key))grouped.set(key,{lot,items:[]});
+   grouped.get(key).items.push(p);
+ });
+
+ const groups=[...grouped.values()].sort((a,b)=>
+   String(a.lot.lot_name||'').localeCompare(String(b.lot.lot_name||''),undefined,{numeric:true})
+ );
+
+ if(summary){
+   const lotCount=groups.length;
+   const itemCount=openItems.length;
+   summary.textContent=`${itemCount} outstanding item${itemCount===1?'':'s'} across ${lotCount} lot${lotCount===1?'':'s'}`;
+ }
+
+ if(!groups.length){
+   root.innerHTML='<div class="subdivision-punchout-empty">No outstanding Punchout items in this subdivision.</div>';
+   return;
+ }
+
+ root.innerHTML=groups.map(({lot,items:lotItems})=>{
+   const sorted=[...lotItems].sort((a,b)=>new Date(b.created_at||0)-new Date(a.created_at||0));
+   const itemsHtml=sorted.map(p=>{
+     const photoCount=punchoutPhotos.filter(ph=>String(ph.punchout_item_id)===String(p.id)).length;
+     const addedBy=profileName(p.created_by);
+     const addedDate=p.created_at?new Date(p.created_at).toLocaleDateString():'';
+     return `<div class="subdivision-punchout-item">
+       <div class="subdivision-punchout-description">${esc(p.description||'Punchout item')}</div>
+       <div class="subdivision-punchout-item-meta">
+         ${addedBy?`<span>Added by ${esc(addedBy)}</span>`:''}
+         ${addedDate?`<span>${esc(addedDate)}</span>`:''}
+         ${photoCount?`<span class="subdivision-punchout-photo-count">📷 ${photoCount} photo${photoCount===1?'':'s'}</span>`:''}
+       </div>
+     </div>`;
+   }).join('');
+
+   return `<section class="subdivision-punchout-lot">
+     <div class="subdivision-punchout-lot-head">
+       <div>
+         <div class="subdivision-punchout-lot-name">${esc(lot.lot_name||'Lot')}</div>
+         ${lot.address?`<div class="subdivision-punchout-lot-address">${esc(lot.address)}</div>`:''}
+       </div>
+       <div class="subdivision-punchout-count">${lotItems.length} open</div>
+     </div>
+     <div class="subdivision-punchout-items">${itemsHtml}</div>
+     <div class="subdivision-punchout-lot-actions">
+       <button class="secondary" type="button" data-open-punchout-lot="${esc(lot.id)}">Open Punchout</button>
+     </div>
+   </section>`;
+ }).join('');
+
+ root.querySelectorAll('[data-open-punchout-lot]').forEach(btn=>{
+   btn.onclick=()=>{
+     currentLot=btn.dataset.openPunchoutLot;
+     showLot();
+     requestAnimationFrame(()=>{
+       const punchTab=document.querySelector('.lot-tab[data-lottab="punchout"]');
+       if(punchTab)punchTab.click();
+     });
+   };
+ });
+}
+
 function showSubdivisionPanel(mode='lots'){
- subdivisionViewMode=mode==='agenda'?'agenda':'lots';
+ subdivisionViewMode=['agenda','punchout'].includes(mode)?mode:'lots';
+
  const lotsMode=subdivisionViewMode==='lots';
+ const agendaMode=subdivisionViewMode==='agenda';
+ const punchoutMode=subdivisionViewMode==='punchout';
+
  $('subdivisionLotsPanel').classList.toggle('hidden',!lotsMode);
- $('subdivisionAgendaPanel').classList.toggle('hidden',lotsMode);
+ $('subdivisionAgendaPanel').classList.toggle('hidden',!agendaMode);
+ $('subdivisionPunchoutPanel').classList.toggle('hidden',!punchoutMode);
+
  $('subdivisionLotsTab').classList.toggle('active',lotsMode);
- $('subdivisionAgendaTab').classList.toggle('active',!lotsMode);
- if(!lotsMode)renderSubdivisionAgenda();
+ $('subdivisionAgendaTab').classList.toggle('active',agendaMode);
+ $('subdivisionPunchoutTab').classList.toggle('active',punchoutMode);
+
+ if(agendaMode)renderSubdivisionAgenda();
+ if(punchoutMode)renderSubdivisionPunchout();
 }
 function showLots(){
  setTimeout(()=>updateAppPresenceLocation(),0);
@@ -3260,6 +3444,7 @@ function showLots(){
  $('heroSub').textContent='Lots and schedules in this subdivision.';
  $('subdivisionName').textContent=s?.name||'';
  $('subdivisionAgendaName').textContent=s?.name||'';
+ if($('subdivisionPunchoutName'))$('subdivisionPunchoutName').textContent=s?.name||'';
 
  const arr=lots.filter(l=>l.subdivision_id===currentSubdivision);
  $('lotsGrid').innerHTML=arr.map(l=>`
@@ -6622,6 +6807,7 @@ $('logout').onclick=async()=>{await updateMyLastSeen();if(lastSeenHeartbeatTimer
 $('backToSubs').onclick=showSubs;
 $('subdivisionLotsTab').onclick=()=>showSubdivisionPanel('lots');
 $('subdivisionAgendaTab').onclick=()=>showSubdivisionPanel('agenda');
+$('subdivisionPunchoutTab').onclick=()=>showSubdivisionPanel('punchout');
 $('backToLots').onclick=showLots;
 function dateInputValue(v){
  if(!v) return '';
