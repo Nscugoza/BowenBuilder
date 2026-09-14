@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="2026-09-11-subdivision-outstanding-punchout">
+<meta name="bowenbuilder-version" content="2026-09-14-checklist-soap-niche">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -2046,7 +2046,7 @@ button.teams-file-row:hover{border-color:#bdccdd}
       <div id="overviewPanel"><div id="lotSchedule" class="schedule-list"></div></div>
       <div id="punchoutPanel" class="hidden">
         <div class="toolbar">
-          <div><strong>Punchout Items</strong><div class="muted">Track corrections, notes, and jobsite photos.</div></div>
+          <div><strong>Punchout Items</strong><div class="muted">Track corrections, notes, and jobsite photos. A photo is required when completing an item.</div></div>
           <button id="addPunchout" class="primary" type="button">+ Add Punchout Item</button>
         </div>
         <div id="punchoutShareBar" class="punchout-share-bar hidden">
@@ -2736,7 +2736,8 @@ const DEFAULT_LOT_CHECKLIST_ITEMS=[
   'Order Windows',
   'Order Slab Materials',
   'Install Island Pipe for Island if Necessary',
-  'Order Steps (2nd Floor Decking)'
+  'Order Steps (2nd Floor Decking)',
+  '24” x 14” Soap Niche (54” off floor)'
 ];
 
 let realtimeRefreshTimer=null;
@@ -3694,7 +3695,7 @@ async function renderPunchout(lotId){
         <div class="punchout-actions">
           <button class="share-btn" type="button" data-text-punchout="${p.id}">Text</button>
           <button class="share-btn" type="button" data-email-punchout="${p.id}">Email</button>
-          ${canPunchoutEdit(subdivisionForLot(p.lot_id))?`<button class="${p.completed?'reopen-btn':'complete-btn'}" type="button" data-toggle-punchout="${p.id}">${p.completed?'Reopen':'Mark Completed'}</button>`:''}
+          ${canPunchoutEdit(subdivisionForLot(p.lot_id))?`<button class="${p.completed?'reopen-btn':'complete-btn'}" type="button" data-toggle-punchout="${p.id}">${p.completed?'Reopen':'Complete + Photo'}</button>`:''}
           ${canPunchoutDelete(subdivisionForLot(p.lot_id))?`<button class="secondary danger" type="button" data-delete-punchout="${p.id}">Delete</button>`:''}
         </div>
       </div>
@@ -3723,7 +3724,7 @@ async function renderPunchout(lotId){
     btn.onclick=()=>sharePunchouts([btn.dataset.emailPunchout],'email');
   });
   root.querySelectorAll('[data-toggle-punchout]').forEach(btn=>{
-    btn.onclick=()=>togglePunchoutComplete(btn.dataset.togglePunchout);
+    btn.onclick=()=>togglePunchoutComplete(btn.dataset.togglePunchout,btn);
   });
   root.querySelectorAll('[data-delete-punchout]').forEach(btn=>{
     btn.onclick=()=>deletePunchoutItem(btn.dataset.deletePunchout);
@@ -4174,23 +4175,133 @@ async function sharePunchouts(ids,mode){
   alert(`${mode==='email'?'Email':'Text'} cannot attach a PDF automatically in this browser. The Punchout PDF was downloaded so you can attach it.`);
 }
 
-async function togglePunchoutComplete(id){
+async function togglePunchoutComplete(id,triggerButton=null){
   const item=punchouts.find(p=>p.id===id);
-  if(!item) return;
+  if(!item)return;
   if(!requirePunchoutEditPermission(subdivisionForLot(item.lot_id)))return;
-  const next=!item.completed;
-  const {data:{user}}=await db.auth.getUser();
-  const payload={
-    completed:next,
-    completed_at:next?new Date().toISOString():null,
-    completed_by:next?(user?.id||null):null
+
+  // Reopening does not require a photo.
+  if(item.completed){
+    const {error}=await db.from('punchout_items').update({
+      completed:false,
+      completed_at:null,
+      completed_by:null
+    }).eq('id',id);
+
+    if(error){alert(error.message);return}
+
+    item.completed=false;
+    item.completed_at=null;
+    item.completed_by=null;
+    await renderPunchout(currentLot);
+    return;
+  }
+
+  // Completing an open Punchout item always requires a NEW completion photo.
+  // The chooser opens immediately from the user's tap so it works reliably on iPhone.
+  const input=document.createElement('input');
+  input.type='file';
+  input.accept='image/*';
+  input.style.position='fixed';
+  input.style.left='-9999px';
+  input.style.width='1px';
+  input.style.height='1px';
+  input.setAttribute('aria-hidden','true');
+  document.body.appendChild(input);
+
+  let busy=false;
+  const cleanup=()=>{
+    try{input.remove()}catch{}
   };
-  const {error}=await db.from('punchout_items').update(payload).eq('id',id);
-  if(error){alert(error.message);return}
-  item.completed=next;
-  item.completed_at=payload.completed_at;
-  item.completed_by=payload.completed_by;
-  await renderPunchout(currentLot);
+
+  input.oncancel=cleanup;
+
+  input.onchange=async()=>{
+    const photo=input.files?.[0];
+    if(!photo){cleanup();return}
+
+    if(photo.size>8*1024*1024){
+      alert(`"${photo.name}" is too large. Please keep the completion photo under 8 MB.`);
+      cleanup();
+      return;
+    }
+
+    busy=true;
+    if(triggerButton){
+      triggerButton.disabled=true;
+      triggerButton.textContent='Uploading Photo...';
+    }
+
+    let photoPath='';
+    let insertedPhoto=null;
+
+    try{
+      const {data:{user}}=await db.auth.getUser();
+      const ext=(photo.name.split('.').pop()||'jpg').toLowerCase().replace(/[^a-z0-9]/g,'')||'jpg';
+      const fileId=(crypto.randomUUID?crypto.randomUUID():Date.now()+'-'+Math.random().toString(36).slice(2));
+      photoPath=`${item.lot_id}/${item.id}/completion-${fileId}.${ext}`;
+
+      const {error:uploadError}=await db.storage.from('punchout-photos').upload(photoPath,photo,{
+        cacheControl:'3600',
+        upsert:false,
+        contentType:photo.type||undefined
+      });
+      if(uploadError)throw uploadError;
+
+      const {data:photoRow,error:photoError}=await db.from('punchout_photos')
+        .insert({
+          punchout_item_id:item.id,
+          storage_path:photoPath
+        })
+        .select()
+        .single();
+
+      if(photoError){
+        await db.storage.from('punchout-photos').remove([photoPath]);
+        throw photoError;
+      }
+
+      insertedPhoto=photoRow;
+
+      const completedAt=new Date().toISOString();
+      const completedBy=user?.id||null;
+      const {error:updateError}=await db.from('punchout_items').update({
+        completed:true,
+        completed_at:completedAt,
+        completed_by:completedBy
+      }).eq('id',id);
+
+      if(updateError){
+        if(insertedPhoto?.id){
+          await db.from('punchout_photos').delete().eq('id',insertedPhoto.id);
+        }else{
+          await db.from('punchout_photos').delete()
+            .eq('punchout_item_id',item.id)
+            .eq('storage_path',photoPath);
+        }
+        await db.storage.from('punchout-photos').remove([photoPath]);
+        throw updateError;
+      }
+
+      item.completed=true;
+      item.completed_at=completedAt;
+      item.completed_by=completedBy;
+      if(insertedPhoto)punchoutPhotos.push(insertedPhoto);
+
+      await renderPunchout(currentLot);
+    }catch(err){
+      alert(`Punchout item was not completed. ${err?.message||'The completion photo could not be saved.'}`);
+      if(triggerButton){
+        triggerButton.disabled=false;
+        triggerButton.textContent='Complete + Photo';
+      }
+    }finally{
+      busy=false;
+      cleanup();
+    }
+  };
+
+  input.click();
 }
 
 async function deletePunchoutItem(id){
