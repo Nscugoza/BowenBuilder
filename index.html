@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="2026-09-15-punchout-photo-completed-badge">
+<meta name="bowenbuilder-version" content="2026-09-15-punchout-completion-badge-existing-items-fixed">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -1945,8 +1945,8 @@ button.teams-file-row:hover{border-color:#bdccdd}
 .punchout-completed-photo-badge{
   position:absolute;left:8px;bottom:8px;z-index:3;
   padding:5px 8px;border-radius:7px;
-  background:rgba(20,92,55,.94);color:#fff;
-  font-size:10px;line-height:1;font-weight:900;
+  background:rgba(20,92,55,.96);color:#fff;
+  font-size:11px;line-height:1;font-weight:900;
   letter-spacing:.05em;text-transform:uppercase;
   box-shadow:0 1px 4px rgba(0,0,0,.22);pointer-events:none;
 }
@@ -3708,14 +3708,19 @@ async function renderPunchout(lotId){
             <div class="punchout-text">${esc(p.description)}</div>
             <span class="punchout-status ${p.completed?'completed':''}">${status}</span>
           </div>
-          ${urls.some(x=>x.url)?`<div class="punchout-gallery">${urls.filter(x=>x.url).map(x=>{
-            const isCompletionPhoto=String(x.path||'').split('/').pop().startsWith('completion-');
+          ${urls.some(x=>x.url)?(()=>{
+          const visibleUrls=urls.filter(x=>x.url);
+          const explicitCompletion=visibleUrls.some(x=>String(x.path||'').split('/').pop().startsWith('completion-'));
+          return `<div class="punchout-gallery">${visibleUrls.map((x,photoIndex)=>{
+            const isExplicitCompletion=String(x.path||'').split('/').pop().startsWith('completion-');
+            const isCompletionPhoto=isExplicitCompletion || (p.completed && !explicitCompletion && photoIndex===visibleUrls.length-1);
             return `<div class="punchout-photo-wrap">
               <img class="punchout-photo" src="${x.url}" alt="${isCompletionPhoto?'Completed Punchout photo':'Original Punchout photo'}" data-punchout-photo="${x.url}">
               ${isCompletionPhoto?'<span class="punchout-completed-photo-badge">Completed</span>':''}
               ${canPunchoutEdit(subdivisionForLot(p.lot_id))?`<button class="punchout-markup-btn" type="button" data-markup-punchout="${p.id}" data-markup-path="${esc(x.path)}">✏ Mark Up</button>`:''}
             </div>`;
-          }).join('')}</div>`:''}
+          }).join('')}</div>`;
+        })():''}
         </div>
       </div>
       <div class="punchout-meta">
