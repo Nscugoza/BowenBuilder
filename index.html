@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="2026-09-15-checklist-garage-portal-anchors">
+<meta name="bowenbuilder-version" content="2026-09-15-punchout-photo-completed-badge">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -1941,6 +1941,16 @@ button.teams-file-row:hover{border-color:#bdccdd}
   line-height:1.35;
   font-weight:500;
 }
+
+.punchout-completed-photo-badge{
+  position:absolute;left:8px;bottom:8px;z-index:3;
+  padding:5px 8px;border-radius:7px;
+  background:rgba(20,92,55,.94);color:#fff;
+  font-size:10px;line-height:1;font-weight:900;
+  letter-spacing:.05em;text-transform:uppercase;
+  box-shadow:0 1px 4px rgba(0,0,0,.22);pointer-events:none;
+}
+
 </style>
 </head>
 <body>
@@ -3698,10 +3708,14 @@ async function renderPunchout(lotId){
             <div class="punchout-text">${esc(p.description)}</div>
             <span class="punchout-status ${p.completed?'completed':''}">${status}</span>
           </div>
-          ${urls.some(x=>x.url)?`<div class="punchout-gallery">${urls.filter(x=>x.url).map(x=>`<div class="punchout-photo-wrap">
-            <img class="punchout-photo" src="${x.url}" alt="Punchout photo" data-punchout-photo="${x.url}">
-            ${canPunchoutEdit(subdivisionForLot(p.lot_id))?`<button class="punchout-markup-btn" type="button" data-markup-punchout="${p.id}" data-markup-path="${esc(x.path)}">✏ Mark Up</button>`:''}
-          </div>`).join('')}</div>`:''}
+          ${urls.some(x=>x.url)?`<div class="punchout-gallery">${urls.filter(x=>x.url).map(x=>{
+            const isCompletionPhoto=String(x.path||'').split('/').pop().startsWith('completion-');
+            return `<div class="punchout-photo-wrap">
+              <img class="punchout-photo" src="${x.url}" alt="${isCompletionPhoto?'Completed Punchout photo':'Original Punchout photo'}" data-punchout-photo="${x.url}">
+              ${isCompletionPhoto?'<span class="punchout-completed-photo-badge">Completed</span>':''}
+              ${canPunchoutEdit(subdivisionForLot(p.lot_id))?`<button class="punchout-markup-btn" type="button" data-markup-punchout="${p.id}" data-markup-path="${esc(x.path)}">✏ Mark Up</button>`:''}
+            </div>`;
+          }).join('')}</div>`:''}
         </div>
       </div>
       <div class="punchout-meta">
@@ -4123,6 +4137,7 @@ async function buildPunchoutPdf(ids){
 
     const photoRows=punchoutPhotos.filter(ph=>ph.punchout_item_id===p.id);
     for(const ph of photoRows){
+      const isCompletionPhoto=String(ph.storage_path||'').split('/').pop().startsWith('completion-');
       const dataUrl=await punchoutPhotoDataUrl(ph.storage_path);
       if(!dataUrl)continue;
       try{
@@ -4134,6 +4149,15 @@ async function buildPunchoutPdf(ids){
         const h=props.height*scale;
         ensure(h+18);
         doc.addImage(dataUrl,props.fileType||'JPEG',margin,y,w,h,undefined,'FAST');
+        if(isCompletionPhoto){
+          doc.setFillColor(20,92,55);
+          doc.setTextColor(255,255,255);
+          doc.setFont('helvetica','bold');
+          doc.setFontSize(9);
+          doc.roundedRect(margin+7,y+h-25,72,18,3,3,'F');
+          doc.text('COMPLETED',margin+14,y+h-12);
+          doc.setTextColor(0,0,0);
+        }
         y+=h+14;
       }catch(err){
         console.warn('Punchout PDF image skipped',err);
