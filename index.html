@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="2026-09-14-checklist-soap-niche">
+<meta name="bowenbuilder-version" content="2026-09-15-checklist-garage-portal-anchors">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -1933,6 +1933,14 @@ button.teams-file-row:hover{border-color:#bdccdd}
 .crew-agent-call:active{transform:translateY(1px)}
 @media(max-width:430px){.crew-agent-actions{grid-template-columns:1fr}.crew-agent-call{min-height:50px}}
 
+
+.checklist-spec{
+  margin-top:4px;
+  color:var(--muted);
+  font-size:12px;
+  line-height:1.35;
+  font-weight:500;
+}
 </style>
 </head>
 <body>
@@ -2729,6 +2737,13 @@ function closeTeamsFileViewer(){
   requestAnimationFrame(()=>window.scrollTo({top:teamsFilesPageScrollY,left:0,behavior:'auto'}));
 }
 
+const LOT_CHECKLIST_SPECS={
+  'Bolt down walls':'Bolts within 12” of break; strap or bolt/anchor every 6’.'
+};
+function lotChecklistSpec(name){
+  return LOT_CHECKLIST_SPECS[name]||'';
+}
+
 const DEFAULT_LOT_CHECKLIST_ITEMS=[
   'Install Temp Pole',
   'Call in Temp Pole Inspection',
@@ -2737,7 +2752,9 @@ const DEFAULT_LOT_CHECKLIST_ITEMS=[
   'Order Slab Materials',
   'Install Island Pipe for Island if Necessary',
   'Order Steps (2nd Floor Decking)',
-  '24” x 14” Soap Niche (54” off floor)'
+  '24” x 14” Soap Niche (54” off floor)',
+  'Bolt down walls',
+  '2 - 4” square washers & 1/2” anchors on each side of garage portal'
 ];
 
 let realtimeRefreshTimer=null;
@@ -4574,7 +4591,7 @@ function renderLotChecklist(){
           data-checklist-index="${index}"
           ${item.complete?'checked':''}
           ${editable?'':'disabled'}>
-        <div class="checklist-row-label">${esc(item.name)}</div>
+        <div class="checklist-row-label">${esc(item.name)}${lotChecklistSpec(item.name)?`<div class="checklist-spec">${esc(lotChecklistSpec(item.name))}</div>`:''}</div>
       </div>
     </div>
   `).join('');
