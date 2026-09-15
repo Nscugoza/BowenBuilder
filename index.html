@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="2026-09-15-punchout-completed-badge-scoped-fixed">
+<meta name="bowenbuilder-version" content="2026-09-15-punchout-trade-categories-custom-v2">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -1951,6 +1951,14 @@ button.teams-file-row:hover{border-color:#bdccdd}
   box-shadow:0 1px 4px rgba(0,0,0,.22);pointer-events:none;
 }
 
+
+.punchout-trade-badge{
+  display:inline-flex;align-items:center;
+  margin:0 0 7px;padding:5px 9px;
+  border-radius:999px;background:#eef4fb;
+  border:1px solid #d8e4f0;color:#244f7e;
+  font-size:11px;font-weight:850;line-height:1.1;
+}
 </style>
 </head>
 <body>
@@ -2382,6 +2390,34 @@ button.teams-file-row:hover{border-color:#bdccdd}
       <h2>Add Punchout Item</h2>
       <button id="punchoutX" class="xbtn" type="button">×</button>
     </div>
+    <label>Trade
+      <select id="punchoutTrade" required>
+        <option value="">Select trade…</option>
+        <option>Framing</option>
+        <option>Windows/Doors</option>
+        <option>Siding</option>
+        <option>Brick</option>
+        <option>Stone</option>
+        <option>Plumbing</option>
+        <option>HVAC</option>
+        <option>Electrical</option>
+        <option>Low Voltage</option>
+        <option>Insulation</option>
+        <option>Drywall</option>
+        <option>Trim</option>
+        <option>Paint</option>
+        <option>Cabinets</option>
+        <option>Counter Top</option>
+        <option>Garage Door</option>
+        <option>Tile</option>
+        <option>Flooring</option>
+        <option>Carpet</option>
+        <option value="__custom__">Other / Custom…</option>
+      </select>
+    </label>
+    <label id="punchoutCustomTradeWrap" class="hidden">Custom Trade
+      <input id="punchoutCustomTrade" type="text" maxlength="80" placeholder="Enter trade name">
+    </label>
     <label>Punchout Item
       <textarea id="punchoutText" rows="5" required placeholder="Describe the item that needs attention..."></textarea>
     </label>
@@ -3408,6 +3444,7 @@ function renderSubdivisionPunchout(){
      const addedBy=profileName(p.created_by);
      const addedDate=p.created_at?new Date(p.created_at).toLocaleDateString():'';
      return `<div class="subdivision-punchout-item">
+       ${p.trade_category?`<div class="punchout-trade-badge">${esc(p.trade_category)}</div>`:''}
        <div class="subdivision-punchout-description">${esc(p.description||'Punchout item')}</div>
        <div class="subdivision-punchout-item-meta">
          ${addedBy?`<span>Added by ${esc(addedBy)}</span>`:''}
@@ -3705,7 +3742,10 @@ async function renderPunchout(lotId){
         ${p.completed?'':`<input class="punchout-select" type="checkbox" data-select-punchout="${p.id}" ${selectedPunchouts.has(p.id)?'checked':''} aria-label="Select punchout item">`}
         <div class="punchout-topline-main">
           <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap">
-            <div class="punchout-text">${esc(p.description)}</div>
+            <div>
+              ${p.trade_category?`<div class="punchout-trade-badge">${esc(p.trade_category)}</div>`:''}
+              <div class="punchout-text">${esc(p.description)}</div>
+            </div>
             <span class="punchout-status ${p.completed?'completed':''}">${status}</span>
           </div>
           ${urls.some(x=>x.url)?(()=>{
@@ -4119,7 +4159,7 @@ async function buildPunchoutPdf(ids){
     ensure(70);
     doc.setFont('helvetica','bold');
     doc.setFontSize(12);
-    doc.text(`Item ${idx+1}`,margin,y);
+    doc.text(`Item ${idx+1}${p.trade_category?' · '+p.trade_category:''}`,margin,y);
     y+=17;
 
     doc.setFont('helvetica','normal');
@@ -4372,15 +4412,20 @@ async function deletePunchoutItem(id){
 
 function openPunchoutDialog(){
   $('punchoutForm').reset();
+  $('punchoutCustomTradeWrap').classList.add('hidden');
+  $('punchoutCustomTrade').required=false;
   $('punchoutDialog').showModal();
 }
 
 async function savePunchout(e){
   e.preventDefault();
   if(!requirePunchoutAddPermission(subdivisionForLot(currentLot)))return;
+  let trade=$('punchoutTrade').value.trim();
+  if(trade==='__custom__')trade=$('punchoutCustomTrade').value.trim();
   const description=$('punchoutText').value.trim();
   const photos=[...($('punchoutPhoto').files||[])];
 
+  if(!trade){alert('Please select a trade or enter a custom trade.');return}
   if(!description){alert('Please enter a punchout item.');return}
   if(!currentLot){alert('No lot selected.');return}
   if(photos.length>12){alert('Please upload no more than 12 photos per punchout item.');return}
@@ -4396,6 +4441,7 @@ async function savePunchout(e){
     .insert({
       lot_id:currentLot,
       description,
+      trade_category:trade,
       created_by:user?.id||null,
       completed:false
     })
@@ -7343,6 +7389,13 @@ $('deleteLotDialog').addEventListener('click',e=>{
 
 
 $('addPunchout').onclick=()=>{if(requirePunchoutAddPermission(subdivisionForLot(currentLot)))openPunchoutDialog()};
+$('punchoutTrade').onchange=()=>{
+  const custom=$('punchoutTrade').value==='__custom__';
+  $('punchoutCustomTradeWrap').classList.toggle('hidden',!custom);
+  $('punchoutCustomTrade').required=custom;
+  if(!custom)$('punchoutCustomTrade').value='';
+  if(custom)setTimeout(()=>$('punchoutCustomTrade').focus(),0);
+};
 $('punchoutForm').onsubmit=savePunchout;
 $('punchoutX').onclick=()=>$('punchoutDialog').close();
 $('punchoutCancel').onclick=()=>$('punchoutDialog').close();
