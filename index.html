@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="2026-09-16-schedule-inspection-external-browser">
+<meta name="bowenbuilder-version" content="2026-09-16-calendar-move-scheduled-item">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -1984,6 +1984,47 @@ button.teams-file-row:hover{border-color:#bdccdd}
 .teams-viewer-actions #teamsFileViewerOpen{grid-column:1/-1!important}
 .teams-viewer-actions #teamsFileViewerShare,.teams-viewer-actions #teamsFileViewerCopy{min-height:48px!important}
 
+
+.calendar-move-banner{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin:0 0 10px;
+  padding:11px 12px;
+  border:1px solid #9fc0e5;
+  border-radius:14px;
+  background:#eef6ff;
+  color:#173f6c;
+}
+.calendar-move-banner #calendarMoveHelp{font-size:12px;margin-top:3px;color:#496985}
+.calendar-move-banner button{flex:0 0 auto}
+.bb-calendar-day.move-target{cursor:pointer}
+.bb-calendar-day.move-target::before{
+  content:"";
+  position:absolute;
+  inset:3px;
+  border:2px dashed rgba(23,79,134,.30);
+  border-radius:8px;
+  pointer-events:none;
+}
+.bb-calendar-day.move-target:hover::before{border-color:#174f86}
+.calendar-item-actions{display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end}
+.calendar-move-btn{
+  background:#eef6ff;
+  color:#174f86;
+  border:1px solid #bcd2e9;
+  border-radius:12px;
+  padding:9px 12px;
+  font-weight:800;
+}
+@media(max-width:640px){
+  .calendar-move-banner{align-items:flex-start}
+  .bb-calendar-selected-item{align-items:flex-start}
+  .calendar-item-actions{width:auto;flex-direction:column}
+  .calendar-item-actions button{min-width:74px}
+}
+
 </style>
 </head>
 <body>
@@ -2157,6 +2198,13 @@ button.teams-file-row:hover{border-color:#bdccdd}
         <div class="bb-calendar-actions">
           <button id="calendarToday" class="secondary" type="button">Today</button>
           <span class="called-in-help">Double-click / double-tap a date to mark Called In ✓ · E/T appear after Email Date or Text Date is opened</span>
+        </div>
+        <div id="calendarMoveBanner" class="calendar-move-banner hidden">
+          <div>
+            <strong id="calendarMoveTitle">Move scheduled item</strong>
+            <div id="calendarMoveHelp">Tap the new start day on the calendar.</div>
+          </div>
+          <button id="calendarMoveCancel" class="secondary" type="button">Cancel</button>
         </div>
         <div class="bb-calendar-weekdays" aria-hidden="true">
           <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
@@ -4862,6 +4910,8 @@ let scheduleContext='lot';
 let scheduleCalendarCursor=new Date();
 scheduleCalendarCursor=new Date(scheduleCalendarCursor.getFullYear(),scheduleCalendarCursor.getMonth(),1);
 let scheduleSelectedDate='';
+let scheduleMoveItemId='';
+let scheduleMoveBusy=false;
 
 function localDateKey(d){
  const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),day=String(d.getDate()).padStart(2,'0');
@@ -4876,6 +4926,93 @@ function itemEndKey(item){return dateInputValue(item.ends_at||item.starts_at)}
 function itemOccursOn(item,key){
  const s=itemStartKey(item),e=itemEndKey(item);
  return !!s && key>=s && key<=e;
+}
+
+function calendarDaysBetween(startKey,endKey){
+ const a=String(startKey||'').split('-').map(Number);
+ const b=String(endKey||'').split('-').map(Number);
+ if(a.length!==3||b.length!==3||a.some(Number.isNaN)||b.some(Number.isNaN))return 0;
+ return Math.max(0,Math.round((Date.UTC(b[0],b[1]-1,b[2])-Date.UTC(a[0],a[1]-1,a[2]))/86400000));
+}
+function calendarAddDays(dateKey,days){
+ const p=String(dateKey||'').split('-').map(Number);
+ if(p.length!==3||p.some(Number.isNaN))return '';
+ const d=new Date(Date.UTC(p[0],p[1]-1,p[2]+Number(days||0)));
+ return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`;
+}
+function cancelScheduleMove(render=true){
+ scheduleMoveItemId='';
+ scheduleMoveBusy=false;
+ if(render && currentScreen()==='schedule' && scheduleViewMode==='calendar')renderScheduleCalendar();
+}
+function beginScheduleMove(id){
+ const item=items.find(x=>String(x.id)===String(id));
+ if(!item)return;
+ if(!requireEditPermission(subdivisionForLot(item.lot_id)))return;
+ scheduleMoveItemId=String(id);
+ scheduleMoveBusy=false;
+ renderScheduleCalendar();
+ const grid=$('calendarGrid');
+ if(grid)grid.scrollIntoView({behavior:'smooth',block:'center'});
+}
+function renderScheduleMoveBanner(){
+ const banner=$('calendarMoveBanner');
+ if(!banner)return;
+ const item=items.find(x=>String(x.id)===String(scheduleMoveItemId));
+ const active=!!item;
+ banner.classList.toggle('hidden',!active);
+ if(!active)return;
+ const start=itemStartKey(item);
+ const end=itemEndKey(item);
+ const range=end&&end!==start?`${start} → ${end}`:start;
+ $('calendarMoveTitle').textContent=`Moving ${item.name||'scheduled item'}`;
+ $('calendarMoveHelp').textContent=`Current date${end&&end!==start?'s':''}: ${range}. Tap the new start day.`;
+}
+async function moveScheduleItemToDate(id,newStartKey){
+ if(scheduleMoveBusy)return;
+ const item=items.find(x=>String(x.id)===String(id));
+ if(!item)return cancelScheduleMove();
+ if(!requireEditPermission(subdivisionForLot(item.lot_id))){cancelScheduleMove();return}
+ const oldStart=itemStartKey(item);
+ const oldEnd=itemEndKey(item)||oldStart;
+ if(!oldStart)return;
+ if(newStartKey===oldStart){
+   scheduleMoveItemId='';
+   renderScheduleCalendar();
+   return;
+ }
+ const duration=calendarDaysBetween(oldStart,oldEnd);
+ const newEndKey=calendarAddDays(newStartKey,duration);
+ const oldSnapshot={...item};
+ scheduleMoveBusy=true;
+ renderScheduleMoveBanner();
+ try{
+   const {data,error}=await db.from('schedule_items')
+     .update({
+       starts_at:newStartKey+'T12:00:00Z',
+       ends_at:newEndKey+'T12:00:00Z'
+     })
+     .eq('id',item.id)
+     .select()
+     .single();
+   if(error)throw error;
+
+   const idx=items.findIndex(x=>String(x.id)===String(item.id));
+   if(idx>=0)items[idx]=data;
+   await cleanupCalendarMarksForDeletedItem(oldSnapshot);
+
+   scheduleSelectedDate=newStartKey;
+   const d=dateFromKey(newStartKey);
+   if(d)scheduleCalendarCursor=new Date(d.getFullYear(),d.getMonth(),1);
+   scheduleMoveItemId='';
+   scheduleMoveBusy=false;
+   await loadCalendarCalledInMarks();
+   renderScheduleCalendar();
+ }catch(err){
+   scheduleMoveBusy=false;
+   alert(`Could not move this schedule item: ${err?.message||err}`);
+   renderScheduleCalendar();
+ }
 }
 
 function itemDateKeys(item){
@@ -5057,6 +5194,7 @@ function calendarDayStatus(dayItems){
 
 function renderScheduleCalendar(){
  const grid=$('calendarGrid'); if(!grid)return;
+ renderScheduleMoveBanner();
  const y=scheduleCalendarCursor.getFullYear(),m=scheduleCalendarCursor.getMonth();
  $('calendarMonthTitle').textContent=scheduleCalendarCursor.toLocaleDateString(undefined,{month:'long',year:'numeric'});
  grid.innerHTML='';
@@ -5078,6 +5216,7 @@ function renderScheduleCalendar(){
    if(isCalledInDate(key))btn.classList.add('called-in');
    if(key===today)btn.classList.add('today');
    if(key===scheduleSelectedDate)btn.classList.add('selected');
+   if(scheduleMoveItemId)btn.classList.add('move-target');
    btn.setAttribute('aria-label',`${d.toLocaleDateString()}, ${dayItems.length} schedule item${dayItems.length===1?'':'s'}`);
    const eventHtml=dayItems.slice(0,3).map(x=>`<span class="bb-calendar-event ${esc(x.status||'scheduled')}" title="${esc(x.name)}">${esc(x.name)}</span>`).join('');
    const commHtml=(wasEmailedDate(key)||wasTextedDate(key))
@@ -5086,6 +5225,10 @@ function renderScheduleCalendar(){
    btn.innerHTML=`<span class="bb-calendar-number">${d.getDate()}</span>${commHtml}<div class="bb-calendar-events">${eventHtml}</div>${dayItems.length>3?`<div class="bb-calendar-more">+${dayItems.length-3} more</div>`:''}`;
    let lastTapAt=0;
    btn.addEventListener('click',()=>{
+     if(scheduleMoveItemId){
+       moveScheduleItemToDate(scheduleMoveItemId,key);
+       return;
+     }
      const now=Date.now();
      if(now-lastTapAt<330){
        lastTapAt=0;
@@ -5100,6 +5243,7 @@ function renderScheduleCalendar(){
    });
    btn.addEventListener('dblclick',e=>{
      e.preventDefault();
+     if(scheduleMoveItemId)return;
      lastTapAt=0;
      toggleCalledInDate(key);
    });
@@ -6981,9 +7125,20 @@ function renderSelectedScheduleDay(){
          <div class="bb-calendar-selected-title">${esc(scheduleLotName(i))} · ${esc(i.name)}</div>
          <div class="bb-calendar-selected-meta">${esc(statusDisplay(i.status))}${i.crew?' · '+esc(i.crew):''}</div>
        </div>
-       <button class="secondary" type="button" data-calendar-edit="${i.id}">Edit</button>
+       <div class="calendar-item-actions">
+         <button class="calendar-move-btn" type="button" data-calendar-move="${i.id}">Move</button>
+         <button class="secondary" type="button" data-calendar-edit="${i.id}">Edit</button>
+       </div>
      </div>
    </div>`).join(''):'<div class="muted">Nothing scheduled for this day.</div>';
+
+ document.querySelectorAll('[data-calendar-move]').forEach(b=>b.onclick=e=>{
+   e.preventDefault();
+   e.stopPropagation();
+   const row=b.closest('.bb-swipe-row');
+   if(row?.classList.contains('swiped'))row.classList.remove('swiped');
+   beginScheduleMove(b.dataset.calendarMove);
+ });
 
  document.querySelectorAll('[data-calendar-edit]').forEach(b=>b.onclick=()=>{
    const row=b.closest('.bb-swipe-row');
@@ -7241,11 +7396,12 @@ $('calendarBackToLot').onclick=()=>{
  showLot();
 };
 $('schedulePageAdd').onclick=()=>openScheduleDialogLive('','schedule',scheduleSelectedDate||todayInput());
+if($('calendarMoveCancel'))$('calendarMoveCancel').onclick=()=>cancelScheduleMove();
 $('calendarEmailSelected').onclick=emailSelectedCalendarDate;
 $('calendarTextSelected').onclick=textSelectedCalendarDate;
 $('calendarAddSelected').onclick=()=>openScheduleDialogLive('','schedule',scheduleSelectedDate||todayInput());
 $('scheduleCalendarMode').onclick=()=>setScheduleViewMode('calendar');
-$('scheduleListMode').onclick=()=>setScheduleViewMode('list');
+$('scheduleListMode').onclick=()=>{cancelScheduleMove(false);setScheduleViewMode('list')};
 $('calendarPrev').onclick=()=>{scheduleCalendarCursor=new Date(scheduleCalendarCursor.getFullYear(),scheduleCalendarCursor.getMonth()-1,1);renderScheduleCalendar()};
 $('calendarNext').onclick=()=>{scheduleCalendarCursor=new Date(scheduleCalendarCursor.getFullYear(),scheduleCalendarCursor.getMonth()+1,1);renderScheduleCalendar()};
 $('calendarToday').onclick=()=>{const n=new Date();scheduleSelectedDate=localDateKey(n);scheduleCalendarCursor=new Date(n.getFullYear(),n.getMonth(),1);renderScheduleCalendar()};
