@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="2026-09-16-teams-share-file-copy-link">
+<meta name="bowenbuilder-version" content="2026-09-16-teams-share-buttons-everywhere">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -1974,6 +1974,15 @@ button.teams-file-row:hover{border-color:#bdccdd}
   .teams-file-share-actions{width:100%;padding-left:42px}
   .teams-file-small-action{min-height:40px}
 }
+
+
+.teams-file-share-row{display:flex!important;flex-wrap:wrap!important;align-items:center!important;padding:10px 12px!important;gap:8px!important}
+.teams-file-share-row .teams-file-open-area{flex:1 1 100%!important;padding:4px 0 8px!important}
+.teams-file-share-row .teams-file-share-actions{display:flex!important;width:100%!important;gap:8px!important;padding:0 0 2px 42px!important}
+.teams-file-share-row .teams-file-small-action{display:inline-flex!important;align-items:center;justify-content:center;min-height:42px!important}
+.teams-viewer-actions{display:grid!important;grid-template-columns:1fr 1fr!important;gap:8px!important}
+.teams-viewer-actions #teamsFileViewerOpen{grid-column:1/-1!important}
+.teams-viewer-actions #teamsFileViewerShare,.teams-viewer-actions #teamsFileViewerCopy{min-height:48px!important}
 
 </style>
 </head>
@@ -5989,6 +5998,7 @@ function overviewScheduleItemMessage(item,planUrl='',includePlans=false,renderin
 
 
 let teamsFilesStableMinHeight=0;
+let teamsViewerCurrentFile=null;
 
 function beginTeamsFilesNavigation(){
   const grid=$('filesGrid');
@@ -6153,7 +6163,7 @@ function renderTeamsFileRows(rows,kind){
         <span class="teams-file-row-main"><span class="teams-file-row-name">${esc(item.name||'File')}</span><span class="teams-file-row-meta">${esc(meta)}</span></span>
       </button>
       <div class="teams-file-share-actions">
-        <button class="secondary teams-file-small-action" type="button" data-share-drive-item="${esc(item.id)}">Share</button>
+        <button class="primary teams-file-small-action" type="button" data-share-drive-item="${esc(item.id)}">↗ Share File</button>
         <button class="secondary teams-file-small-action" type="button" data-copy-drive-link="${esc(item.id)}">Copy Link</button>
       </div>
     </div>`;
@@ -6306,12 +6316,49 @@ async function copyTeamsDriveLink(item){
   }
 }
 
+
+async function shareTeamsViewerFile(){
+  const item=teamsViewerCurrentFile;
+  if(!item?.id||!item?.driveId){alert('Open a Teams file first.');return}
+  try{
+    const token=await microsoftProviderToken();
+    if(!token)throw new Error('Microsoft access expired. Sign in again and try once more.');
+    const r=await fetch(`https://graph.microsoft.com/v1.0/drives/${encodeURIComponent(item.driveId)}/items/${encodeURIComponent(item.id)}/content`,{headers:{Authorization:`Bearer ${token}`}});
+    if(!r.ok)throw new Error(`Microsoft could not download this file (${r.status}).`);
+    const blob=await r.blob();
+    const file=new File([blob],item.name||'Teams file',{type:blob.type||'application/octet-stream'});
+    if(navigator.share && (!navigator.canShare || navigator.canShare({files:[file]}))){
+      await navigator.share({files:[file],title:item.name||'Teams file'});
+      return;
+    }
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');a.href=url;a.download=item.name||'Teams file';
+    document.body.appendChild(a);a.click();a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),30000);
+    alert('This browser cannot share the file directly. The file was downloaded instead.');
+  }catch(err){
+    if(err?.name==='AbortError')return;
+    alert(`Teams file could not be shared: ${err?.message||err}`);
+  }
+}
+async function copyTeamsViewerLink(){
+  const link=String(teamsViewerCurrentFile?.webUrl||'').trim();
+  if(!link){alert('Microsoft did not provide a link for this file.');return}
+  try{await navigator.clipboard.writeText(link);alert('Teams file link copied.');}
+  catch{
+    const ta=document.createElement('textarea');ta.value=link;ta.style.position='fixed';ta.style.left='-9999px';
+    document.body.appendChild(ta);ta.select();const ok=document.execCommand('copy');ta.remove();
+    alert(ok?'Teams file link copied.':'Copy was blocked by this browser.');
+  }
+}
+
 async function openTeamsDriveItem(itemId,name){
   if(!teamsFilesState.driveId)return;
   return openTeamsDriveItemFromDrive(teamsFilesState.driveId,itemId,name);
 }
 
 async function openTeamsDriveItemFromDrive(driveId,itemId,name,knownWebUrl=''){
+  teamsViewerCurrentFile={id:itemId,name:name||'Teams file',webUrl:knownWebUrl||'',driveId};
   if(!driveId||!itemId)return;
   cleanupTeamsPreviewObjectUrl();
   openTeamsFileViewerShell(name);
@@ -6325,6 +6372,7 @@ async function openTeamsDriveItemFromDrive(driveId,itemId,name,knownWebUrl=''){
       const meta=await microsoftGraphJson(`/drives/${encodeURIComponent(driveId)}/items/${encodeURIComponent(itemId)}?$select=webUrl`);
       openUrl=meta?.webUrl||'';
     }catch(_){ }
+    teamsViewerCurrentFile={id:itemId,name:name||'Teams file',webUrl:openUrl||'',driveId};
     $('teamsFileViewerOpen').href=openUrl||'#';
     $('teamsFileViewerOpen').classList.toggle('hidden',!openUrl);
 
@@ -7911,6 +7959,10 @@ $('documentViewerClose').onclick=()=>$('documentViewerDialog').close();
 $('documentViewerDialog').addEventListener('click',e=>{if(e.target===e.currentTarget)$('documentViewerDialog').close()});
 
 document.addEventListener('click',e=>{
+  const shareBtn=e.target.closest?.('#teamsFileViewerShare');
+  if(shareBtn){e.preventDefault();e.stopPropagation();shareTeamsViewerFile();return}
+  const copyBtn=e.target.closest?.('#teamsFileViewerCopy');
+  if(copyBtn){e.preventDefault();e.stopPropagation();copyTeamsViewerLink();return}
   const closeBtn=e.target.closest?.('#teamsFileViewerClose');
   if(closeBtn){e.preventDefault();e.stopPropagation();closeTeamsFileViewer();}
 });
@@ -7989,6 +8041,8 @@ try{
   </div>
   <div id="teamsFileViewerBody" class="teams-viewer-body"></div>
   <div class="teams-viewer-actions">
+    <button id="teamsFileViewerShare" class="primary" type="button">↗ Share File</button>
+    <button id="teamsFileViewerCopy" class="secondary" type="button">Copy Link</button>
     <a id="teamsFileViewerOpen" class="secondary hidden" href="#" target="_blank" rel="noopener">Open in Microsoft 365</a>
   </div>
 </div>
