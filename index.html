@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="2026-09-15-punchout-trade-categories-custom-v2">
+<meta name="bowenbuilder-version" content="2026-09-16-teams-share-file-copy-link">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -1959,6 +1959,22 @@ button.teams-file-row:hover{border-color:#bdccdd}
   border:1px solid #d8e4f0;color:#244f7e;
   font-size:11px;font-weight:850;line-height:1.1;
 }
+
+.teams-file-share-row{display:flex;align-items:center;gap:8px;padding-right:10px}
+.teams-file-open-area{
+  flex:1;min-width:0;display:flex;align-items:center;gap:12px;
+  padding:12px 4px 12px 12px;border:0;background:transparent;
+  color:inherit;text-align:left;font:inherit;cursor:pointer;
+}
+.teams-file-share-actions{display:flex;gap:6px;flex:0 0 auto}
+.teams-file-small-action{padding:7px 9px;min-height:36px;font-size:12px;white-space:nowrap}
+@media(max-width:520px){
+  .teams-file-share-row{align-items:stretch;flex-wrap:wrap;padding:0 10px 10px}
+  .teams-file-open-area{flex-basis:100%;padding:12px 2px 4px}
+  .teams-file-share-actions{width:100%;padding-left:42px}
+  .teams-file-small-action{min-height:40px}
+}
+
 </style>
 </head>
 <body>
@@ -6128,11 +6144,33 @@ function renderTeamsFileRows(rows,kind){
   grid.innerHTML=rows.map(item=>{
     const isFolder=!!item.folder;
     const meta=isFolder?`${item.folder?.childCount??''} item${item.folder?.childCount===1?'':'s'}`:[teamsFilesFormatBytes(item.size),item.lastModifiedDateTime?new Date(item.lastModifiedDateTime).toLocaleDateString():null].filter(Boolean).join(' · ');
-    return `<button class="teams-file-row" type="button" data-drive-item="${esc(item.id)}" data-drive-name="${esc(item.name||'File')}" data-drive-folder="${isFolder?'1':'0'}"><span class="teams-file-row-icon">${teamsFilesIcon(item)}</span><span class="teams-file-row-main"><span class="teams-file-row-name">${esc(item.name||'File')}</span><span class="teams-file-row-meta">${esc(meta)}</span></span><span class="teams-file-row-arrow">›</span></button>`;
+    if(isFolder){
+      return `<button class="teams-file-row" type="button" data-drive-item="${esc(item.id)}" data-drive-name="${esc(item.name||'Folder')}" data-drive-folder="1"><span class="teams-file-row-icon">${teamsFilesIcon(item)}</span><span class="teams-file-row-main"><span class="teams-file-row-name">${esc(item.name||'Folder')}</span><span class="teams-file-row-meta">${esc(meta)}</span></span><span class="teams-file-row-arrow">›</span></button>`;
+    }
+    return `<div class="teams-file-row teams-file-share-row">
+      <button class="teams-file-open-area" type="button" data-drive-item="${esc(item.id)}" data-drive-name="${esc(item.name||'File')}" data-drive-folder="0">
+        <span class="teams-file-row-icon">${teamsFilesIcon(item)}</span>
+        <span class="teams-file-row-main"><span class="teams-file-row-name">${esc(item.name||'File')}</span><span class="teams-file-row-meta">${esc(meta)}</span></span>
+      </button>
+      <div class="teams-file-share-actions">
+        <button class="secondary teams-file-small-action" type="button" data-share-drive-item="${esc(item.id)}">Share</button>
+        <button class="secondary teams-file-small-action" type="button" data-copy-drive-link="${esc(item.id)}">Copy Link</button>
+      </div>
+    </div>`;
   }).join('');
+
   grid.querySelectorAll('[data-drive-item]').forEach(b=>b.onclick=()=>{
     if(b.dataset.driveFolder==='1')openTeamsFolder(b.dataset.driveItem,b.dataset.driveName);
     else openTeamsDriveItem(b.dataset.driveItem,b.dataset.driveName);
+  });
+
+  grid.querySelectorAll('[data-share-drive-item]').forEach(b=>b.onclick=async()=>{
+    const item=rows.find(x=>String(x.id)===String(b.dataset.shareDriveItem));
+    if(item)await shareTeamsDriveItem(item);
+  });
+  grid.querySelectorAll('[data-copy-drive-link]').forEach(b=>b.onclick=async()=>{
+    const item=rows.find(x=>String(x.id)===String(b.dataset.copyDriveLink));
+    if(item)await copyTeamsDriveLink(item);
   });
 }
 
@@ -6212,6 +6250,60 @@ async function openTeamsFolder(itemId,name){
 
 function cleanupTeamsPreviewObjectUrl(){
   if(teamsPreviewObjectUrl){try{URL.revokeObjectURL(teamsPreviewObjectUrl)}catch(_){ }teamsPreviewObjectUrl='';}
+}
+
+
+async function teamsDriveItemBlob(item){
+  if(!teamsFilesState.driveId)throw new Error('Teams drive is not available.');
+  const token=await microsoftProviderToken();
+  if(!token)throw new Error('Microsoft access expired. Sign in again and try once more.');
+  const response=await fetch(`https://graph.microsoft.com/v1.0/drives/${encodeURIComponent(teamsFilesState.driveId)}/items/${encodeURIComponent(item.id)}/content`,{
+    headers:{Authorization:`Bearer ${token}`}
+  });
+  if(!response.ok)throw new Error(`Microsoft could not download this file (${response.status}).`);
+  return await response.blob();
+}
+
+async function shareTeamsDriveItem(item){
+  try{
+    const blob=await teamsDriveItemBlob(item);
+    const file=new File([blob],item.name||'Teams file',{type:blob.type||item.file?.mimeType||'application/octet-stream'});
+    if(navigator.share && (!navigator.canShare || navigator.canShare({files:[file]}))){
+      await navigator.share({files:[file],title:item.name||'Teams file'});
+      return;
+    }
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;
+    a.download=item.name||'Teams file';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),30000);
+    alert('This browser cannot share the file directly. The file was downloaded instead.');
+  }catch(err){
+    if(err?.name==='AbortError')return;
+    alert(`Teams file could not be shared: ${err?.message||err}`);
+  }
+}
+
+async function copyTeamsDriveLink(item){
+  const link=String(item?.webUrl||'').trim();
+  if(!link){alert('Microsoft did not provide a link for this file.');return}
+  try{
+    await navigator.clipboard.writeText(link);
+    alert('Teams file link copied.');
+  }catch{
+    const ta=document.createElement('textarea');
+    ta.value=link;
+    ta.style.position='fixed';
+    ta.style.left='-9999px';
+    document.body.appendChild(ta);
+    ta.select();
+    const ok=document.execCommand('copy');
+    ta.remove();
+    alert(ok?'Teams file link copied.':'Copy was blocked by this browser.');
+  }
 }
 
 async function openTeamsDriveItem(itemId,name){
