@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="2026-09-16-calendar-move-scheduled-item">
+<meta name="bowenbuilder-version" content="2026-09-17-double-tap-copy-lot-info">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -2023,6 +2023,33 @@ button.teams-file-row:hover{border-color:#bdccdd}
   .bb-calendar-selected-item{align-items:flex-start}
   .calendar-item-actions{width:auto;flex-direction:column}
   .calendar-item-actions button{min-width:74px}
+}
+
+
+.copyable-lot-info{
+  position:relative;
+  cursor:pointer;
+  touch-action:manipulation;
+  -webkit-tap-highlight-color:rgba(23,79,134,.08);
+}
+.copyable-lot-info.copy-flash{
+  border-color:#6f9fd2;
+  box-shadow:0 0 0 3px rgba(47,111,188,.12),0 8px 20px rgba(24,50,82,.05);
+}
+.copy-info-toast{
+  position:fixed;
+  left:50%;
+  bottom:max(22px,env(safe-area-inset-bottom));
+  transform:translateX(-50%);
+  z-index:1000005;
+  background:#10243e;
+  color:#fff;
+  border-radius:999px;
+  padding:10px 15px;
+  font-size:13px;
+  font-weight:800;
+  box-shadow:0 8px 24px rgba(0,0,0,.22);
+  pointer-events:none;
 }
 
 </style>
@@ -4618,6 +4645,68 @@ function ensureLotCalendarVisible(){
 }
 
 
+
+let lotInfoCopyLastTap={el:null,at:0};
+
+function showLotInfoCopyToast(message='Copied'){
+  let toast=document.getElementById('copyInfoToast');
+  if(!toast){
+    toast=document.createElement('div');
+    toast.id='copyInfoToast';
+    toast.className='copy-info-toast hidden';
+    document.body.appendChild(toast);
+  }
+  toast.textContent=message;
+  toast.classList.remove('hidden');
+  clearTimeout(showLotInfoCopyToast._timer);
+  showLotInfoCopyToast._timer=setTimeout(()=>toast.classList.add('hidden'),1200);
+}
+
+async function copyLotInfoCard(card){
+  if(!card)return;
+  const value=card.querySelector('[data-copy-value]');
+  let copyText=String(value?.innerText||value?.textContent||'').trim();
+  if(!copyText || copyText==='Not added')return;
+  copyText=copyText.replace(/\n{3,}/g,'\n\n').trim();
+  try{
+    await navigator.clipboard.writeText(copyText);
+  }catch(_){
+    const ta=document.createElement('textarea');
+    ta.value=copyText;
+    ta.style.position='fixed';
+    ta.style.left='-9999px';
+    ta.style.top='0';
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    const ok=document.execCommand('copy');
+    ta.remove();
+    if(!ok){alert('Copy was blocked by this browser.');return}
+  }
+  card.classList.add('copy-flash');
+  setTimeout(()=>card.classList.remove('copy-flash'),450);
+  showLotInfoCopyToast('Copied');
+}
+
+function wireLotInfoDoubleTapCopy(){
+  document.querySelectorAll('[data-copy-lot-info]').forEach(card=>{
+    card.ondblclick=e=>{
+      e.preventDefault();
+      copyLotInfoCard(card);
+    };
+    card.onclick=e=>{
+      const now=Date.now();
+      if(lotInfoCopyLastTap.el===card && now-lotInfoCopyLastTap.at<360){
+        e.preventDefault();
+        lotInfoCopyLastTap={el:null,at:0};
+        copyLotInfoCard(card);
+        return;
+      }
+      lotInfoCopyLastTap={el:card,at:now};
+    };
+  });
+}
+
 function wireScheduleInspectionExternal(){
   document.querySelectorAll('[data-schedule-inspection-url]').forEach(link=>{
     link.onclick=()=>{
@@ -4665,7 +4754,7 @@ function showLot(preserveScroll=false){
  const storedDocs=[['Plans',l.plans_file_path],['Redlined Plan',l.redlined_plan_file_path],['HLP',l.hlp_file_path],['LGP',l.lgp_file_path]].filter(x=>x[1]);
  const teamsDocs=[['Deco Sheet',l.deco_url],['HLP',l.hlp_url],['LGP',l.lgp_url]].filter(x=>parseTeamsDocumentRef(x[1]));
  const externalLegacyDocs=[['Deco Sheet',l.deco_url],['HLP',l.hlp_url],['LGP',l.lgp_url]].filter(x=>x[1]&&!parseTeamsDocumentRef(x[1])&&safe(x[1]));
- $('lotInfo').innerHTML=`<div class="info-grid"><div class="info"><small>Address</small><strong>${esc(l.address||'Not added')}</strong></div><div class="info"><small>Permit Number</small><strong>${esc(l.permit_number||'Not added')}</strong></div><div class="info"><small>Plan</small><strong>${esc(l.plan_name||'Not added')}</strong></div><div class="info"><small>Included Options</small><div class="included-options-detail">${includedOptionsBullets(l.included_options)}</div></div><div class="info"><small>County</small><strong>${esc(l.county||'Not added')}</strong></div></div>${(links.length||storedDocs.length||teamsDocs.length||externalLegacyDocs.length)?`<div class="resource-row">${storedDocs.filter(x=>!teamsDocs.some(t=>t[0]===x[0])).map(x=>`<button type="button" class="document-resource" data-lot-document="${esc(x[1])}" data-document-title="${esc(x[0])}">${esc(x[0])} ▣</button>`).join('')}${teamsDocs.map(x=>`<button type="button" class="document-resource" data-lot-teams-document="${esc(x[1])}" data-document-title="${esc(x[0])}">${esc(x[0])} ▣</button>`).join('')}${links.map(x=>`<a href="${safe(x[1])}" target="_blank" rel="noopener noreferrer" data-schedule-inspection-url="${safe(x[1])}">${x[0]} ↗</a>`).join('')}${externalLegacyDocs.filter(x=>!storedDocs.some(d=>d[0]===x[0])).map(x=>`<a href="${safe(x[1])}" target="_blank">${x[0]} ↗</a>`).join('')}</div>`:''}${l.color_rendering_url?`<div class="card" style="margin-top:14px"><small class="muted">Color Rendering</small><div style="margin-top:8px"><img src="${l.color_rendering_url}" alt="${esc(l.lot_name)} color rendering" style="max-width:100%;max-height:320px;border-radius:14px;cursor:zoom-in" id="liveRendering"></div></div>`:''}`;
+ $('lotInfo').innerHTML=`<div class="info-grid"><div class="info copyable-lot-info" data-copy-lot-info><small>Address</small><strong data-copy-value>${esc(l.address||'Not added')}</strong></div><div class="info copyable-lot-info" data-copy-lot-info><small>Permit Number</small><strong data-copy-value>${esc(l.permit_number||'Not added')}</strong></div><div class="info copyable-lot-info" data-copy-lot-info><small>Plan</small><strong data-copy-value>${esc(l.plan_name||'Not added')}</strong></div><div class="info copyable-lot-info" data-copy-lot-info><small>Included Options</small><div class="included-options-detail" data-copy-value>${includedOptionsBullets(l.included_options)}</div></div><div class="info"><small>County</small><strong>${esc(l.county||'Not added')}</strong></div></div>${(links.length||storedDocs.length||teamsDocs.length||externalLegacyDocs.length)?`<div class="resource-row">${storedDocs.filter(x=>!teamsDocs.some(t=>t[0]===x[0])).map(x=>`<button type="button" class="document-resource" data-lot-document="${esc(x[1])}" data-document-title="${esc(x[0])}">${esc(x[0])} ▣</button>`).join('')}${teamsDocs.map(x=>`<button type="button" class="document-resource" data-lot-teams-document="${esc(x[1])}" data-document-title="${esc(x[0])}">${esc(x[0])} ▣</button>`).join('')}${links.map(x=>`<a href="${safe(x[1])}" target="_blank" rel="noopener noreferrer" data-schedule-inspection-url="${safe(x[1])}">${x[0]} ↗</a>`).join('')}${externalLegacyDocs.filter(x=>!storedDocs.some(d=>d[0]===x[0])).map(x=>`<a href="${safe(x[1])}" target="_blank">${x[0]} ↗</a>`).join('')}</div>`:''}${l.color_rendering_url?`<div class="card" style="margin-top:14px"><small class="muted">Color Rendering</small><div style="margin-top:8px"><img src="${l.color_rendering_url}" alt="${esc(l.lot_name)} color rendering" style="max-width:100%;max-height:320px;border-radius:14px;cursor:zoom-in" id="liveRendering"></div></div>`:''}`;
  const editAllowed=canEditSubdivision(l.subdivision_id);
  $('editLot').classList.toggle('hidden',!editAllowed);
  $('crewQrBtn').classList.toggle('hidden',!isBowenBuilderAdmin());
@@ -4678,6 +4767,7 @@ function showLot(preserveScroll=false){
  wireLotDocumentButtons();
  wireLotTeamsDocumentButtons();
  wireScheduleInspectionExternal();
+ wireLotInfoDoubleTapCopy();
  const liveRendering=$('liveRendering');
  if(liveRendering){
    liveRendering.onclick=()=>openRenderingViewer(l.color_rendering_url);
