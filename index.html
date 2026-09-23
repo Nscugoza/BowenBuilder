@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="2026-09-23-barrow-worksheet-inspection-sync">
+<meta name="bowenbuilder-version" content="2026-09-23-barrow-ocr-autocalendar-reinspection">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -2499,7 +2499,7 @@ button.teams-file-row:hover{border-color:#bdccdd}
       <div id="adminInspectionEmailPanel" class="hidden">
         <div class="card admin-note">
           <strong>Inspection Email Sync</strong>
-          <div class="muted" style="margin-top:5px">Reads approved inspection-result emails from your signed-in Microsoft mailbox and updates matching BowenBuilder inspection statuses. It processes Right Choice / Vallus emails by subdivision + lot. For Barrow County Tyler emails, it matches Permit Number + Address and reads the attached inspection worksheet to determine the inspection result.</div>
+          <div class="muted" style="margin-top:5px">Reads approved inspection-result emails from your signed-in Microsoft mailbox and updates matching BowenBuilder inspection statuses. It processes Right Choice / Vallus emails by subdivision + lot. For Barrow County Tyler emails, it matches Permit Number + Address, reads the attached inspection worksheet (including scanned PDFs/images with OCR), finds the inspection date/type/result, and automatically adds or updates that inspection on the lot calendar. Reinspections are kept as separate calendar events.</div>
         </div>
 
         <div class="card inspection-email-sync-card">
@@ -6455,7 +6455,9 @@ async function readBarrowInspectionWorksheet(messageId){
       || type.includes('pdf')
       || name.endsWith('.docx')
       || name.endsWith('.txt')
-      || type.startsWith('text/');
+      || type.startsWith('text/')
+      || type.startsWith('image/')
+      || /\.(png|jpe?g|webp|tiff?|bmp)$/i.test(name);
   });
 
   for(const att of likely){
@@ -6547,6 +6549,323 @@ function inspectionStatusFromWorksheetText(value){
   return '';
 }
 
+
+function worksheetDateToKey(value){
+  const raw=String(value||'').trim();
+  if(!raw)return '';
+
+  let m=raw.match(/\b(20\d{2})[-\/](\d{1,2})[-\/](\d{1,2})\b/);
+  if(m){
+    const y=Number(m[1]),mo=Number(m[2]),d=Number(m[3]);
+    if(mo>=1&&mo<=12&&d>=1&&d<=31)return `${y}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+  }
+
+  m=raw.match(/\b(\d{1,2})[\/\-](\d{1,2})[\/\-](20\d{2}|\d{2})\b/);
+  if(m){
+    const mo=Number(m[1]),d=Number(m[2]);
+    let y=Number(m[3]); if(y<100)y+=2000;
+    if(mo>=1&&mo<=12&&d>=1&&d<=31)return `${y}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+  }
+
+  const parsed=new Date(raw);
+  if(!Number.isNaN(parsed.getTime())){
+    return `${parsed.getFullYear()}-${String(parsed.getMonth()+1).padStart(2,'0')}-${String(parsed.getDate()).padStart(2,'0')}`;
+  }
+  return '';
+}
+
+function inspectionDateFromWorksheetText(value){
+  const raw=String(value||'');
+  const lines=raw.split(/\r?\n/).map(x=>x.replace(/\s+/g,' ').trim()).filter(Boolean);
+
+  // Prefer the date the inspection was actually performed/resulted.
+  const labels=[
+    'inspection date','date inspected','inspected date','date of inspection',
+    'result date','completed date','completion date','performed date',
+    'inspection performed','inspection completed'
+  ];
+
+  for(const label of labels){
+    const escaped=label.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+    const sameLine=new RegExp(`\\b${escaped}\\b\\s*[:#-]?\\s*([^\\n]{0,60})`,'i');
+    for(let i=0;i<lines.length;i++){
+      const match=lines[i].match(sameLine);
+      if(match){
+        const date=worksheetDateToKey(match[1]);
+        if(date)return date;
+        // Field labels and values are sometimes separated by OCR into adjacent rows.
+        for(let j=i+1;j<Math.min(lines.length,i+3);j++){
+          const next=worksheetDateToKey(lines[j]);
+          if(next)return next;
+        }
+      }
+    }
+  }
+
+  // Do not blindly choose the first date on a permit worksheet. Only fall back
+  // when there is a single unambiguous date in the extracted report.
+  const found=[];
+  const dateRe=/\b(?:20\d{2}[-\/]\d{1,2}[-\/]\d{1,2}|\d{1,2}[\/\-]\d{1,2}[\/\-](?:20\d{2}|\d{2}))\b/g;
+  for(const match of raw.matchAll(dateRe)){
+    const key=worksheetDateToKey(match[0]);
+    if(key && !found.includes(key))found.push(key);
+  }
+  return found.length===1?found[0]:'';
+}
+
+function cleanInspectionTypeLabel(value){
+  let v=String(value||'')
+    .replace(/\s+/g,' ')
+    .replace(/^[\s:#\-]+|[\s:#\-]+$/g,'')
+    .trim();
+  if(!v)return '';
+
+  // Strip trailing field labels that OCR can merge onto the same row.
+  v=v.split(/\b(?:result|status|inspector|inspection date|date inspected|comments?|remarks?)\b/i)[0].trim();
+  if(v.length>100)return '';
+  return v;
+}
+
+function canonicalBarrowInspectionName(rawType,allText=''){
+  const raw=normalizeInspectionEmailText(`${rawType||''} ${allText||''}`);
+
+  const aliases=[
+    {terms:['slab plumbing','plumbing slab','under slab plumbing'],name:'Slab Plumbing Inspection'},
+    {terms:['slab inspection','concrete slab'],name:'Slab Inspection'},
+    {terms:['footing inspection','footer inspection','footing'],name:'Footing Inspection'},
+    {terms:['foundation inspection','foundation'],name:'Foundation Inspection'},
+    {terms:['framing inspection','frame inspection','framing'],name:'Framing Inspection'},
+    {terms:['rough mechanical','mechanical rough'],name:'Rough Mechanical Inspection'},
+    {terms:['rough electrical','electrical rough','rough electric'],name:'Rough Electrical Inspection'},
+    {terms:['rough plumbing','plumbing rough'],name:'Rough Plumbing Inspection'},
+    {terms:['gas rough','rough gas'],name:'Rough Gas Inspection'},
+    {terms:['insulation inspection'],name:'Insulation Inspection'},
+    {terms:['drywall inspection','sheetrock inspection'],name:'Drywall Inspection'},
+    {terms:['temp pole','temporary pole','temporary power'],name:'Temp Pole Inspection'},
+    {terms:['driveway inspection'],name:'Driveway Inspection'},
+    {terms:['final building inspection','building final inspection','final inspection'],name:'Final Building Inspection'},
+    {terms:['certificate of occupancy','co inspection','c o inspection','occupancy inspection'],name:'CO Inspection'}
+  ];
+
+  for(const alias of aliases){
+    if(alias.terms.some(term=>raw.includes(term)))return alias.name;
+  }
+
+  let clean=cleanInspectionTypeLabel(rawType);
+  if(clean){
+    clean=clean.replace(/\bre[- ]?inspection\b/ig,'').replace(/\breinspect(?:ion)?\b/ig,'').replace(/\s+/g,' ').trim();
+    if(clean && !/\binspection\b/i.test(clean))clean+=' Inspection';
+    return clean;
+  }
+  return '';
+}
+
+function inspectionTypeFromWorksheetText(value){
+  const raw=String(value||'');
+  const lines=raw.split(/\r?\n/).map(x=>x.replace(/\s+/g,' ').trim()).filter(Boolean);
+  const labels=['inspection type','inspection name','type of inspection','inspection','inspection description'];
+
+  for(const label of labels){
+    const escaped=label.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+    const sameLine=new RegExp(`^${escaped}\\s*[:#-]?\\s*(.+)$`,'i');
+    for(let i=0;i<lines.length;i++){
+      const match=lines[i].match(sameLine);
+      if(match && cleanInspectionTypeLabel(match[1]))return cleanInspectionTypeLabel(match[1]);
+      if(new RegExp(`^${escaped}\\s*[:#-]?\\s*$`,'i').test(lines[i])){
+        for(let j=i+1;j<Math.min(lines.length,i+3);j++){
+          const candidate=cleanInspectionTypeLabel(lines[j]);
+          if(candidate && !/^(result|status|date|inspector|address|permit)/i.test(candidate))return candidate;
+        }
+      }
+    }
+  }
+
+  // Fall back to known inspection wording anywhere in the worksheet.
+  const normalized=normalizeInspectionEmailText(raw);
+  const known=[
+    'slab plumbing inspection','slab inspection','footing inspection','foundation inspection',
+    'framing inspection','rough mechanical inspection','rough electrical inspection',
+    'rough plumbing inspection','insulation inspection','drywall inspection',
+    'driveway inspection','final building inspection','co inspection','certificate of occupancy'
+  ];
+  return known.find(x=>normalized.includes(x))||'';
+}
+
+function inspectionWorksheetIsReinspection(value,subject=''){
+  const text=normalizeInspectionEmailText(`${subject||''} ${value||''}`);
+  return /\b(reinspection|re inspection|reinspect|re inspect|recheck|re check)\b/.test(text);
+}
+
+function inspectionWorksheetDetails(value,subject=''){
+  const inspectionType=inspectionTypeFromWorksheetText(value);
+  return {
+    status:inspectionStatusFromWorksheetText(value),
+    date:inspectionDateFromWorksheetText(value),
+    rawType:inspectionType,
+    baseName:canonicalBarrowInspectionName(inspectionType,value),
+    reinspection:inspectionWorksheetIsReinspection(value,subject)
+  };
+}
+
+function baseInspectionNameForCompare(value){
+  return normalizeInspectionEmailText(
+    String(value||'')
+      .replace(/\s*[-–—]?\s*re[- ]?inspection(?:\s*#?\d+)?\s*$/i,'')
+      .replace(/\s*[-–—]?\s*reinspect(?:ion)?(?:\s*#?\d+)?\s*$/i,'')
+  );
+}
+
+function scheduleItemIsReinspection(item){
+  return /\b(reinspection|re inspection|reinspect|re inspect)\b/i.test(String(item?.name||'')+' '+String(item?.notes||''));
+}
+
+function scheduleItemOnDate(item,dateKey){
+  return !!dateKey && itemStartKey(item)===dateKey;
+}
+
+function findPriorFailedInspection(lotId,baseName,dateKey){
+  const target=baseInspectionNameForCompare(baseName);
+  return items.some(i=>{
+    if(String(i.lot_id)!==String(lotId))return false;
+    if(String(i.inspection_status||'').toLowerCase()!=='failed')return false;
+    if(baseInspectionNameForCompare(i.name)!==target)return false;
+    const key=itemStartKey(i);
+    return !dateKey || (!!key && key<dateKey);
+  });
+}
+
+function nextReinspectionName(lotId,baseName){
+  const target=baseInspectionNameForCompare(baseName);
+  const prior=items.filter(i=>
+    String(i.lot_id)===String(lotId)
+    && baseInspectionNameForCompare(i.name)===target
+    && scheduleItemIsReinspection(i)
+  );
+
+  if(!prior.length)return `${baseName} - Reinspection`;
+  return `${baseName} - Reinspection ${prior.length+1}`;
+}
+
+function sourceEmailNote(messageId,worksheetName,reinspection){
+  return [
+    'Auto-synced from Barrow County inspection worksheet.',
+    reinspection?'Reinspection.':'',
+    worksheetName?`Worksheet: ${worksheetName}.`:'',
+    `Barrow email ID: ${messageId}`
+  ].filter(Boolean).join(' ');
+}
+
+function findItemByBarrowEmailId(lotId,messageId){
+  const needle=`Barrow email ID: ${messageId}`;
+  return items.find(i=>String(i.lot_id)===String(lotId) && String(i.notes||'').includes(needle))||null;
+}
+
+function findExistingInspectionForReport(lot,baseName,dateKey,reinspection){
+  const target=baseInspectionNameForCompare(baseName);
+  const candidates=items.filter(i=>
+    String(i.lot_id)===String(lot.id)
+    && baseInspectionNameForCompare(i.name)===target
+  );
+
+  const sameDate=candidates.find(i=>
+    scheduleItemOnDate(i,dateKey)
+    && scheduleItemIsReinspection(i)===!!reinspection
+  );
+  if(sameDate)return sameDate;
+
+  if(reinspection)return null;
+
+  // For a normal inspection, reuse a not-yet-resulted planned inspection rather
+  // than creating a duplicate. It can then be moved to the actual inspection date.
+  return candidates.find(i=>
+    !scheduleItemIsReinspection(i)
+    && !['passed','failed','cancelled'].includes(String(i.inspection_status||'').toLowerCase())
+  )||null;
+}
+
+async function upsertBarrowInspectionCalendarItem({
+  lot,details,messageId,worksheetName,receivedDateTime
+}){
+  let baseName=details.baseName||'County Inspection';
+  let isReinspection=!!details.reinspection;
+
+  // If the worksheet doesn't explicitly say "reinspection" but this same
+  // inspection already failed on an earlier date, treat the later report as a
+  // reinspection instead of overwriting the failed original.
+  if(!isReinspection && details.date && findPriorFailedInspection(lot.id,baseName,details.date)){
+    isReinspection=true;
+  }
+
+  let existing=findItemByBarrowEmailId(lot.id,messageId);
+  if(!existing){
+    existing=findExistingInspectionForReport(lot,baseName,details.date,isReinspection);
+  }
+
+  const itemName=isReinspection
+    ? (existing?.name || nextReinspectionName(lot.id,baseName))
+    : (existing?.name || baseName);
+
+  const note=sourceEmailNote(messageId,worksheetName,isReinspection);
+  const scheduleStatus=['passed','failed','cancelled'].includes(details.status)?'complete':'scheduled';
+  const dateKey=details.date;
+
+  if(existing){
+    const mergedNotes=String(existing.notes||'').includes(`Barrow email ID: ${messageId}`)
+      ? String(existing.notes||'')
+      : [String(existing.notes||'').trim(),note].filter(Boolean).join('\n');
+
+    const payload={
+      name:itemName,
+      inspection_status:details.status,
+      status:scheduleStatus,
+      notes:mergedNotes
+    };
+    if(dateKey){
+      payload.starts_at=dateKey+'T12:00:00Z';
+      payload.ends_at=dateKey+'T12:00:00Z';
+    }
+
+    const {data,error}=await db.from('schedule_items')
+      .update(payload)
+      .eq('id',existing.id)
+      .select()
+      .single();
+    if(error)throw error;
+
+    const index=items.findIndex(i=>String(i.id)===String(existing.id));
+    if(index>=0)items[index]=data;
+    else items.push(data);
+
+    return {item:data,created:false,reinspection:isReinspection};
+  }
+
+  if(!dateKey){
+    throw new Error('Inspection date could not be identified on the attached worksheet.');
+  }
+
+  const payload={
+    lot_id:lot.id,
+    item_type:'Inspection',
+    name:itemName,
+    status:scheduleStatus,
+    crew:'',
+    starts_at:dateKey+'T12:00:00Z',
+    ends_at:dateKey+'T12:00:00Z',
+    location:lot.address||'',
+    inspection_status:details.status,
+    notes:note
+  };
+
+  const {data,error}=await db.from('schedule_items')
+    .insert(payload)
+    .select()
+    .single();
+  if(error)throw error;
+
+  items.push(data);
+  return {item:data,created:true,reinspection:isReinspection};
+}
+
 function inspectionEmailFindScheduleItem(lot,subject,body){
   if(!lot)return null;
   const text=normalizeInspectionEmailText(`${subject||''} ${body||''}`);
@@ -6625,6 +6944,7 @@ async function syncOneInspectionEmail(message){
   let worksheet={name:'',text:''};
   let status='';
   let matchingText=bodyText;
+  let details=null;
 
   if(isBarrow){
     worksheet=await readBarrowInspectionWorksheet(detail?.id||message.id);
@@ -6633,20 +6953,18 @@ async function syncOneInspectionEmail(message){
       return {
         kind:'unmatched',
         title:subject||'Barrow County inspection email',
-        meta:`${sender}${received?' · '+received:''} · Attached inspection worksheet could not be read`
+        meta:`${sender}${received?' · '+received:''} · Attached inspection worksheet could not be read, including OCR fallback`
       };
     }
 
-    // For Barrow County, the inspection result comes from the attached worksheet.
-    // The email body is still useful for Permit Number + Address matching.
-    status=inspectionStatusFromWorksheetText(worksheet.text);
+    details=inspectionWorksheetDetails(worksheet.text,subject);
+    status=details.status;
     matchingText=`${bodyText}\n${worksheet.text}`;
   }else{
     status=inspectionStatusFromEmailText(subject,bodyText);
   }
 
   const lot=inspectionEmailFindLot(subject,matchingText,sender);
-  const scheduleItem=inspectionEmailFindScheduleItem(lot,subject,matchingText);
   const worksheetMeta=isBarrow && worksheet.name ? ` · Worksheet: ${worksheet.name}` : '';
 
   if(!status){
@@ -6668,11 +6986,47 @@ async function syncOneInspectionEmail(message){
     };
   }
 
+  if(isBarrow){
+    if(!details?.baseName){
+      return {
+        kind:'unmatched',
+        title:subject||'Barrow County inspection email',
+        meta:`${lot.lot_name} · ${received||'email matched'}${worksheetMeta} · Inspection type could not be identified on the worksheet`
+      };
+    }
+    if(!details?.date){
+      return {
+        kind:'unmatched',
+        title:subject||'Barrow County inspection email',
+        meta:`${lot.lot_name} · ${details.baseName}${worksheetMeta} · Inspection date could not be identified on the worksheet`
+      };
+    }
+
+    const result=await upsertBarrowInspectionCalendarItem({
+      lot,
+      details,
+      messageId:detail?.id||message.id,
+      worksheetName:worksheet.name,
+      receivedDateTime:detail?.receivedDateTime||message.receivedDateTime
+    });
+
+    const kind=result.created?'updated':'matched';
+    const category=result.reinspection?'Reinspection':'Inspection';
+    return {
+      kind,
+      title:`${lot.lot_name} · ${result.item.name}`,
+      meta:`${category} ${result.created?'added to':'updated on'} calendar ${details.date} · ${inspectionStatusDisplay(details.status)}${worksheetMeta}`
+    };
+  }
+
+  // Right Choice / Vallus behavior remains conservative: update an existing
+  // matching scheduled inspection; do not invent a new date from email text.
+  const scheduleItem=inspectionEmailFindScheduleItem(lot,subject,bodyText);
   if(!scheduleItem){
     return {
       kind:'unmatched',
       title:subject||'Inspection email',
-      meta:`${lot.lot_name} · ${sender}${received?' · '+received:''}${worksheetMeta} · Could not uniquely match a schedule item`
+      meta:`${lot.lot_name} · ${sender}${received?' · '+received:''} · Could not uniquely match a schedule item`
     };
   }
 
@@ -6681,7 +7035,7 @@ async function syncOneInspectionEmail(message){
     return {
       kind:'matched',
       title:`${lot.lot_name} · ${scheduleItem.name}`,
-      meta:`Already ${inspectionStatusDisplay(status)} · ${received||'email matched'}${worksheetMeta}`
+      meta:`Already ${inspectionStatusDisplay(status)} · ${received||'email matched'}`
     };
   }
 
@@ -6698,7 +7052,7 @@ async function syncOneInspectionEmail(message){
   return {
     kind:'updated',
     title:`${lot.lot_name} · ${scheduleItem.name}`,
-    meta:`Inspection updated: ${inspectionStatusDisplay(oldStatus)||'Not linked'} → ${inspectionStatusDisplay(status)} · ${received||'email matched'}${worksheetMeta}`
+    meta:`Inspection updated: ${inspectionStatusDisplay(oldStatus)||'Not linked'} → ${inspectionStatusDisplay(status)} · ${received||'email matched'}`
   };
 }
 
@@ -6712,7 +7066,7 @@ async function runInspectionEmailSync({silent=false}={}){
   inspectionEmailSyncRunning=true;
   const button=$('inspectionEmailSyncNow');
   if(button){button.disabled=true;button.textContent='Syncing…';}
-  if(!silent)setInspectionEmailSyncStatus('Checking your Microsoft inbox for approved inspection emails…');
+  if(!silent)setInspectionEmailSyncStatus('Checking your Microsoft inbox and inspection worksheets…');
 
   try{
     const days=Math.max(1,Number($('inspectionEmailDays')?.value||30));
@@ -9164,23 +9518,67 @@ function aiExtractFields(raw){
   };
 }
 
+let bowenBuilderTesseractPromise=null;
+
+async function ensureBowenBuilderTesseract(){
+  if(window.Tesseract)return window.Tesseract;
+  if(bowenBuilderTesseractPromise)return bowenBuilderTesseractPromise;
+
+  bowenBuilderTesseractPromise=new Promise((resolve,reject)=>{
+    const existing=document.querySelector('script[data-bb-tesseract]');
+    if(existing){
+      existing.addEventListener('load',()=>resolve(window.Tesseract),{once:true});
+      existing.addEventListener('error',()=>reject(new Error('OCR library failed to load.')),{once:true});
+      return;
+    }
+    const script=document.createElement('script');
+    script.src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+    script.async=true;
+    script.dataset.bbTesseract='1';
+    script.onload=()=>window.Tesseract
+      ? resolve(window.Tesseract)
+      : reject(new Error('OCR library loaded but was unavailable.'));
+    script.onerror=()=>reject(new Error('OCR library failed to load.'));
+    document.head.appendChild(script);
+  });
+
+  return bowenBuilderTesseractPromise;
+}
+
+async function bowenBuilderOcrImageSource(source){
+  const Tesseract=await ensureBowenBuilderTesseract();
+  const result=await Tesseract.recognize(source,'eng',{
+    logger:m=>{
+      if(m?.status==='recognizing text'){
+        const pct=Math.round(Number(m.progress||0)*100);
+        setInspectionEmailSyncStatus(`Reading scanned inspection worksheet… ${pct}%`);
+      }
+    }
+  });
+  return String(result?.data?.text||'');
+}
+
 async function aiReadPdf(file){
   const pdfjs = await import('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.6.82/pdf.min.mjs');
   pdfjs.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.6.82/pdf.worker.min.mjs';
   const pdf=await pdfjs.getDocument({data:await file.arrayBuffer()}).promise;
   let output='';
+
+  // Inspection worksheets are usually short. Cap OCR work so a malformed or
+  // unexpectedly huge PDF cannot lock up an iPhone.
+  const maxOcrPages=Math.min(pdf.numPages,5);
+
   for(let p=1;p<=pdf.numPages;p++){
     const page=await pdf.getPage(p);
     const content=await page.getTextContent();
 
     // Rebuild approximate visual rows instead of flattening the whole page.
-    // This is important on permit forms where LOCATION ADDRESS is a specific
-    // field in the top-left and other mailing/owner addresses also appear.
     const items=content.items
       .filter(x=>String(x.str||'').trim())
       .map(x=>({str:String(x.str||'').trim(),x:Number(x.transform?.[4]||0),y:Number(x.transform?.[5]||0)}))
       .sort((a,b)=>Math.abs(b.y-a.y)>2 ? b.y-a.y : a.x-b.x);
 
+    let pageText='';
     const rows=[];
     for(const item of items){
       let row=rows.find(r=>Math.abs(r.y-item.y)<=2.5);
@@ -9190,11 +9588,33 @@ async function aiReadPdf(file){
     rows.sort((a,b)=>b.y-a.y);
     for(const row of rows){
       row.items.sort((a,b)=>a.x-b.x);
-      output += row.items.map(x=>x.str).join(' ').replace(/\s+/g,' ').trim()+'\n';
+      pageText += row.items.map(x=>x.str).join(' ').replace(/\s+/g,' ').trim()+'\n';
     }
-    output+='\n';
+
+    // If PDF.js found little/no real text, the page is probably a scan.
+    // OCR only that page; normal text PDFs stay fast.
+    if(pageText.replace(/\s+/g,'').length<30 && p<=maxOcrPages){
+      try{
+        const viewport=page.getViewport({scale:2});
+        const canvas=document.createElement('canvas');
+        const ctx=canvas.getContext('2d',{willReadFrequently:true});
+        canvas.width=Math.ceil(viewport.width);
+        canvas.height=Math.ceil(viewport.height);
+        await page.render({canvasContext:ctx,viewport}).promise;
+        const ocrText=await bowenBuilderOcrImageSource(canvas);
+        if(String(ocrText||'').trim())pageText=ocrText;
+      }catch(err){
+        console.warn(`OCR failed on PDF page ${p}`,err);
+      }
+    }
+
+    output+=pageText+'\n';
   }
   return output;
+}
+
+async function aiReadImageFile(file){
+  return await bowenBuilderOcrImageSource(file);
 }
 
 async function aiReadDocx(file){
@@ -9205,9 +9625,11 @@ async function aiReadDocx(file){
 
 async function aiReadFile(file){
   const n=file.name.toLowerCase();
-  if(n.endsWith('.txt') || file.type.startsWith('text/')) return await file.text();
-  if(n.endsWith('.pdf')) return await aiReadPdf(file);
+  const type=String(file.type||'').toLowerCase();
+  if(n.endsWith('.txt') || type.startsWith('text/')) return await file.text();
+  if(n.endsWith('.pdf') || type.includes('pdf')) return await aiReadPdf(file);
   if(n.endsWith('.docx')) return await aiReadDocx(file);
+  if(type.startsWith('image/') || /\.(png|jpe?g|webp|tiff?|bmp)$/i.test(n)) return await aiReadImageFile(file);
   return '';
 }
 
