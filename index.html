@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="2026-09-23-calendar-inspection-doubletap-add">
+<meta name="bowenbuilder-version" content="2026-09-23-subdivision-power-companies">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -2081,6 +2081,46 @@ button.teams-file-row:hover{border-color:#bdccdd}
   border-color:#a9d9be;
 }
 
+
+.power-company-trigger{
+  border:1px solid var(--border);
+  background:#fff;
+  border-radius:999px;
+  padding:9px 15px;
+  font-weight:800;
+  color:#59667b;
+}
+.power-company-trigger:hover{border-color:#a9bfd7;color:var(--navy);background:#f8fbff}
+.power-company-trigger:active{transform:scale(.99)}
+.power-company-overlay{position:fixed;inset:0;z-index:1000006;background:rgba(9,28,50,.28);display:flex;align-items:flex-end;justify-content:center;padding:18px max(14px,env(safe-area-inset-right)) max(18px,env(safe-area-inset-bottom)) max(14px,env(safe-area-inset-left));backdrop-filter:blur(2px)}
+.power-company-overlay.hidden{display:none!important}
+.power-company-bubble{width:min(440px,100%);background:#fff;border:1px solid var(--border);border-radius:24px;padding:18px;box-shadow:0 24px 70px rgba(6,25,45,.28)}
+.power-company-bubble-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px}
+.power-company-bubble-head strong{font-size:20px;color:var(--navy)}
+.power-company-close{border:0;background:#eef3f8;color:#415069;border-radius:12px;width:40px;height:40px;font-size:24px;line-height:1;flex:0 0 auto}
+.power-company-actions{display:grid;gap:10px}
+.power-company-contact{display:flex;align-items:center;gap:12px;text-decoration:none;color:var(--text);border:1px solid var(--border);border-radius:16px;padding:14px;background:#f9fbfd;min-width:0}
+.power-company-contact:hover{border-color:#aac2dc;background:#f2f7fd}
+.power-company-contact:active{transform:scale(.99)}
+.power-company-contact span:last-child{min-width:0;display:grid;gap:2px}
+.power-company-contact small{color:var(--muted);font-size:12px;font-weight:700}
+.power-company-contact strong{color:#174f86;overflow-wrap:anywhere}
+.power-company-icon{width:42px;height:42px;flex:0 0 auto;border-radius:12px;display:grid;place-items:center;background:#eaf2fb;color:#174f86;font-size:20px}
+.admin-power-list{display:grid;gap:12px}
+.admin-power-card{border:1px solid #dbe3ee;border-radius:16px;background:#fff;padding:14px}
+.admin-power-card-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:12px}
+.admin-power-card-name{font-weight:850;color:var(--navy);font-size:17px}
+.admin-power-fields{display:grid;grid-template-columns:1.1fr .9fr 1.2fr;gap:10px}
+.admin-power-fields label{margin:0}
+.admin-power-actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-top:12px}
+.admin-power-status{font-size:12px;min-height:17px;margin-top:8px}
+@media(max-width:700px){
+  .power-company-overlay{align-items:flex-end}
+  .power-company-bubble{border-radius:22px}
+  .admin-power-fields{grid-template-columns:1fr}
+  .admin-power-actions button{flex:1}
+}
+
 </style>
 </head>
 <body>
@@ -2190,6 +2230,7 @@ button.teams-file-row:hover{border-color:#bdccdd}
         <button class="lot-tab active" data-lottab="overview" type="button">Overview</button>
         <button class="lot-tab" data-lottab="punchout" type="button">Punchout</button>
         <button class="lot-tab" data-lottab="files" type="button">Files</button>
+        <button id="powerCompanyButton" class="power-company-trigger hidden" type="button">Power Company</button>
       </div>
       <div id="overviewPanel"><div id="lotSchedule" class="schedule-list"></div></div>
       <div id="punchoutPanel" class="hidden">
@@ -2294,12 +2335,13 @@ button.teams-file-row:hover{border-color:#bdccdd}
       <div class="toolbar">
         <div>
           <h2 style="margin:0">Admin</h2>
-          <div class="muted">Manage BowenBuilder contacts and user permissions.</div>
+          <div class="muted">Manage BowenBuilder contacts, power companies, and user permissions.</div>
         </div>
       </div>
 
       <div class="admin-inner-tabs">
         <button id="adminContactsTab" class="admin-inner-tab active" type="button">Schedule Contacts</button>
+        <button id="adminPowerTab" class="admin-inner-tab" type="button">Power Companies</button>
         <button id="adminPermissionsTab" class="admin-inner-tab" type="button">User Permissions</button>
         <button id="adminOnlineTab" class="admin-inner-tab" type="button">Online Now</button>
       </div>
@@ -2314,6 +2356,16 @@ button.teams-file-row:hover{border-color:#bdccdd}
         </label>
         <div id="adminContactNotice" class="notice hidden" style="margin:12px 0"></div>
         <div id="adminContactList" class="admin-contact-list"></div>
+      </div>
+
+
+      <div id="adminPowerPanel" class="hidden">
+        <div class="card admin-note">
+          <strong>Subdivision Power Companies</strong>
+          <div class="muted" style="margin-top:5px">Set the electric utility shown on every lot in a subdivision. The lot button opens a contact bubble with tap-to-call and tap-to-email options.</div>
+        </div>
+        <div id="adminPowerNotice" class="notice hidden" style="margin:12px 0"></div>
+        <div id="adminPowerList" class="admin-power-list"></div>
       </div>
 
       <div id="adminPermissionsPanel" class="hidden">
@@ -2343,6 +2395,20 @@ button.teams-file-row:hover{border-color:#bdccdd}
 
   </main>
 </section>
+
+
+<div id="powerCompanyOverlay" class="power-company-overlay hidden" aria-hidden="true">
+  <div class="power-company-bubble" role="dialog" aria-modal="true" aria-labelledby="powerCompanyBubbleName">
+    <div class="power-company-bubble-head">
+      <div>
+        <strong id="powerCompanyBubbleName">Power Company</strong>
+        <div id="powerCompanyBubbleSubdivision" class="muted"></div>
+      </div>
+      <button id="powerCompanyClose" class="power-company-close" type="button" aria-label="Close power company contacts">×</button>
+    </div>
+    <div id="powerCompanyActions" class="power-company-actions"></div>
+  </div>
+</div>
 
 <dialog id="subDialog"><form id="subForm" class="sheet">
   <div class="dialog-head"><h2>Add Subdivision</h2><button class="xbtn" id="subX" type="button">×</button></div>
@@ -4787,6 +4853,74 @@ function wireScheduleInspectionExternal(){
   });
 }
 
+function powerCompanyForSubdivision(subdivision){
+ if(!subdivision)return null;
+ const schemaReady=Object.prototype.hasOwnProperty.call(subdivision,'power_company_name');
+ let name=String(subdivision.power_company_name||'').trim();
+ let phone=String(subdivision.power_company_phone||'').trim();
+ let email=String(subdivision.power_company_email||'').trim();
+
+ // Backward-compatible fallback so GoldFinch keeps Jackson EMC until the SQL is run.
+ if(!schemaReady && String(subdivision.name||'').trim().toLowerCase()==='goldfinch farms'){
+   name='Jackson EMC';
+   phone='18004623692';
+   email='Info@jacksonemc.com';
+ }
+ if(!name || (!phone && !email))return null;
+ return {name,phone,email,subdivisionName:subdivision.name||'Subdivision'};
+}
+function powerCompanyForLot(lot){
+ const sub=subdivisions.find(s=>String(s.id)===String(lot?.subdivision_id));
+ return powerCompanyForSubdivision(sub);
+}
+function powerCompanyPhoneHref(phone){
+ const raw=String(phone||'').trim();
+ if(!raw)return '';
+ const digits=raw.replace(/\D/g,'');
+ if(!digits)return '';
+ return `tel:${digits.length===11&&digits.startsWith('1')?'+':''}${digits}`;
+}
+function formatPowerCompanyPhone(phone){
+ const digits=String(phone||'').replace(/\D/g,'');
+ if(digits.length===11 && digits.startsWith('1'))return `1-${digits.slice(1,4)}-${digits.slice(4,7)}-${digits.slice(7)}`;
+ if(digits.length===10)return `${digits.slice(0,3)}-${digits.slice(3,6)}-${digits.slice(6)}`;
+ return String(phone||'').trim();
+}
+function configurePowerCompanyButton(lot){
+ const btn=$('powerCompanyButton');
+ if(!btn)return;
+ const company=powerCompanyForLot(lot);
+ btn.classList.toggle('hidden',!company);
+ btn.textContent=company?.name||'Power Company';
+ btn.dataset.lotId=company?String(lot.id||''):'';
+}
+function closePowerCompanyBubble(){
+ const overlay=$('powerCompanyOverlay');
+ if(!overlay)return;
+ overlay.classList.add('hidden');
+ overlay.setAttribute('aria-hidden','true');
+}
+function openPowerCompanyBubble(lotId=currentLot){
+ const lot=lots.find(l=>String(l.id)===String(lotId));
+ const company=powerCompanyForLot(lot);
+ if(!company)return;
+ const overlay=$('powerCompanyOverlay');
+ const actions=$('powerCompanyActions');
+ if(!overlay||!actions)return;
+ $('powerCompanyBubbleName').textContent=company.name;
+ $('powerCompanyBubbleSubdivision').textContent=company.subdivisionName;
+ const parts=[];
+ if(company.phone){
+   parts.push(`<a class="power-company-contact" href="${esc(powerCompanyPhoneHref(company.phone))}"><span class="power-company-icon">☎</span><span><small>Call</small><strong>${esc(formatPowerCompanyPhone(company.phone))}</strong></span></a>`);
+ }
+ if(company.email){
+   parts.push(`<a class="power-company-contact" href="mailto:${encodeURIComponent(company.email)}"><span class="power-company-icon">✉</span><span><small>Email</small><strong>${esc(company.email)}</strong></span></a>`);
+ }
+ actions.innerHTML=parts.join('');
+ overlay.classList.remove('hidden');
+ overlay.setAttribute('aria-hidden','false');
+}
+
 function showLot(preserveScroll=false){
  const savedWindowY=window.scrollY||0;
  const mainScrollEl=document.querySelector('main');
@@ -4802,6 +4936,7 @@ function showLot(preserveScroll=false){
   if(lotViewEl) lotViewEl.classList.remove('hidden');
 
  const l=lots.find(x=>x.id===currentLot);if(!l)return;
+ configurePowerCompanyButton(l);
  requestAnimationFrame(()=>{
    const mainEl=document.querySelector('main');
    if(preserveScroll){
@@ -5738,6 +5873,78 @@ async function setAdminSubdivisionPermission(userId,subdivisionId,kind,value,che
 
 }
 
+
+function adminPowerCompanyValue(subdivision){
+ const configured=powerCompanyForSubdivision(subdivision);
+ return configured||{name:'',phone:'',email:'',subdivisionName:subdivision?.name||''};
+}
+function renderAdminPowerCompanies(){
+ const list=$('adminPowerList');
+ const notice=$('adminPowerNotice');
+ if(!list||!notice)return;
+ notice.classList.add('hidden');
+ list.innerHTML=subdivisions.slice().sort((a,b)=>String(a.name||'').localeCompare(String(b.name||''))).map(sub=>{
+   const c=adminPowerCompanyValue(sub);
+   return `<div class="admin-power-card" data-power-card="${esc(sub.id)}">
+     <div class="admin-power-card-head"><div><div class="admin-power-card-name">${esc(sub.name||'Subdivision')}</div><div class="muted">Shown on every lot in this subdivision</div></div></div>
+     <div class="admin-power-fields">
+       <label>Power Company Name<input data-power-name value="${esc(c.name||'')}" placeholder="e.g. Jackson EMC"></label>
+       <label>Phone Number<input data-power-phone inputmode="tel" value="${esc(c.phone||'')}" placeholder="e.g. 1-800-462-3692"></label>
+       <label>Email Address<input data-power-email inputmode="email" value="${esc(c.email||'')}" placeholder="e.g. Info@company.com"></label>
+     </div>
+     <div class="admin-power-actions">
+       <button class="secondary" type="button" data-power-clear="${esc(sub.id)}">Clear</button>
+       <button class="primary" type="button" data-power-save="${esc(sub.id)}">Save</button>
+     </div>
+     <div class="admin-power-status muted" data-power-status></div>
+   </div>`;
+ }).join('')||'<div class="muted">No subdivisions found.</div>';
+
+ list.querySelectorAll('[data-power-save]').forEach(btn=>btn.onclick=()=>saveAdminPowerCompany(btn.dataset.powerSave,false));
+ list.querySelectorAll('[data-power-clear]').forEach(btn=>btn.onclick=()=>saveAdminPowerCompany(btn.dataset.powerClear,true));
+}
+async function saveAdminPowerCompany(subdivisionId,clear=false){
+ if(!isBowenBuilderAdmin())return;
+ const card=document.querySelector(`[data-power-card="${CSS.escape(String(subdivisionId))}"]`);
+ if(!card)return;
+ const status=card.querySelector('[data-power-status]');
+ const name=clear?'':String(card.querySelector('[data-power-name]')?.value||'').trim();
+ const phone=clear?'':String(card.querySelector('[data-power-phone]')?.value||'').trim();
+ const email=clear?'':String(card.querySelector('[data-power-email]')?.value||'').trim();
+ if(!clear){
+   if(!name){alert('Enter the power company name.');return}
+   if(!phone&&!email){alert('Enter a phone number or email address.');return}
+   if(email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){alert('Enter a valid email address.');return}
+ }
+ if(status)status.textContent=clear?'Clearing…':'Saving…';
+ const {error}=await db.rpc('bowenbuilder_admin_set_power_company',{
+   p_subdivision_id:subdivisionId,
+   p_company_name:name,
+   p_phone:phone,
+   p_email:email
+ });
+ if(error){
+   if(status)status.textContent='Could not save. Run the Power Companies Supabase SQL if it has not been added yet.';
+   alert(error.message);
+   return;
+ }
+ const sub=subdivisions.find(s=>String(s.id)===String(subdivisionId));
+ if(sub){
+   sub.power_company_name=name||null;
+   sub.power_company_phone=phone||null;
+   sub.power_company_email=email||null;
+ }
+ if(clear){
+   const n=card.querySelector('[data-power-name]'),p=card.querySelector('[data-power-phone]'),e=card.querySelector('[data-power-email]');
+   if(n)n.value='';if(p)p.value='';if(e)e.value='';
+ }
+ if(status)status.textContent=clear?'Power company removed.':'Saved.';
+ if(currentLot){
+   const lot=lots.find(l=>String(l.id)===String(currentLot));
+   if(lot)configurePowerCompanyButton(lot);
+ }
+}
+
 async function showAdminView(){
   if(!isBowenBuilderAdmin()){
     alert('Administrator access is limited to nick@bowenhomes.com.');
@@ -5749,22 +5956,26 @@ async function showAdminView(){
   $('adminView').classList.remove('hidden');
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.view==='admin'));
   $('heroTitle').textContent='Admin';
-  $('heroSub').textContent='Manage BowenBuilder contacts and user permissions.';
+  $('heroSub').textContent='Manage BowenBuilder contacts, power companies, and user permissions.';
   updateHeroSiteMap(null);
   showAdminPanel(activeAdminPanel);
 }
 function showAdminPanel(panel='contacts'){
  activeAdminPanel=panel;
  const contacts=panel==='contacts';
+ const power=panel==='power';
  const permissions=panel==='permissions';
  const online=panel==='online';
  $('adminContactsPanel').classList.toggle('hidden',!contacts);
+ $('adminPowerPanel').classList.toggle('hidden',!power);
  $('adminPermissionsPanel').classList.toggle('hidden',!permissions);
  $('adminOnlinePanel').classList.toggle('hidden',!online);
  $('adminContactsTab').classList.toggle('active',contacts);
+ $('adminPowerTab').classList.toggle('active',power);
  $('adminPermissionsTab').classList.toggle('active',permissions);
  $('adminOnlineTab').classList.toggle('active',online);
  if(contacts)renderAdminContacts();
+ else if(power)renderAdminPowerCompanies();
  else if(permissions)renderAdminUserPermissions();
  else{
    syncAppPresenceState();
@@ -7798,6 +8009,16 @@ $('emailLot').onclick=()=>{
   ].join('\n');
   location.href=`mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 };
+if($('powerCompanyButton'))$('powerCompanyButton').onclick=e=>{
+ e.preventDefault();
+ e.stopPropagation();
+ openPowerCompanyBubble($('powerCompanyButton').dataset.lotId||currentLot);
+};
+if($('powerCompanyClose'))$('powerCompanyClose').onclick=closePowerCompanyBubble;
+if($('powerCompanyOverlay'))$('powerCompanyOverlay').onclick=e=>{
+ if(e.target===e.currentTarget)closePowerCompanyBubble();
+};
+
 document.querySelectorAll('.lot-tab').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('.lot-tab').forEach(x=>x.classList.toggle('active',x===b));
   $('overviewPanel').classList.toggle('hidden',b.dataset.lottab!=='overview');
@@ -7828,6 +8049,7 @@ document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{
  }
 });
 $('adminContactsTab').onclick=()=>showAdminPanel('contacts');
+$('adminPowerTab').onclick=()=>showAdminPanel('power');
 $('adminPermissionsTab').onclick=()=>showAdminPanel('permissions');
 $('adminOnlineTab').onclick=()=>showAdminPanel('online');
 $('adminOnlineRefresh').onclick=async()=>{syncAppPresenceState();await loadAdminPresenceProfiles();renderAdminOnlineUsers();};
