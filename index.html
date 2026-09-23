@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="2026-09-23-subdivision-schedule-inspection-dropdown">
+<meta name="bowenbuilder-version" content="2026-09-23-calendar-inspection-status">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -2137,6 +2137,33 @@ button.teams-file-row:hover{border-color:#bdccdd}
   .power-company-bubble{border-radius:22px}
   .admin-power-fields{grid-template-columns:1fr}
   .admin-power-actions button{flex:1}
+}
+
+
+.bb-calendar-inspection{
+  display:block;
+  margin-top:2px;
+  font-size:9px;
+  line-height:1.1;
+  font-weight:900;
+  letter-spacing:.01em;
+  opacity:.88;
+}
+.bb-calendar-inspection.requested{color:#7a5310}
+.bb-calendar-inspection.scheduled{color:#174f86}
+.bb-calendar-inspection.passed{color:#1f704b}
+.bb-calendar-inspection.failed{color:#a1271d}
+.bb-calendar-inspection.cancelled{color:#667085}
+.bb-calendar-inspection.check_county{color:#6941c6}
+
+@media(max-width:640px){
+  .bb-calendar-event{
+    -webkit-line-clamp:3;
+  }
+  .bb-calendar-inspection{
+    font-size:8px;
+    margin-top:1px;
+  }
 }
 
 </style>
@@ -5550,6 +5577,20 @@ function scheduleLotName(item){
 function statusDisplay(status){
  return String(status||'scheduled').replaceAll('_',' ').replace(/\b\w/g,c=>c.toUpperCase());
 }
+
+function inspectionStatusDisplay(status){
+ const raw=String(status||'').trim().toLowerCase();
+ if(!raw || raw==='not_linked')return '';
+ const labels={
+   check_county:'Check County',
+   requested:'Requested',
+   scheduled:'Scheduled',
+   passed:'Passed',
+   failed:'Failed',
+   cancelled:'Cancelled'
+ };
+ return labels[raw]||raw.replaceAll('_',' ').replace(/\b\w/g,c=>c.toUpperCase());
+}
 function renderScheduleListView(){
  const arr=subdivisionScheduleItems().slice().sort((a,b)=>String(a.starts_at||'').localeCompare(String(b.starts_at||'')));
  $('allSchedule').innerHTML=arr.length?arr.map(i=>{
@@ -5601,7 +5642,11 @@ function renderScheduleCalendar(){
    if(key===scheduleSelectedDate)btn.classList.add('selected');
    if(scheduleMoveItemId)btn.classList.add('move-target');
    btn.setAttribute('aria-label',`${d.toLocaleDateString()}, ${dayItems.length} schedule item${dayItems.length===1?'':'s'}`);
-   const eventHtml=dayItems.slice(0,3).map(x=>`<span class="bb-calendar-event ${esc(x.status||'scheduled')}" title="${esc(x.name)}">${esc(x.name)}</span>`).join('');
+   const eventHtml=dayItems.slice(0,3).map(x=>{
+     const inspection=inspectionStatusDisplay(x.inspection_status);
+     const inspectionClass=esc(String(x.inspection_status||'').toLowerCase());
+     return `<span class="bb-calendar-event ${esc(x.status||'scheduled')}" title="${esc(x.name)}${inspection?' · Inspection: '+esc(inspection):''}"><span>${esc(x.name)}</span>${inspection?`<span class="bb-calendar-inspection ${inspectionClass}">Inspection: ${esc(inspection)}</span>`:''}</span>`;
+   }).join('');
    const commHtml=(wasEmailedDate(key)||wasTextedDate(key))
      ? `<div class="bb-calendar-comm-marks">${wasEmailedDate(key)?'<span class="bb-calendar-comm-mark email" title="Email opened for this date">E</span>':''}${wasTextedDate(key)?'<span class="bb-calendar-comm-mark text" title="Text opened for this date">T</span>':''}</div>`
      : '';
@@ -7592,7 +7637,7 @@ function renderSelectedScheduleDay(){
      <div class="bb-calendar-selected-item bb-swipe-content" data-swipe-content="${i.id}">
        <div class="bb-calendar-selected-main">
          <div class="bb-calendar-selected-title">${esc(scheduleLotName(i))} · ${esc(i.name)}</div>
-         <div class="bb-calendar-selected-meta">${esc(statusDisplay(i.status))}${i.crew?' · '+esc(i.crew):''}</div>
+         <div class="bb-calendar-selected-meta">${esc(statusDisplay(i.status))}${i.crew?' · '+esc(i.crew):''}${inspectionStatusDisplay(i.inspection_status)?' · Inspection: '+esc(inspectionStatusDisplay(i.inspection_status)):''}</div>
        </div>
        <div class="calendar-item-actions">
          <button class="calendar-move-btn" type="button" data-calendar-move="${i.id}">Move</button>
