@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="2026-09-23-inspection-email-stable-v5">
+<meta name="bowenbuilder-version" content="2026-09-23-inspection-email-diagnostics">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -2176,6 +2176,12 @@ button.teams-file-row:hover{border-color:#bdccdd}
 .inspection-email-sync-status.success{background:#edf9f2;border-color:#cfe8d9;color:#1f704b}
 .inspection-email-sync-status.error{background:#fff1f0;border-color:#f1c8c4;color:#a1271d}
 .inspection-email-results{display:grid;gap:8px}
+.inspection-email-diagnostic{padding:11px 12px;border:1px solid #d9e2ec;border-radius:12px;background:#fff}
+.inspection-email-diagnostic strong{display:block;color:#24364d}
+.inspection-email-diagnostic .diag-grid{display:grid;grid-template-columns:140px 1fr;gap:4px 10px;margin-top:7px;font-size:12px;line-height:1.45}
+.inspection-email-diagnostic .diag-label{color:#667085;font-weight:800}
+.inspection-email-diagnostic .diag-value{color:#344054;word-break:break-word}
+@media(max-width:640px){.inspection-email-diagnostic .diag-grid{grid-template-columns:1fr;gap:2px}.inspection-email-diagnostic .diag-label{margin-top:6px}}
 .inspection-email-result{padding:10px 12px;border:1px solid #e4e7ec;border-radius:12px;background:#fff}
 .inspection-email-result-title{font-weight:800;color:#25364d}
 .inspection-email-result-meta{font-size:12px;color:var(--muted);margin-top:3px;line-height:1.45}
@@ -2499,7 +2505,7 @@ button.teams-file-row:hover{border-color:#bdccdd}
       <div id="adminInspectionEmailPanel" class="hidden">
         <div class="card admin-note">
           <strong>Inspection Email Sync</strong>
-          <div class="muted" style="margin-top:5px">Reads approved inspection-result emails from your signed-in Microsoft mailbox and updates matching BowenBuilder inspection statuses. Barrow/Tyler is using the last confirmed-good Parser v3 worksheet logic. Right Choice/Vallus now has a separate stable parser that recognizes the sender by address, display name, or subject; matches subdivision + lot; reads GO / NO GO / Pass / Fail; updates the existing RightChoice Pre-Insulation item or creates it when missing; and keeps reinspections separate. <strong>Stable Parser v5</strong>.</div>
+          <div class="muted" style="margin-top:5px">Reads approved inspection-result emails from your signed-in Microsoft mailbox and updates matching BowenBuilder inspection statuses. It processes Right Choice / Vallus emails by subdivision + lot. Every email from Tyler's eplmail.tylerapp.com domain is handled as a Barrow County worksheet report: BowenBuilder matches Permit Number + Address, reads the attached worksheet (including scanned PDFs/images with OCR), extracts the inspection date/type/result, and automatically adds or updates that inspection on the lot calendar. Reinspections stay as separate calendar events. <strong>Parser v3 + Diagnostics</strong>. Use <strong>Diagnose Email Parsing</strong> to inspect what BowenBuilder is actually seeing without changing any schedule data.</div>
         </div>
 
         <div class="card inspection-email-sync-card">
@@ -2521,9 +2527,11 @@ button.teams-file-row:hover{border-color:#bdccdd}
               </select>
             </label>
             <button id="inspectionEmailSyncNow" class="primary" type="button">↻ Sync Inspection Emails</button>
+            <button id="inspectionEmailDiagnose" class="secondary" type="button">Diagnose Email Parsing</button>
           </div>
 
           <div id="inspectionEmailSyncStatus" class="muted inspection-email-sync-status">Sign out and back in after Mail.Read is enabled, then run a sync.</div>
+          <div id="inspectionEmailDiagnostics" class="inspection-email-results"></div>
           <div id="inspectionEmailSyncResults" class="inspection-email-results"></div>
         </div>
       </div>
@@ -6308,18 +6316,6 @@ function isBarrowTylerSender(sender){
   return value==='barrowcountydonotreply@eplmail.tylerapp.com'
     || value.endsWith('@eplmail.tylerapp.com');
 }
-
-function isRightChoiceEmail(message){
-  const sender=inspectionEmailSenderAddress(message);
-  const senderName=normalizeInspectionEmailText(inspectionEmailSenderName(message));
-  const subject=normalizeInspectionEmailText(message?.subject||'');
-
-  if(sender.endsWith('@vallus.com') || sender==='vallus.com')return true;
-  if(sender.includes('vallus') || sender.includes('rightchoice') || sender.includes('right-choice'))return true;
-  if(/\bvallus\b/.test(senderName) || /\bright choice\b/.test(senderName) || /\brightchoice\b/.test(senderName))return true;
-  if(/\bvallus\b/.test(subject) || /\bright choice\b/.test(subject) || /\brightchoice\b/.test(subject))return true;
-  return false;
-}
 function inspectionEmailSource(message){
   const sender=inspectionEmailSenderAddress(message);
   if(isBarrowTylerSender(sender))return 'Barrow County / Tyler';
@@ -6330,9 +6326,7 @@ function inspectionEmailSource(message){
 function inspectionEmailAllowed(message){
   const sender=inspectionEmailSenderAddress(message);
   if(INSPECTION_EMAIL_ALLOWED_SENDERS.includes(sender))return true;
-  if(INSPECTION_EMAIL_ALLOWED_DOMAINS.some(domain=>sender===domain||sender.endsWith('@'+domain)))return true;
-  if(isRightChoiceEmail(message))return true;
-  return false;
+  return INSPECTION_EMAIL_ALLOWED_DOMAINS.some(domain=>sender===domain||sender.endsWith('@'+domain));
 }
 
 function inspectionStatusFromEmailText(subject,body){
@@ -6343,301 +6337,6 @@ function inspectionStatusFromEmailText(subject,body){
   if(/\bscheduled\b/.test(text))return 'scheduled';
   if(/\brequested\b/.test(text))return 'requested';
   return '';
-}
-
-
-function rightChoiceStatusFromText(subject,body){
-  const subjectText=normalizeInspectionEmailText(subject||'');
-  const bodyText=normalizeInspectionEmailText(body||'');
-  const all=`${subjectText} ${bodyText}`;
-
-  // Failure phrases first so "NO GO" can never be mistaken for "GO".
-  const failurePatterns=[
-    /\bno go\b/,
-    /\bnogo\b/,
-    /\bfailed\b/,
-    /\bfail\b/,
-    /\bnot approved\b/,
-    /\breinspection required\b/,
-    /\bre inspection required\b/,
-    /\bcorrections required\b/,
-    /\bcorrection required\b/
-  ];
-  if(failurePatterns.some(p=>p.test(all)))return 'failed';
-
-  const passPatterns=[
-    /\bpassed\b/,
-    /\bpass\b/,
-    /\bapproved\b/
-  ];
-  if(passPatterns.some(p=>p.test(all)))return 'passed';
-
-  // GO by itself is valid for Right Choice, but only after NO GO was checked.
-  if(/\bgo\b/.test(all))return 'passed';
-
-  if(/\bcancelled\b|\bcanceled\b/.test(all))return 'cancelled';
-  if(/\bscheduled\b/.test(all))return 'scheduled';
-  if(/\brequested\b/.test(all))return 'requested';
-  return '';
-}
-
-function rightChoiceInspectionDate(subject,body,receivedDateTime){
-  const raw=`${subject||''}\n${body||''}`;
-  const lines=raw.split(/\r?\n/).map(x=>x.replace(/\s+/g,' ').trim()).filter(Boolean);
-
-  const labels=[
-    'inspection date','date inspected','date of inspection',
-    'inspected date','completed date','report date','performed date'
-  ];
-
-  for(let i=0;i<lines.length;i++){
-    for(const label of labels){
-      const escaped=label.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
-      const match=lines[i].match(new RegExp(`\\b${escaped}\\b\\s*[:#-]?\\s*(.*)$`,'i'));
-      if(!match)continue;
-
-      const same=worksheetDateToKey(match[1]);
-      if(same)return same;
-
-      for(let j=i+1;j<Math.min(lines.length,i+3);j++){
-        const next=worksheetDateToKey(lines[j]);
-        if(next)return next;
-      }
-    }
-  }
-
-  return '';
-}
-
-function rightChoiceIsReinspection(subject,body){
-  const text=normalizeInspectionEmailText(`${subject||''} ${body||''}`);
-  return /\b(reinspection|re inspection|reinspect|re inspect|recheck|re check|second inspection|follow up inspection|followup inspection)\b/.test(text);
-}
-
-function rightChoiceLotNumberFromText(subject,body){
-  const raw=`${subject||''} ${body||''}`;
-  const patterns=[
-    /\blot\s*(?:number|no\.?|#)?\s*[:#-]?\s*(\d{1,4})\b/i,
-    /\blot\s+(\d{1,4})\b/i
-  ];
-  for(const pattern of patterns){
-    const match=raw.match(pattern);
-    if(match)return String(Number(match[1]));
-  }
-  return '';
-}
-
-function rightChoiceSubdivisionMatches(subdivisionName,subject,body){
-  const hay=normalizeInspectionEmailText(`${subject||''} ${body||''}`);
-  const full=normalizeInspectionEmailText(subdivisionName||'');
-  if(full && hay.includes(full))return true;
-
-  const reduced=full
-    .replace(/\bestates at\b/g,' ')
-    .replace(/\bestates\b/g,' ')
-    .replace(/\bfarms\b/g,' ')
-    .replace(/\bsubdivision\b/g,' ')
-    .replace(/\bcommunity\b/g,' ')
-    .replace(/\s+/g,' ')
-    .trim();
-
-  return reduced.length>=4 && hay.includes(reduced);
-}
-
-function findRightChoiceLot(subject,body){
-  const lotNo=rightChoiceLotNumberFromText(subject,body);
-  if(!lotNo)return null;
-
-  const bySub=lots.filter(lot=>{
-    const thisLot=String(Number(inspectionLotNumber(lot.lot_name||'')));
-    if(thisLot!==lotNo)return false;
-    const sub=subdivisions.find(s=>String(s.id)===String(lot.subdivision_id));
-    return rightChoiceSubdivisionMatches(sub?.name||'',subject,body);
-  });
-  if(bySub.length===1)return bySub[0];
-
-  // Address fallback if the template includes an address but abbreviates subdivision.
-  const byAddress=lots.filter(lot=>{
-    const thisLot=String(Number(inspectionLotNumber(lot.lot_name||'')));
-    return thisLot===lotNo && inspectionTextContainsAddress(`${subject||''} ${body||''}`,lot.address);
-  });
-  if(byAddress.length===1)return byAddress[0];
-
-  // Final fallback only when that lot number exists exactly once across all accessible lots.
-  const unique=lots.filter(lot=>String(Number(inspectionLotNumber(lot.lot_name||'')))===lotNo);
-  return unique.length===1?unique[0]:null;
-}
-
-function rightChoiceBaseName(subject,body){
-  const text=normalizeInspectionEmailText(`${subject||''} ${body||''}`);
-
-  // Current BowenBuilder workflow uses Right Choice for the pre-insulation report.
-  // Accept several common spellings.
-  if(/\b(pre insulation|preinsulation|pre insul|pre drywall|predrywall)\b/.test(text)){
-    return 'RightChoice Pre-Insulation Inspection';
-  }
-
-  // If a Right Choice email is clearly an inspection report but the template
-  // doesn't repeat the inspection name, use the existing RightChoice item on that lot.
-  return '';
-}
-
-function rightChoiceItemIsReinspection(item){
-  return /\b(reinspection|re inspection|reinspect|re inspect)\b/i.test(String(item?.name||'')+' '+String(item?.notes||''));
-}
-
-function rightChoiceComparableName(value){
-  return normalizeInspectionEmailText(
-    String(value||'')
-      .replace(/\s*[-–—]?\s*re[- ]?inspection(?:\s*#?\d+)?\s*$/i,'')
-      .replace(/\s*[-–—]?\s*reinspect(?:ion)?(?:\s*#?\d+)?\s*$/i,'')
-  );
-}
-
-function rightChoicePriorFailed(lotId,baseName,dateKey){
-  const target=rightChoiceComparableName(baseName);
-  return items.some(i=>{
-    if(String(i.lot_id)!==String(lotId))return false;
-    if(String(i.inspection_status||'').toLowerCase()!=='failed')return false;
-    if(rightChoiceComparableName(i.name)!==target)return false;
-    const d=itemStartKey(i);
-    return !dateKey || (!!d && d<dateKey);
-  });
-}
-
-function rightChoiceNextReinspectionName(lotId,baseName){
-  const target=rightChoiceComparableName(baseName);
-  const count=items.filter(i=>
-    String(i.lot_id)===String(lotId)
-    && rightChoiceComparableName(i.name)===target
-    && rightChoiceItemIsReinspection(i)
-  ).length;
-  return count===0 ? `${baseName} - Reinspection` : `${baseName} - Reinspection ${count+1}`;
-}
-
-function findRightChoiceEmailItem(lotId,messageId){
-  const marker=`RightChoice email ID: ${messageId}`;
-  return items.find(i=>String(i.lot_id)===String(lotId) && String(i.notes||'').includes(marker))||null;
-}
-
-async function upsertRightChoiceEmailInspection({
-  lot,messageId,subject,body,status,receivedDateTime
-}){
-  let baseName=rightChoiceBaseName(subject,body);
-
-  const lotItems=items.filter(i=>String(i.lot_id)===String(lot.id));
-  const existingRightChoice=lotItems.find(i=>
-    normalizeInspectionEmailText(i.name).includes('rightchoice pre insulation')
-    || normalizeInspectionEmailText(i.name).includes('pre insulation')
-  );
-
-  // This is the key stability fallback: Right Choice is the pre-insulation
-  // inspection in this BowenBuilder setup, so an existing pre-insulation item
-  // is enough to identify the schedule item even if the email template changed.
-  if(!baseName && existingRightChoice){
-    baseName='RightChoice Pre-Insulation Inspection';
-  }
-  if(!baseName){
-    baseName='RightChoice Pre-Insulation Inspection';
-  }
-
-  let reportDate=rightChoiceInspectionDate(subject,body,receivedDateTime);
-  let isReinspection=rightChoiceIsReinspection(subject,body);
-
-  if(!isReinspection && reportDate && rightChoicePriorFailed(lot.id,baseName,reportDate)){
-    isReinspection=true;
-  }
-
-  let existing=findRightChoiceEmailItem(lot.id,messageId);
-
-  if(!existing && !isReinspection){
-    existing=lotItems.find(i=>
-      !rightChoiceItemIsReinspection(i)
-      && (
-        normalizeInspectionEmailText(i.name).includes('rightchoice pre insulation')
-        || normalizeInspectionEmailText(i.name).includes('pre insulation')
-      )
-      && !['passed','failed','cancelled'].includes(String(i.inspection_status||'').toLowerCase())
-    ) || existingRightChoice || null;
-  }
-
-  // Keep an existing scheduled date if the email does not print one.
-  if(!reportDate && existing)reportDate=itemStartKey(existing);
-
-  // Only as a final fallback for a brand-new event use the email's received date.
-  let usedReceivedDate=false;
-  if(!reportDate && receivedDateTime){
-    const d=new Date(receivedDateTime);
-    if(!Number.isNaN(d.getTime())){
-      reportDate=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-      usedReceivedDate=true;
-    }
-  }
-  if(!reportDate)throw new Error('Right Choice inspection date could not be determined.');
-
-  if(!isReinspection && rightChoicePriorFailed(lot.id,baseName,reportDate)){
-    isReinspection=true;
-    existing=null;
-  }
-
-  const name=isReinspection
-    ? (existing && rightChoiceItemIsReinspection(existing) ? existing.name : rightChoiceNextReinspectionName(lot.id,baseName))
-    : (existing?.name || baseName);
-
-  const marker=`RightChoice email ID: ${messageId}`;
-  const syncNote=[
-    'Auto-synced from Right Choice / Vallus email.',
-    isReinspection?'Reinspection.':'',
-    usedReceivedDate?'Inspection date not printed; used email received date.':'',
-    marker
-  ].filter(Boolean).join(' ');
-
-  const scheduleStatus=['passed','failed','cancelled'].includes(status)?'complete':'scheduled';
-
-  if(existing){
-    const notes=String(existing.notes||'').includes(marker)
-      ? String(existing.notes||'')
-      : [String(existing.notes||'').trim(),syncNote].filter(Boolean).join('\n');
-
-    const {data,error}=await db.from('schedule_items')
-      .update({
-        name,
-        status:scheduleStatus,
-        starts_at:reportDate+'T12:00:00Z',
-        ends_at:reportDate+'T12:00:00Z',
-        inspection_status:status,
-        notes
-      })
-      .eq('id',existing.id)
-      .select()
-      .single();
-    if(error)throw error;
-
-    const index=items.findIndex(i=>String(i.id)===String(existing.id));
-    if(index>=0)items[index]=data; else items.push(data);
-
-    return {item:data,created:false,reinspection:isReinspection,usedReceivedDate};
-  }
-
-  const {data,error}=await db.from('schedule_items')
-    .insert({
-      lot_id:lot.id,
-      item_type:'Inspection',
-      name,
-      status:scheduleStatus,
-      crew:'',
-      starts_at:reportDate+'T12:00:00Z',
-      ends_at:reportDate+'T12:00:00Z',
-      location:lot.address||'',
-      inspection_status:status,
-      notes:syncNote
-    })
-    .select()
-    .single();
-
-  if(error)throw error;
-  items.push(data);
-  return {item:data,created:true,reinspection:isReinspection,usedReceivedDate};
 }
 
 function inspectionLotNumber(value){
@@ -7258,7 +6957,6 @@ async function syncOneInspectionEmail(message){
   const subject=detail?.subject||message.subject||'';
   const sender=inspectionEmailSenderAddress(detail||message);
   const isBarrow=isBarrowTylerSender(sender);
-  const isRightChoice=isRightChoiceEmail(detail||message);
   const received=inspectionEmailReceivedLabel(detail?.receivedDateTime||message.receivedDateTime);
 
   let worksheet={name:'',text:''};
@@ -7266,7 +6964,6 @@ async function syncOneInspectionEmail(message){
   let matchingText=bodyText;
   let details=null;
 
-  // BARROW PATH: intentionally preserved from the last confirmed-good build.
   if(isBarrow){
     worksheet=await readBarrowInspectionWorksheet(detail?.id||message.id);
 
@@ -7281,32 +6978,25 @@ async function syncOneInspectionEmail(message){
     details=inspectionWorksheetDetails(worksheet.text,subject);
     status=details.status;
     matchingText=`${bodyText}\n${worksheet.text}`;
-  }else if(isRightChoice){
-    status=rightChoiceStatusFromText(subject,bodyText);
   }else{
     status=inspectionStatusFromEmailText(subject,bodyText);
   }
 
-  const lot=isRightChoice && !isBarrow
-    ? findRightChoiceLot(subject,bodyText)
-    : inspectionEmailFindLot(subject,matchingText,sender);
-
+  const lot=inspectionEmailFindLot(subject,matchingText,sender);
   const worksheetMeta=isBarrow && worksheet.name ? ` · Worksheet: ${worksheet.name}` : '';
 
   if(!status){
     return {
       kind:'unmatched',
       title:subject||'Inspection email',
-      meta:`${sender}${received?' · '+received:''}${worksheetMeta} · Result/status not recognized`
+      meta:`${sender}${received?' · '+received:''}${worksheetMeta} · Result/status not recognized${isBarrow?' on attached worksheet':''}`
     };
   }
 
   if(!lot){
     const reason=isBarrow
       ? 'Could not uniquely match Permit Number + Address to a BowenBuilder lot'
-      : isRightChoice
-        ? 'Right Choice result recognized, but subdivision + lot could not be uniquely matched'
-        : 'Could not uniquely match a subdivision and lot';
+      : 'Could not uniquely match a subdivision and lot';
     return {
       kind:'unmatched',
       title:subject||'Inspection email',
@@ -7314,7 +7004,6 @@ async function syncOneInspectionEmail(message){
     };
   }
 
-  // BARROW PATH: preserved.
   if(isBarrow){
     if(!details?.baseName){
       return {
@@ -7348,32 +7037,14 @@ async function syncOneInspectionEmail(message){
     };
   }
 
-  // RIGHT CHOICE / VALLUS PATH.
-  if(isRightChoice){
-    const result=await upsertRightChoiceEmailInspection({
-      lot,
-      messageId:detail?.id||message.id,
-      subject,
-      body:bodyText,
-      status,
-      receivedDateTime:detail?.receivedDateTime||message.receivedDateTime
-    });
-
-    const dateKey=itemStartKey(result.item);
-    return {
-      kind:result.created?'updated':'matched',
-      title:`${lot.lot_name} · ${result.item.name}`,
-      meta:`Right Choice ${result.reinspection?'reinspection':'inspection'} ${result.created?'added to':'updated on'} calendar ${dateKey} · ${inspectionStatusDisplay(status)}${result.usedReceivedDate?' · Used email received date':''} · Sender: ${sender||inspectionEmailSenderName(detail||message)}`
-    };
-  }
-
-  // Any other approved source keeps the old conservative matching behavior.
+  // Right Choice / Vallus behavior remains conservative: update an existing
+  // matching scheduled inspection; do not invent a new date from email text.
   const scheduleItem=inspectionEmailFindScheduleItem(lot,subject,bodyText);
   if(!scheduleItem){
     return {
       kind:'unmatched',
       title:subject||'Inspection email',
-      meta:`${lot.lot_name} · Sender: ${sender}${received?' · '+received:''} · Could not uniquely match a schedule item`
+      meta:`${lot.lot_name} · Right Choice / Vallus path · Sender: ${sender}${received?' · '+received:''} · Could not uniquely match a schedule item`
     };
   }
 
@@ -7401,6 +7072,151 @@ async function syncOneInspectionEmail(message){
     title:`${lot.lot_name} · ${scheduleItem.name}`,
     meta:`Inspection updated: ${inspectionStatusDisplay(oldStatus)||'Not linked'} → ${inspectionStatusDisplay(status)} · ${received||'email matched'}`
   };
+}
+
+
+function diagnosticRightChoiceGuess(message,bodyText){
+  const sender=inspectionEmailSenderAddress(message);
+  const senderName=inspectionEmailSenderName(message);
+  const subject=String(message?.subject||'');
+  const blob=normalizeInspectionEmailText(`${sender} ${senderName} ${subject} ${bodyText||''}`);
+
+  const sourceHints=[];
+  if(sender.endsWith('@vallus.com'))sourceHints.push('sender @vallus.com');
+  if(blob.includes('vallus'))sourceHints.push('contains vallus');
+  if(blob.includes('right choice') || blob.includes('rightchoice'))sourceHints.push('contains right choice');
+  if(blob.includes('pre insulation') || blob.includes('preinsulation'))sourceHints.push('contains pre-insulation');
+  if(/\bno go\b/.test(blob))sourceHints.push('NO GO');
+  else if(/\bgo\b/.test(blob))sourceHints.push('GO');
+  if(/\bfailed\b|\bfail\b|\bnot approved\b/.test(blob))sourceHints.push('fail wording');
+  if(/\bpassed\b|\bpass\b|\bapproved\b/.test(blob))sourceHints.push('pass wording');
+
+  const lotMatch=inspectionEmailFindLot(subject,bodyText,sender);
+  const scheduleMatch=inspectionEmailFindScheduleItem(lotMatch,subject,bodyText);
+  const status=inspectionStatusFromEmailText(subject,bodyText);
+
+  return {
+    sender,
+    senderName,
+    subject,
+    sourceHints:sourceHints.join(', ')||'none',
+    status:status||'NOT DETECTED',
+    lot:lotMatch?.lot_name||'NOT MATCHED',
+    subdivision:lotMatch ? (subdivisions.find(s=>String(s.id)===String(lotMatch.subdivision_id))?.name||'') : '',
+    scheduleItem:scheduleMatch?.name||'NOT MATCHED'
+  };
+}
+
+async function diagnoseInspectionEmails(){
+  if(!isBowenBuilderAdmin())return;
+  const host=$('inspectionEmailDiagnostics');
+  const btn=$('inspectionEmailDiagnose');
+  if(!host)return;
+
+  btn.disabled=true;
+  btn.textContent='Diagnosing…';
+  host.innerHTML='<div class="muted">Reading recent inspection-related emails without changing any BowenBuilder data…</div>';
+
+  try{
+    const select=encodeURIComponent('id,subject,from,receivedDateTime,bodyPreview');
+    const data=await microsoftMailGraphJson(`/me/mailFolders/inbox/messages?$top=75&$select=${select}&$orderby=receivedDateTime%20desc`);
+    const rows=[];
+
+    for(const msg of (data?.value||[])){
+      const sender=inspectionEmailSenderAddress(msg);
+      const senderName=inspectionEmailSenderName(msg);
+      const headline=normalizeInspectionEmailText(`${sender} ${senderName} ${msg.subject||''} ${msg.bodyPreview||''}`);
+
+      const looksBarrow=isBarrowTylerSender(sender)
+        || headline.includes('barrow county')
+        || headline.includes('tyler');
+      const looksRightChoice=sender.endsWith('@vallus.com')
+        || headline.includes('vallus')
+        || headline.includes('right choice')
+        || headline.includes('rightchoice')
+        || headline.includes('pre insulation')
+        || headline.includes('preinsulation');
+
+      if(!looksBarrow && !looksRightChoice)continue;
+
+      const detail=await microsoftMailGraphJson(`/me/messages/${encodeURIComponent(msg.id)}?$select=id,subject,from,receivedDateTime,body,bodyPreview`);
+      const bodyText=htmlToInspectionText(detail?.body?.content||detail?.bodyPreview||'');
+      const received=inspectionEmailReceivedLabel(detail?.receivedDateTime||msg.receivedDateTime);
+
+      if(isBarrowTylerSender(inspectionEmailSenderAddress(detail))){
+        let worksheet={name:'',text:''};
+        let details=null;
+        try{
+          worksheet=await readBarrowInspectionWorksheet(detail.id);
+          details=worksheet.text ? inspectionWorksheetDetails(worksheet.text,detail.subject||'') : null;
+        }catch(err){
+          details={error:err?.message||String(err)};
+        }
+        const lot=inspectionEmailFindLot(detail.subject||'',`${bodyText}\n${worksheet.text||''}`,inspectionEmailSenderAddress(detail));
+        rows.push({
+          kind:'Barrow/Tyler',
+          sender:inspectionEmailSenderAddress(detail),
+          senderName:inspectionEmailSenderName(detail),
+          subject:detail.subject||'',
+          received,
+          status:details?.status||'NOT DETECTED',
+          type:details?.baseName||'NOT DETECTED',
+          date:details?.date||'NOT DETECTED',
+          reinspection:details?.reinspection?'YES':'NO',
+          lot:lot?.lot_name||'NOT MATCHED',
+          subdivision:lot ? (subdivisions.find(s=>String(s.id)===String(lot.subdivision_id))?.name||'') : '',
+          attachment:worksheet.name||'NOT READ',
+          error:details?.error||''
+        });
+      }else{
+        const d=diagnosticRightChoiceGuess(detail,bodyText);
+        rows.push({
+          kind:'RightChoice/Vallus candidate',
+          sender:d.sender,
+          senderName:d.senderName,
+          subject:d.subject,
+          received,
+          status:d.status,
+          type:d.sourceHints,
+          date:'—',
+          reinspection:/\b(reinspection|re inspection|reinspect|re inspect|recheck|re check)\b/.test(normalizeInspectionEmailText(`${detail.subject||''} ${bodyText}`))?'YES':'NO',
+          lot:d.lot,
+          subdivision:d.subdivision,
+          attachment:'—',
+          scheduleItem:d.scheduleItem,
+          error:''
+        });
+      }
+    }
+
+    if(!rows.length){
+      host.innerHTML='<div class="inspection-email-diagnostic"><strong>No Barrow/RightChoice candidates detected in the newest 75 Inbox messages.</strong><div class="diag-grid"><div class="diag-label">Meaning</div><div class="diag-value">The sender address/display name/subject may differ from what the parser expects, or the messages may be outside the newest 75 Inbox messages.</div></div></div>';
+      return;
+    }
+
+    host.innerHTML=rows.map(r=>`
+      <div class="inspection-email-diagnostic">
+        <strong>${esc(r.kind)} · ${esc(r.subject||'(no subject)')}</strong>
+        <div class="diag-grid">
+          <div class="diag-label">From address</div><div class="diag-value">${esc(r.sender||'(blank)')}</div>
+          <div class="diag-label">From name</div><div class="diag-value">${esc(r.senderName||'(blank)')}</div>
+          <div class="diag-label">Received</div><div class="diag-value">${esc(r.received||'')}</div>
+          <div class="diag-label">Detected status</div><div class="diag-value">${esc(r.status||'')}</div>
+          <div class="diag-label">Detected lot</div><div class="diag-value">${esc(r.subdivision ? `${r.subdivision} · ${r.lot}` : r.lot||'')}</div>
+          <div class="diag-label">${r.kind==='Barrow/Tyler'?'Detected type':'Parser hints'}</div><div class="diag-value">${esc(r.type||'')}</div>
+          ${r.scheduleItem!==undefined?`<div class="diag-label">Matched schedule item</div><div class="diag-value">${esc(r.scheduleItem||'')}</div>`:''}
+          <div class="diag-label">Reinspection</div><div class="diag-value">${esc(r.reinspection||'NO')}</div>
+          ${r.kind==='Barrow/Tyler'?`<div class="diag-label">Detected date</div><div class="diag-value">${esc(r.date||'')}</div><div class="diag-label">Worksheet</div><div class="diag-value">${esc(r.attachment||'')}</div>`:''}
+          ${r.error?`<div class="diag-label">Error</div><div class="diag-value">${esc(r.error)}</div>`:''}
+        </div>
+      </div>
+    `).join('');
+  }catch(err){
+    host.innerHTML=`<div class="inspection-email-diagnostic"><strong>Diagnostics failed</strong><div class="diag-grid"><div class="diag-label">Error</div><div class="diag-value">${esc(err?.message||String(err))}</div></div></div>`;
+  }finally{
+    btn.disabled=false;
+    btn.textContent='Diagnose Email Parsing';
+  }
 }
 
 async function runInspectionEmailSync({silent=false}={}){
@@ -9544,6 +9360,8 @@ $('adminPermissionsTab').onclick=()=>showAdminPanel('permissions');
 $('adminOnlineTab').onclick=()=>showAdminPanel('online');
 $('adminOnlineRefresh').onclick=async()=>{syncAppPresenceState();await loadAdminPresenceProfiles();renderAdminOnlineUsers();};
 if($('inspectionEmailSyncNow'))$('inspectionEmailSyncNow').onclick=()=>runInspectionEmailSync();
+if($('inspectionEmailDiagnose'))$('inspectionEmailDiagnose').onclick=()=>diagnoseInspectionEmails();
+
 
 $('adminContactSearch').oninput=()=>renderAdminContacts();
 $('adminUserSearch').oninput=()=>renderAdminUserPermissions();
