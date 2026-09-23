@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="2026-09-23-subdivision-power-companies">
+<meta name="bowenbuilder-version" content="2026-09-23-subdivision-schedule-inspection-dropdown">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -1775,6 +1775,24 @@ button.teams-file-row:hover{border-color:#bdccdd}
   color:#fff;
   border-color:#244f7e;
 }
+
+.subdivision-inspection-card{max-width:620px;padding:18px}
+.subdivision-inspection-label{font-weight:850;color:#10233c;margin-bottom:10px}
+.subdivision-inspection-dropdown-wrap{position:relative;max-width:430px}
+.subdivision-inspection-dropdown-button{width:100%;display:flex;justify-content:space-between;align-items:center;text-align:left;min-height:48px}
+.subdivision-inspection-menu{position:absolute;top:calc(100% + 7px);left:0;right:0;z-index:20;background:#fff;border:1px solid var(--border);border-radius:14px;box-shadow:0 16px 42px rgba(24,50,82,.18);max-height:360px;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:6px}
+.subdivision-inspection-lot{display:flex;flex-direction:column;gap:3px;width:100%;padding:11px 12px;border:0;border-radius:10px;background:#fff;color:#173f6c;text-decoration:none;text-align:left}
+.subdivision-inspection-lot:hover{background:#eef4fb}
+.subdivision-inspection-lot-name{font-weight:850}
+.subdivision-inspection-lot-meta{font-size:12px;color:var(--muted)}
+.subdivision-inspection-lot.disabled{opacity:.5;cursor:not-allowed;background:#f7f9fc;color:#667085}
+.subdivision-inspection-help{margin-top:10px}
+@media(max-width:700px){
+  .subdivision-inspection-card{max-width:none}
+  .subdivision-inspection-dropdown-wrap{max-width:none}
+  .subdivision-inspection-menu{position:static;margin-top:7px;max-height:50vh}
+}
+
 .subdivision-agenda{
   display:grid;
   gap:16px;
@@ -2168,6 +2186,7 @@ button.teams-file-row:hover{border-color:#bdccdd}
         <button id="subdivisionLotsTab" class="subdivision-inner-tab active" type="button">Lots</button>
         <button id="subdivisionAgendaTab" class="subdivision-inner-tab" type="button">Today & Tomorrow</button>
         <button id="subdivisionPunchoutTab" class="subdivision-inner-tab" type="button">Outstanding Punchout</button>
+        <button id="subdivisionInspectionTab" class="subdivision-inner-tab" type="button">Schedule Inspection</button>
       </div>
 
       <div id="subdivisionLotsPanel">
@@ -2194,6 +2213,23 @@ button.teams-file-row:hover{border-color:#bdccdd}
         </div>
         <div id="subdivisionPunchoutSummary" class="subdivision-punchout-summary"></div>
         <div id="subdivisionPunchout" class="subdivision-punchout"></div>
+      </div>
+
+      <div id="subdivisionInspectionPanel" class="hidden">
+        <div class="toolbar">
+          <div>
+            <strong id="subdivisionInspectionName"></strong>
+            <div class="muted">Choose a lot to open its county Schedule Inspection page.</div>
+          </div>
+        </div>
+        <div class="card subdivision-inspection-card">
+          <div class="subdivision-inspection-label">Schedule Inspection</div>
+          <div class="subdivision-inspection-dropdown-wrap">
+            <button id="subdivisionInspectionDropdownButton" class="secondary subdivision-inspection-dropdown-button" type="button" aria-expanded="false">Choose Lot ▾</button>
+            <div id="subdivisionInspectionMenu" class="subdivision-inspection-menu hidden" role="menu"></div>
+          </div>
+          <div class="muted subdivision-inspection-help">Tap a lot and BowenBuilder will open that lot's inspection link.</div>
+        </div>
       </div>
     </section>
 
@@ -3715,23 +3751,74 @@ function updateHeroSiteMap(subdivision){
   btn.classList.remove('hidden');
 }
 
+
+function renderSubdivisionInspectionMenu(){
+ const nameEl=$('subdivisionInspectionName');
+ const menu=$('subdivisionInspectionMenu');
+ const dropdown=$('subdivisionInspectionDropdownButton');
+ const sub=subdivisions.find(s=>String(s.id)===String(currentSubdivision));
+ if(nameEl)nameEl.textContent=sub?.name||'Subdivision';
+ if(!menu||!dropdown)return;
+
+ const arr=lots
+   .filter(l=>String(l.subdivision_id)===String(currentSubdivision))
+   .slice()
+   .sort((a,b)=>String(a.lot_name||'').localeCompare(String(b.lot_name||''),undefined,{numeric:true,sensitivity:'base'}));
+
+ if(!arr.length){
+   menu.innerHTML='<div class="muted" style="padding:12px">No lots are available in this subdivision.</div>';
+   return;
+ }
+
+ menu.innerHTML=arr.map(l=>{
+   const url=safe(l.permit_url||'');
+   const meta=[l.address,l.permit_number?`Permit ${l.permit_number}`:''].filter(Boolean).join(' · ');
+   if(!url){
+     return `<div class="subdivision-inspection-lot disabled" role="menuitem" aria-disabled="true"><span class="subdivision-inspection-lot-name">${esc(l.lot_name||'Lot')}</span><span class="subdivision-inspection-lot-meta">${esc(meta||'No Schedule Inspection link')}</span></div>`;
+   }
+   return `<a class="subdivision-inspection-lot" role="menuitem" href="${url}" target="_blank" rel="noopener noreferrer" data-subdivision-inspection-lot="${esc(l.id)}"><span class="subdivision-inspection-lot-name">${esc(l.lot_name||'Lot')}</span><span class="subdivision-inspection-lot-meta">${esc(meta||'Open Schedule Inspection')}</span></a>`;
+ }).join('');
+
+ menu.querySelectorAll('[data-subdivision-inspection-lot]').forEach(link=>{
+   link.onclick=()=>{
+     menu.classList.add('hidden');
+     dropdown.setAttribute('aria-expanded','false');
+   };
+ });
+}
+
+function toggleSubdivisionInspectionMenu(forceOpen=null){
+ const menu=$('subdivisionInspectionMenu');
+ const btn=$('subdivisionInspectionDropdownButton');
+ if(!menu||!btn)return;
+ const willOpen=forceOpen===null?menu.classList.contains('hidden'):!!forceOpen;
+ if(willOpen)renderSubdivisionInspectionMenu();
+ menu.classList.toggle('hidden',!willOpen);
+ btn.setAttribute('aria-expanded',willOpen?'true':'false');
+}
+
 function showSubdivisionPanel(mode='lots'){
- subdivisionViewMode=['agenda','punchout'].includes(mode)?mode:'lots';
+ subdivisionViewMode=['agenda','punchout','inspection'].includes(mode)?mode:'lots';
 
  const lotsMode=subdivisionViewMode==='lots';
  const agendaMode=subdivisionViewMode==='agenda';
  const punchoutMode=subdivisionViewMode==='punchout';
+ const inspectionMode=subdivisionViewMode==='inspection';
 
  $('subdivisionLotsPanel').classList.toggle('hidden',!lotsMode);
  $('subdivisionAgendaPanel').classList.toggle('hidden',!agendaMode);
  $('subdivisionPunchoutPanel').classList.toggle('hidden',!punchoutMode);
+ $('subdivisionInspectionPanel').classList.toggle('hidden',!inspectionMode);
 
  $('subdivisionLotsTab').classList.toggle('active',lotsMode);
  $('subdivisionAgendaTab').classList.toggle('active',agendaMode);
  $('subdivisionPunchoutTab').classList.toggle('active',punchoutMode);
+ $('subdivisionInspectionTab').classList.toggle('active',inspectionMode);
 
+ toggleSubdivisionInspectionMenu(false);
  if(agendaMode)renderSubdivisionAgenda();
  if(punchoutMode)renderSubdivisionPunchout();
+ if(inspectionMode)renderSubdivisionInspectionMenu();
 }
 function showLots(){
  setTimeout(()=>updateAppPresenceLocation(),0);
@@ -3744,6 +3831,7 @@ function showLots(){
  $('subdivisionName').textContent=s?.name||'';
  $('subdivisionAgendaName').textContent=s?.name||'';
  if($('subdivisionPunchoutName'))$('subdivisionPunchoutName').textContent=s?.name||'';
+ if($('subdivisionInspectionName'))$('subdivisionInspectionName').textContent=s?.name||'';
 
  const arr=lots.filter(l=>l.subdivision_id===currentSubdivision);
  $('lotsGrid').innerHTML=arr.map(l=>`
@@ -7711,6 +7799,12 @@ $('backToSubs').onclick=showSubs;
 $('subdivisionLotsTab').onclick=()=>showSubdivisionPanel('lots');
 $('subdivisionAgendaTab').onclick=()=>showSubdivisionPanel('agenda');
 $('subdivisionPunchoutTab').onclick=()=>showSubdivisionPanel('punchout');
+$('subdivisionInspectionTab').onclick=()=>showSubdivisionPanel('inspection');
+$('subdivisionInspectionDropdownButton').onclick=e=>{e.stopPropagation();toggleSubdivisionInspectionMenu()};
+document.addEventListener('click',e=>{
+ const wrap=e.target.closest?.('.subdivision-inspection-dropdown-wrap');
+ if(!wrap)toggleSubdivisionInspectionMenu(false);
+});
 $('backToLots').onclick=showLots;
 function dateInputValue(v){
  if(!v) return '';
