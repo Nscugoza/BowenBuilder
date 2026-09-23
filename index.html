@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="2026-09-17-subdivision-site-map">
+<meta name="bowenbuilder-version" content="2026-09-23-calendar-inspection-doubletap-add">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -2067,6 +2067,20 @@ button.teams-file-row:hover{border-color:#bdccdd}
   pointer-events:none;
 }
 
+
+.schedule-view-toggle a.secondary{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  text-decoration:none;
+}
+.bb-calendar-day{touch-action:manipulation;-webkit-tap-highlight-color:rgba(23,79,134,.08)}
+#calendarCalledInSelected.active{
+  background:#edf9f2;
+  color:#1f704b;
+  border-color:#a9d9be;
+}
+
 </style>
 </head>
 <body>
@@ -2226,6 +2240,7 @@ button.teams-file-row:hover{border-color:#bdccdd}
       <div class="schedule-view-toggle">
         <button id="scheduleCalendarMode" class="primary" type="button">▦ Calendar</button>
         <button id="scheduleListMode" class="secondary" type="button">☷ List</button>
+        <a id="scheduleInspectionCalendarLink" class="secondary hidden" href="#" target="_blank" rel="noopener noreferrer">Schedule Inspection ↗</a>
       </div>
 
       <div id="scheduleCalendarPanel">
@@ -2239,7 +2254,7 @@ button.teams-file-row:hover{border-color:#bdccdd}
         </div>
         <div class="bb-calendar-actions">
           <button id="calendarToday" class="secondary" type="button">Today</button>
-          <span class="called-in-help">Double-click / double-tap a date to mark Called In ✓ · E/T appear after Email Date or Text Date is opened</span>
+          <span class="called-in-help">Single-tap a date to select it · Double-tap a date to add a schedule item</span>
         </div>
         <div id="calendarMoveBanner" class="calendar-move-banner hidden">
           <div>
@@ -2260,6 +2275,7 @@ button.teams-file-row:hover{border-color:#bdccdd}
               <div id="calendarSelectedCount" class="muted"></div>
             </div>
             <div class="calendar-day-actions">
+              <button id="calendarCalledInSelected" class="secondary" type="button">✓ Mark Called In</button>
               <button id="calendarEmailSelected" class="secondary" type="button">✉ Email Date</button>
               <button id="calendarTextSelected" class="secondary" type="button">💬 Text Date</button>
               <button id="calendarAddSelected" class="primary" type="button">+ Add Item</button>
@@ -5052,6 +5068,8 @@ let scheduleContext='lot';
 let scheduleCalendarCursor=new Date();
 scheduleCalendarCursor=new Date(scheduleCalendarCursor.getFullYear(),scheduleCalendarCursor.getMonth(),1);
 let scheduleSelectedDate='';
+let calendarLastTapKey='';
+let calendarLastTapAt=0;
 let scheduleMoveItemId='';
 let scheduleMoveBusy=false;
 
@@ -5365,30 +5383,32 @@ function renderScheduleCalendar(){
      ? `<div class="bb-calendar-comm-marks">${wasEmailedDate(key)?'<span class="bb-calendar-comm-mark email" title="Email opened for this date">E</span>':''}${wasTextedDate(key)?'<span class="bb-calendar-comm-mark text" title="Text opened for this date">T</span>':''}</div>`
      : '';
    btn.innerHTML=`<span class="bb-calendar-number">${d.getDate()}</span>${commHtml}<div class="bb-calendar-events">${eventHtml}</div>${dayItems.length>3?`<div class="bb-calendar-more">+${dayItems.length-3} more</div>`:''}`;
-   let lastTapAt=0;
-   btn.addEventListener('click',()=>{
+   btn.addEventListener('click',e=>{
      if(scheduleMoveItemId){
        moveScheduleItemToDate(scheduleMoveItemId,key);
        return;
      }
      const now=Date.now();
-     if(now-lastTapAt<330){
-       lastTapAt=0;
-       toggleCalledInDate(key);
-       return;
-     }
-     lastTapAt=now;
+     const isDoubleTap=calendarLastTapKey===key && (now-calendarLastTapAt)<420;
+     calendarLastTapKey=key;
+     calendarLastTapAt=now;
+
      scheduleSelectedDate=key;
      scheduleCalendarCursor=new Date(d.getFullYear(),d.getMonth(),1);
+
+     if(isDoubleTap){
+       e.preventDefault();
+       calendarLastTapKey='';
+       calendarLastTapAt=0;
+       renderScheduleCalendar();
+       openScheduleDialogLive('','schedule',key);
+       return;
+     }
+
      renderScheduleCalendar();
      renderSelectedScheduleDay();
    });
-   btn.addEventListener('dblclick',e=>{
-     e.preventDefault();
-     if(scheduleMoveItemId)return;
-     lastTapAt=0;
-     toggleCalledInDate(key);
-   });
+   btn.addEventListener('dblclick',e=>e.preventDefault());
    grid.appendChild(btn);
  }
  renderSelectedScheduleDay();
@@ -7250,6 +7270,13 @@ async function textSelectedCalendarDate(){
 
 function renderSelectedScheduleDay(){
  const wrap=$('calendarSelectedItems');
+ const calledBtn=$('calendarCalledInSelected');
+ if(calledBtn){
+   const active=!!scheduleSelectedDate && isCalledInDate(scheduleSelectedDate);
+   calledBtn.classList.toggle('active',active);
+   calledBtn.textContent=active?'✓ Called In':'✓ Mark Called In';
+   calledBtn.disabled=!scheduleSelectedDate;
+ }
  if(!scheduleSelectedDate){
    $('calendarSelectedTitle').textContent='Select a day';
    $('calendarSelectedCount').textContent='';
@@ -7344,6 +7371,15 @@ async function showScheduleView(mode=scheduleViewMode,preserveScroll=false){
  $('heroSub').textContent=`${sub?.name||''}${activeLot?.address?' · '+activeLot.address:''}`;
  updateHeroSiteMap(null);
  $('scheduleScope').textContent=`Showing only ${activeLot?.lot_name||'this lot'}`;
+ const inspectionLink=$('scheduleInspectionCalendarLink');
+ if(inspectionLink){
+   const permitLink=safe(activeLot?.permit_url||'');
+   inspectionLink.classList.toggle('hidden',!permitLink);
+   inspectionLink.href=permitLink||'#';
+   if(permitLink)inspectionLink.dataset.scheduleInspectionUrl=permitLink;
+   else delete inspectionLink.dataset.scheduleInspectionUrl;
+ }
+ wireScheduleInspectionExternal();
  if(!scheduleSelectedDate)scheduleSelectedDate=localDateKey(new Date());
  const selected=dateFromKey(scheduleSelectedDate);
  if(selected)scheduleCalendarCursor=new Date(selected.getFullYear(),selected.getMonth(),1);
@@ -7541,6 +7577,10 @@ $('calendarBackToLot').onclick=()=>{
 };
 $('schedulePageAdd').onclick=()=>openScheduleDialogLive('','schedule',scheduleSelectedDate||todayInput());
 if($('calendarMoveCancel'))$('calendarMoveCancel').onclick=()=>cancelScheduleMove();
+if($('calendarCalledInSelected'))$('calendarCalledInSelected').onclick=()=>{
+  if(!scheduleSelectedDate)return;
+  toggleCalledInDate(scheduleSelectedDate);
+};
 $('calendarEmailSelected').onclick=emailSelectedCalendarDate;
 $('calendarTextSelected').onclick=textSelectedCalendarDate;
 $('calendarAddSelected').onclick=()=>openScheduleDialogLive('','schedule',scheduleSelectedDate||todayInput());
