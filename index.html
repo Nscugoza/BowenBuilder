@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="2026-09-23-calendar-inspection-status">
+<meta name="bowenbuilder-version" content="2026-09-23-inspection-email-sync">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -2166,6 +2166,26 @@ button.teams-file-row:hover{border-color:#bdccdd}
   }
 }
 
+
+.inspection-email-sync-card{display:grid;gap:16px}
+.inspection-email-sync-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
+.inspection-email-sync-controls{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
+.inspection-email-sync-controls label{margin:0;min-width:150px}
+.inspection-email-sync-controls button{min-height:46px}
+.inspection-email-sync-status{padding:10px 12px;border-radius:12px;background:#f8fafc;border:1px solid #e4e7ec}
+.inspection-email-sync-status.success{background:#edf9f2;border-color:#cfe8d9;color:#1f704b}
+.inspection-email-sync-status.error{background:#fff1f0;border-color:#f1c8c4;color:#a1271d}
+.inspection-email-results{display:grid;gap:8px}
+.inspection-email-result{padding:10px 12px;border:1px solid #e4e7ec;border-radius:12px;background:#fff}
+.inspection-email-result-title{font-weight:800;color:#25364d}
+.inspection-email-result-meta{font-size:12px;color:var(--muted);margin-top:3px;line-height:1.45}
+.inspection-email-result.updated{border-color:#b8dcc7;background:#f6fbf8}
+.inspection-email-result.unmatched{border-color:#ead9b8;background:#fffaf1}
+@media(max-width:640px){
+  .inspection-email-sync-controls{align-items:stretch}
+  .inspection-email-sync-controls label,.inspection-email-sync-controls button{width:100%}
+}
+
 </style>
 </head>
 <body>
@@ -2405,6 +2425,7 @@ button.teams-file-row:hover{border-color:#bdccdd}
       <div class="admin-inner-tabs">
         <button id="adminContactsTab" class="admin-inner-tab active" type="button">Schedule Contacts</button>
         <button id="adminPowerTab" class="admin-inner-tab" type="button">Power Companies</button>
+        <button id="adminInspectionEmailTab" class="admin-inner-tab" type="button">Inspection Email Sync</button>
         <button id="adminPermissionsTab" class="admin-inner-tab" type="button">User Permissions</button>
         <button id="adminOnlineTab" class="admin-inner-tab" type="button">Online Now</button>
       </div>
@@ -2429,6 +2450,38 @@ button.teams-file-row:hover{border-color:#bdccdd}
         </div>
         <div id="adminPowerNotice" class="notice hidden" style="margin:12px 0"></div>
         <div id="adminPowerList" class="admin-power-list"></div>
+      </div>
+
+      <div id="adminInspectionEmailPanel" class="hidden">
+        <div class="card admin-note">
+          <strong>Inspection Email Sync</strong>
+          <div class="muted" style="margin-top:5px">Reads approved inspection-result emails from your signed-in Microsoft mailbox and updates matching BowenBuilder inspection statuses. This first version automatically processes Right Choice / Vallus inspection emails only.</div>
+        </div>
+
+        <div class="card inspection-email-sync-card">
+          <div class="inspection-email-sync-head">
+            <div>
+              <strong>Microsoft Mail</strong>
+              <div class="muted" style="margin-top:4px">Approved sender domain: <strong>vallus.com</strong></div>
+            </div>
+            <span class="pill">Read only</span>
+          </div>
+
+          <div class="inspection-email-sync-controls">
+            <label>Look back
+              <select id="inspectionEmailDays">
+                <option value="7">7 days</option>
+                <option value="30" selected>30 days</option>
+                <option value="60">60 days</option>
+                <option value="90">90 days</option>
+              </select>
+            </label>
+            <button id="inspectionEmailSyncNow" class="primary" type="button">↻ Sync Inspection Emails</button>
+          </div>
+
+          <div id="inspectionEmailSyncStatus" class="muted inspection-email-sync-status">Sign out and back in after Mail.Read is enabled, then run a sync.</div>
+          <div id="inspectionEmailSyncResults" class="inspection-email-results"></div>
+        </div>
       </div>
 
       <div id="adminPermissionsPanel" class="hidden">
@@ -3523,7 +3576,7 @@ async function signIn(){
  const {error}=await db.auth.signInWithOAuth({
    provider:'azure',
    options:{
-     scopes:'openid email profile https://graph.microsoft.com/Mail.Send https://graph.microsoft.com/Files.Read.All https://graph.microsoft.com/Channel.ReadBasic.All https://graph.microsoft.com/Team.ReadBasic.All',
+     scopes:'openid email profile https://graph.microsoft.com/Mail.Send https://graph.microsoft.com/Mail.Read https://graph.microsoft.com/Files.Read.All https://graph.microsoft.com/Channel.ReadBasic.All https://graph.microsoft.com/Team.ReadBasic.All',
      redirectTo
    }
  });
@@ -3569,7 +3622,7 @@ async function load(){
  if(se||le||ie||pe||ppe||pre||mpe){alert((se||le||ie||pe||ppe||pre||mpe).message);return}
  subdivisions=s||[];lots=l||[];items=i||[];punchouts=p||[];punchoutPhotos=pp||[];profiles=pr||[];currentMembershipPermissions=mp||[];showSubs();
 }
-function appOn(){ $('login').classList.add('hidden');$('app').classList.remove('hidden');}
+function appOn(){ $('login').classList.add('hidden');$('app').classList.remove('hidden');setTimeout(()=>maybeAutoSyncInspectionEmails(),3000);}
 function showSubs(){
  setTimeout(()=>updateAppPresenceLocation(),0);
  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.view==='subdivisions'));
@@ -6097,24 +6150,292 @@ function showAdminPanel(panel='contacts'){
  activeAdminPanel=panel;
  const contacts=panel==='contacts';
  const power=panel==='power';
+ const inspectionEmail=panel==='inspection-email';
  const permissions=panel==='permissions';
  const online=panel==='online';
  $('adminContactsPanel').classList.toggle('hidden',!contacts);
  $('adminPowerPanel').classList.toggle('hidden',!power);
+ $('adminInspectionEmailPanel').classList.toggle('hidden',!inspectionEmail);
  $('adminPermissionsPanel').classList.toggle('hidden',!permissions);
  $('adminOnlinePanel').classList.toggle('hidden',!online);
  $('adminContactsTab').classList.toggle('active',contacts);
  $('adminPowerTab').classList.toggle('active',power);
+ $('adminInspectionEmailTab').classList.toggle('active',inspectionEmail);
  $('adminPermissionsTab').classList.toggle('active',permissions);
  $('adminOnlineTab').classList.toggle('active',online);
  if(contacts)renderAdminContacts();
  else if(power)renderAdminPowerCompanies();
+ else if(inspectionEmail)renderInspectionEmailSyncPanel();
  else if(permissions)renderAdminUserPermissions();
  else{
    syncAppPresenceState();
    loadAdminPresenceProfiles().then(()=>renderAdminOnlineUsers());
  }
  updateAppPresenceLocation();
+}
+
+
+const INSPECTION_EMAIL_ALLOWED_DOMAINS=['vallus.com'];
+let inspectionEmailSyncRunning=false;
+let inspectionEmailSyncLastResults=[];
+
+function inspectionEmailStatusEl(){
+  return $('inspectionEmailSyncStatus');
+}
+function setInspectionEmailSyncStatus(message,type=''){
+  const el=inspectionEmailStatusEl();
+  if(!el)return;
+  el.textContent=message||'';
+  el.classList.remove('success','error');
+  if(type)el.classList.add(type);
+}
+function renderInspectionEmailSyncPanel(){
+  const results=$('inspectionEmailSyncResults');
+  if(!results)return;
+  if(!inspectionEmailSyncLastResults.length){
+    results.innerHTML='<div class="muted">No inspection email sync results yet.</div>';
+    return;
+  }
+  results.innerHTML=inspectionEmailSyncLastResults.slice(0,30).map(r=>`
+    <div class="inspection-email-result ${esc(r.kind||'')}">
+      <div class="inspection-email-result-title">${esc(r.title||'Inspection email')}</div>
+      <div class="inspection-email-result-meta">${esc(r.meta||'')}</div>
+    </div>
+  `).join('');
+}
+
+async function microsoftMailGraphJson(path){
+  const token=await microsoftProviderToken();
+  if(!token)throw new Error('Microsoft Mail permission is not active. Sign out of BowenBuilder and sign back in with Microsoft.');
+  const url=/^https:\/\/graph\.microsoft\.com\//i.test(path)
+    ? path
+    : `https://graph.microsoft.com/v1.0${path}`;
+  const response=await fetch(url,{
+    headers:{
+      'Authorization':`Bearer ${token}`,
+      'Accept':'application/json'
+    }
+  });
+  let payload=null;
+  try{payload=await response.json()}catch(_){}
+  if(!response.ok){
+    if(response.status===401||response.status===403){
+      throw new Error('BowenBuilder does not currently have Microsoft Mail.Read permission. Add delegated Mail.Read in Microsoft Entra, then sign out and back in to BowenBuilder and approve the permission.');
+    }
+    throw new Error(payload?.error?.message||`Microsoft Mail request failed (${response.status}).`);
+  }
+  return payload;
+}
+
+function normalizeInspectionEmailText(value){
+  return String(value||'')
+    .toLowerCase()
+    .replace(/&nbsp;/g,' ')
+    .replace(/[^a-z0-9]+/g,' ')
+    .replace(/\s+/g,' ')
+    .trim();
+}
+
+function htmlToInspectionText(value){
+  const raw=String(value||'');
+  if(!raw)return '';
+  try{
+    const doc=new DOMParser().parseFromString(raw,'text/html');
+    return String(doc.body?.innerText||doc.body?.textContent||raw);
+  }catch(_){
+    return raw.replace(/<[^>]+>/g,' ');
+  }
+}
+
+function inspectionEmailSenderAddress(message){
+  return String(message?.from?.emailAddress?.address||'').trim().toLowerCase();
+}
+
+function inspectionEmailAllowed(message){
+  const sender=inspectionEmailSenderAddress(message);
+  return INSPECTION_EMAIL_ALLOWED_DOMAINS.some(domain=>sender===domain||sender.endsWith('@'+domain));
+}
+
+function inspectionStatusFromEmailText(subject,body){
+  const text=normalizeInspectionEmailText(`${subject||''} ${body||''}`);
+  if(/\bno go\b/.test(text) || /\bfailed\b/.test(text) || /\bfail\b/.test(text) || /\bnot approved\b/.test(text))return 'failed';
+  if(/\bpassed\b/.test(text) || /\bpass\b/.test(text) || /\bapproved\b/.test(text) || /\bgo\b/.test(text))return 'passed';
+  if(/\bcancelled\b/.test(text) || /\bcanceled\b/.test(text))return 'cancelled';
+  if(/\bscheduled\b/.test(text))return 'scheduled';
+  if(/\brequested\b/.test(text))return 'requested';
+  return '';
+}
+
+function inspectionLotNumber(value){
+  const match=String(value||'').match(/\b(?:lot\s*)?(\d{1,4})\b/i);
+  return match?match[1]:'';
+}
+
+function inspectionEmailFindLot(subject,body){
+  const combined=normalizeInspectionEmailText(`${subject||''} ${body||''}`);
+  const candidates=[];
+  for(const lot of lots){
+    const sub=subdivisions.find(s=>String(s.id)===String(lot.subdivision_id));
+    const subName=normalizeInspectionEmailText(sub?.name||'');
+    const lotNumber=inspectionLotNumber(lot.lot_name||'');
+    if(!subName||!lotNumber)continue;
+    const lotPattern=new RegExp(`\\blot\\s*${lotNumber}\\b`,'i');
+    const hasSubdivision=combined.includes(subName);
+    const hasLot=lotPattern.test(combined);
+    if(hasSubdivision&&hasLot)candidates.push(lot);
+  }
+  return candidates.length===1?candidates[0]:null;
+}
+
+function inspectionEmailFindScheduleItem(lot,subject,body){
+  if(!lot)return null;
+  const text=normalizeInspectionEmailText(`${subject||''} ${body||''}`);
+  const lotItems=items.filter(i=>String(i.lot_id)===String(lot.id));
+
+  if(text.includes('pre insulation') || text.includes('preinsulation')){
+    const exact=lotItems.find(i=>normalizeInspectionEmailText(i.name).includes('rightchoice pre insulation'));
+    if(exact)return exact;
+    const fallback=lotItems.find(i=>normalizeInspectionEmailText(i.name).includes('pre insulation'));
+    if(fallback)return fallback;
+  }
+
+  // Conservative generic matching: only use a schedule item when its full normalized
+  // name appears in the email text. This avoids updating the wrong trade.
+  const matches=lotItems.filter(i=>{
+    const name=normalizeInspectionEmailText(i.name||'');
+    return name.length>=6 && text.includes(name);
+  });
+  return matches.length===1?matches[0]:null;
+}
+
+function inspectionEmailReceivedLabel(value){
+  if(!value)return '';
+  const d=new Date(value);
+  return Number.isNaN(d.getTime())?'':d.toLocaleString();
+}
+
+async function fetchInspectionEmailCandidates(days=30){
+  const cutoff=new Date(Date.now()-Math.max(1,Number(days||30))*86400000);
+  const select=encodeURIComponent('id,subject,from,receivedDateTime,bodyPreview');
+  let url=`/me/mailFolders/inbox/messages?$top=100&$select=${select}&$orderby=receivedDateTime%20desc`;
+  const messages=[];
+  let pages=0;
+
+  while(url && pages<5){
+    const data=await microsoftMailGraphJson(url);
+    const page=data?.value||[];
+    for(const msg of page){
+      const received=new Date(msg.receivedDateTime||0);
+      if(received>=cutoff && inspectionEmailAllowed(msg))messages.push(msg);
+    }
+    pages++;
+    const oldest=page.length?new Date(page[page.length-1].receivedDateTime||0):null;
+    if(oldest && oldest<cutoff)break;
+    url=data?.['@odata.nextLink']||'';
+  }
+  return messages;
+}
+
+async function syncOneInspectionEmail(message){
+  const detail=await microsoftMailGraphJson(`/me/messages/${encodeURIComponent(message.id)}?$select=id,subject,from,receivedDateTime,body,bodyPreview`);
+  const bodyText=htmlToInspectionText(detail?.body?.content||detail?.bodyPreview||'');
+  const subject=detail?.subject||message.subject||'';
+  const status=inspectionStatusFromEmailText(subject,bodyText);
+  const lot=inspectionEmailFindLot(subject,bodyText);
+  const scheduleItem=inspectionEmailFindScheduleItem(lot,subject,bodyText);
+  const sender=inspectionEmailSenderAddress(detail||message);
+  const received=inspectionEmailReceivedLabel(detail?.receivedDateTime||message.receivedDateTime);
+
+  if(!status){
+    return {kind:'unmatched',title:subject||'Inspection email',meta:`${sender}${received?' · '+received:''} · Result/status not recognized`};
+  }
+  if(!lot){
+    return {kind:'unmatched',title:subject||'Inspection email',meta:`${sender}${received?' · '+received:''} · Could not uniquely match a subdivision and lot`};
+  }
+  if(!scheduleItem){
+    return {kind:'unmatched',title:subject||'Inspection email',meta:`${lot.lot_name} · ${sender}${received?' · '+received:''} · Could not uniquely match a schedule item`};
+  }
+
+  const oldStatus=String(scheduleItem.inspection_status||'').toLowerCase();
+  if(oldStatus===status){
+    return {kind:'matched',title:`${lot.lot_name} · ${scheduleItem.name}`,meta:`Already ${inspectionStatusDisplay(status)} · ${received||'email matched'}`};
+  }
+
+  const {data,error}=await db.from('schedule_items')
+    .update({inspection_status:status})
+    .eq('id',scheduleItem.id)
+    .select()
+    .single();
+
+  if(error)throw error;
+  const index=items.findIndex(i=>String(i.id)===String(scheduleItem.id));
+  if(index>=0)items[index]=data;
+
+  return {kind:'updated',title:`${lot.lot_name} · ${scheduleItem.name}`,meta:`Inspection updated: ${inspectionStatusDisplay(oldStatus)||'Not linked'} → ${inspectionStatusDisplay(status)} · ${received||'email matched'}`};
+}
+
+async function runInspectionEmailSync({silent=false}={}){
+  if(inspectionEmailSyncRunning)return;
+  if(!isBowenBuilderAdmin()){
+    if(!silent)alert('Inspection Email Sync is currently limited to the BowenBuilder admin account.');
+    return;
+  }
+
+  inspectionEmailSyncRunning=true;
+  const button=$('inspectionEmailSyncNow');
+  if(button){button.disabled=true;button.textContent='Syncing…';}
+  if(!silent)setInspectionEmailSyncStatus('Checking your Microsoft inbox for approved inspection emails…');
+
+  try{
+    const days=Math.max(1,Number($('inspectionEmailDays')?.value||30));
+    const messages=await fetchInspectionEmailCandidates(days);
+    const results=[];
+
+    for(const message of messages){
+      try{
+        results.push(await syncOneInspectionEmail(message));
+      }catch(err){
+        results.push({
+          kind:'unmatched',
+          title:message.subject||'Inspection email',
+          meta:`Could not process: ${err?.message||err}`
+        });
+      }
+    }
+
+    inspectionEmailSyncLastResults=results;
+    const updated=results.filter(r=>r.kind==='updated').length;
+    const matched=results.filter(r=>r.kind==='matched').length;
+    const unmatched=results.filter(r=>r.kind==='unmatched').length;
+
+    const now=new Date();
+    try{localStorage.setItem('bowenbuilder_inspection_email_last_sync',String(now.getTime()))}catch(_){}
+
+    if(!messages.length){
+      setInspectionEmailSyncStatus(`No approved Right Choice / Vallus inspection emails were found in the last ${days} days.`,'success');
+    }else{
+      setInspectionEmailSyncStatus(`Sync complete: ${updated} updated, ${matched} already current, ${unmatched} need review.`,'success');
+    }
+    renderInspectionEmailSyncPanel();
+
+    // Refresh visible calendar/lot UI without forcing a navigation change.
+    if(currentScreen()==='schedule' && scheduleViewMode==='calendar')renderScheduleCalendar();
+    else if(currentScreen()==='lot' && currentLot)showLot(true);
+  }catch(err){
+    setInspectionEmailSyncStatus(err?.message||String(err),'error');
+    if(!silent)alert(err?.message||String(err));
+  }finally{
+    inspectionEmailSyncRunning=false;
+    if(button){button.disabled=false;button.textContent='↻ Sync Inspection Emails';}
+  }
+}
+
+function maybeAutoSyncInspectionEmails(){
+  if(!isBowenBuilderAdmin())return;
+  let last=0;
+  try{last=Number(localStorage.getItem('bowenbuilder_inspection_email_last_sync')||0)}catch(_){}
+  if(Date.now()-last<30*60*1000)return;
+  setTimeout(()=>runInspectionEmailSync({silent:true}),2500);
 }
 
 const SCHEDULE_AUTO_INFO_FIELDS=[
@@ -8189,9 +8510,12 @@ document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{
 });
 $('adminContactsTab').onclick=()=>showAdminPanel('contacts');
 $('adminPowerTab').onclick=()=>showAdminPanel('power');
+$('adminInspectionEmailTab').onclick=()=>showAdminPanel('inspection-email');
 $('adminPermissionsTab').onclick=()=>showAdminPanel('permissions');
 $('adminOnlineTab').onclick=()=>showAdminPanel('online');
 $('adminOnlineRefresh').onclick=async()=>{syncAppPresenceState();await loadAdminPresenceProfiles();renderAdminOnlineUsers();};
+if($('inspectionEmailSyncNow'))$('inspectionEmailSyncNow').onclick=()=>runInspectionEmailSync();
+
 $('adminContactSearch').oninput=()=>renderAdminContacts();
 $('adminUserSearch').oninput=()=>renderAdminUserPermissions();
 // Crew QR controls
