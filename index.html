@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="2026-09-23-inspection-email-sync">
+<meta name="bowenbuilder-version" content="2026-09-23-inspection-email-sync-barrow-overview">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -2186,6 +2186,25 @@ button.teams-file-row:hover{border-color:#bdccdd}
   .inspection-email-sync-controls label,.inspection-email-sync-controls button{width:100%}
 }
 
+
+.overview-inspection-pill{
+  display:inline-flex;
+  align-items:center;
+  margin-left:6px;
+  padding:5px 9px;
+  border-radius:999px;
+  font-size:12px;
+  font-weight:850;
+  border:1px solid transparent;
+  vertical-align:middle;
+}
+.overview-inspection-pill.check_county{background:#f3efff;border-color:#d9ccff;color:#6941c6}
+.overview-inspection-pill.requested{background:#fff7df;border-color:#edd9a1;color:#7a5310}
+.overview-inspection-pill.scheduled{background:#eaf2fb;border-color:#a9c9eb;color:#174f86}
+.overview-inspection-pill.passed{background:#edf9f2;border-color:#a9d9be;color:#1f704b}
+.overview-inspection-pill.failed{background:#fdeceb;border-color:#efaaa4;color:#a1271d}
+.overview-inspection-pill.cancelled{background:#f2f4f7;border-color:#d0d5dd;color:#667085}
+
 </style>
 </head>
 <body>
@@ -2455,14 +2474,14 @@ button.teams-file-row:hover{border-color:#bdccdd}
       <div id="adminInspectionEmailPanel" class="hidden">
         <div class="card admin-note">
           <strong>Inspection Email Sync</strong>
-          <div class="muted" style="margin-top:5px">Reads approved inspection-result emails from your signed-in Microsoft mailbox and updates matching BowenBuilder inspection statuses. This first version automatically processes Right Choice / Vallus inspection emails only.</div>
+          <div class="muted" style="margin-top:5px">Reads approved inspection-result emails from your signed-in Microsoft mailbox and updates matching BowenBuilder inspection statuses. It automatically processes Right Choice / Vallus inspection emails and Barrow County Tyler inspection emails.</div>
         </div>
 
         <div class="card inspection-email-sync-card">
           <div class="inspection-email-sync-head">
             <div>
               <strong>Microsoft Mail</strong>
-              <div class="muted" style="margin-top:4px">Approved sender domain: <strong>vallus.com</strong></div>
+              <div class="muted" style="margin-top:4px">Approved sources: <strong>vallus.com</strong> and <strong>barrowcountydonotreply@eplmail.tylerapp.com</strong></div>
             </div>
             <span class="pill">Read only</span>
           </div>
@@ -5148,12 +5167,14 @@ function showLot(preserveScroll=false){
    const sd=i.starts_at?new Date(i.starts_at).toLocaleDateString():'';
    const ed=i.ends_at?new Date(i.ends_at).toLocaleDateString():'';
    const comm=overviewCommunicationMarks(i);
+   const inspectionLabel=inspectionStatusDisplay(i.inspection_status);
+   const inspectionClass=esc(String(i.inspection_status||'').toLowerCase());
    return `<div class="schedule-card overview-schedule-card">
      <div class="overview-comm-badges">
        <span class="overview-comm-badge ${comm?.email?'active':''}" data-overview-email-badge="${i.id}">E</span>
        <span class="overview-comm-badge ${comm?.text?'active':''}" data-overview-text-badge="${i.id}">T</span>
      </div>
-     <div><span class="schedule-status-pill ${esc(i.status)}">${esc((i.status||'').replaceAll('_',' ').replace(/\b\w/g,c=>c.toUpperCase()))}</span><h4>${esc(i.name)}</h4><div class="schedule-meta">${esc(i.item_type)}${i.crew?' · '+esc(i.crew):''}<br>${sd}${ed&&ed!==sd?' → '+ed:''}</div></div><div class="schedule-actions overview-schedule-actions"><button class="iconbtn" type="button" data-overview-email="${i.id}">Email</button><button class="iconbtn" type="button" data-overview-text="${i.id}">Text</button><button class="iconbtn" type="button" data-edit-schedule="${i.id}">Edit</button></div></div>`;
+     <div><span class="schedule-status-pill ${esc(i.status)}">${esc((i.status||'').replaceAll('_',' ').replace(/\b\w/g,c=>c.toUpperCase()))}</span>${inspectionLabel?`<span class="overview-inspection-pill ${inspectionClass}">Inspection: ${esc(inspectionLabel)}</span>`:''}<h4>${esc(i.name)}</h4><div class="schedule-meta">${esc(i.item_type)}${i.crew?' · '+esc(i.crew):''}<br>${sd}${ed&&ed!==sd?' → '+ed:''}</div></div><div class="schedule-actions overview-schedule-actions"><button class="iconbtn" type="button" data-overview-email="${i.id}">Email</button><button class="iconbtn" type="button" data-overview-text="${i.id}">Text</button><button class="iconbtn" type="button" data-edit-schedule="${i.id}">Edit</button></div></div>`;
  }).join(''):'<div class="card muted">No schedule items yet.</div>';
  document.querySelectorAll('[data-overview-email]').forEach(btn=>{
    btn.onclick=()=>emailOverviewScheduleItem(btn.dataset.overviewEmail);
@@ -6176,6 +6197,7 @@ function showAdminPanel(panel='contacts'){
 
 
 const INSPECTION_EMAIL_ALLOWED_DOMAINS=['vallus.com'];
+const INSPECTION_EMAIL_ALLOWED_SENDERS=['barrowcountydonotreply@eplmail.tylerapp.com'];
 let inspectionEmailSyncRunning=false;
 let inspectionEmailSyncLastResults=[];
 
@@ -6253,6 +6275,7 @@ function inspectionEmailSenderAddress(message){
 
 function inspectionEmailAllowed(message){
   const sender=inspectionEmailSenderAddress(message);
+  if(INSPECTION_EMAIL_ALLOWED_SENDERS.includes(sender))return true;
   return INSPECTION_EMAIL_ALLOWED_DOMAINS.some(domain=>sender===domain||sender.endsWith('@'+domain));
 }
 
@@ -6297,6 +6320,24 @@ function inspectionEmailFindScheduleItem(lot,subject,body){
     if(exact)return exact;
     const fallback=lotItems.find(i=>normalizeInspectionEmailText(i.name).includes('pre insulation'));
     if(fallback)return fallback;
+  }
+
+  // Common Barrow County / Tyler inspection wording.
+  // Only return a match when the wording points to one specific BowenBuilder item.
+  const senderText=text;
+  const barrowAliases=[
+    {terms:['slab plumbing inspection','plumbing slab inspection'],names:['Slab Plumbing Inspection']},
+    {terms:['slab inspection','concrete slab inspection'],names:['Slab Inspection']},
+    {terms:['framing inspection','frame inspection'],names:['Framing Inspection']},
+    {terms:['rough mechanical inspection','mechanical rough inspection'],names:['Rough Mechanical Inspection']},
+    {terms:['drywall inspection','sheetrock inspection'],names:['Drywall']},
+    {terms:['driveway inspection'],names:['Call In Driveway Inspection']},
+    {terms:['co inspection','certificate of occupancy inspection','final occupancy inspection'],names:['Call in CO Inspection']}
+  ];
+  for(const alias of barrowAliases){
+    if(!alias.terms.some(term=>senderText.includes(term)))continue;
+    const matches=lotItems.filter(i=>alias.names.includes(String(i.name||'')));
+    if(matches.length===1)return matches[0];
   }
 
   // Conservative generic matching: only use a schedule item when its full normalized
@@ -6412,7 +6453,7 @@ async function runInspectionEmailSync({silent=false}={}){
     try{localStorage.setItem('bowenbuilder_inspection_email_last_sync',String(now.getTime()))}catch(_){}
 
     if(!messages.length){
-      setInspectionEmailSyncStatus(`No approved Right Choice / Vallus inspection emails were found in the last ${days} days.`,'success');
+      setInspectionEmailSyncStatus(`No approved Right Choice / Vallus or Barrow County inspection emails were found in the last ${days} days.`,'success');
     }else{
       setInspectionEmailSyncStatus(`Sync complete: ${updated} updated, ${matched} already current, ${unmatched} need review.`,'success');
     }
