@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="2026-09-23-barrow-ocr-autocalendar-reinspection">
+<meta name="bowenbuilder-version" content="2026-09-23-barrow-sync-parser-v3">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -2499,14 +2499,14 @@ button.teams-file-row:hover{border-color:#bdccdd}
       <div id="adminInspectionEmailPanel" class="hidden">
         <div class="card admin-note">
           <strong>Inspection Email Sync</strong>
-          <div class="muted" style="margin-top:5px">Reads approved inspection-result emails from your signed-in Microsoft mailbox and updates matching BowenBuilder inspection statuses. It processes Right Choice / Vallus emails by subdivision + lot. For Barrow County Tyler emails, it matches Permit Number + Address, reads the attached inspection worksheet (including scanned PDFs/images with OCR), finds the inspection date/type/result, and automatically adds or updates that inspection on the lot calendar. Reinspections are kept as separate calendar events.</div>
+          <div class="muted" style="margin-top:5px">Reads approved inspection-result emails from your signed-in Microsoft mailbox and updates matching BowenBuilder inspection statuses. It processes Right Choice / Vallus emails by subdivision + lot. Every email from Tyler's eplmail.tylerapp.com domain is handled as a Barrow County worksheet report: BowenBuilder matches Permit Number + Address, reads the attached worksheet (including scanned PDFs/images with OCR), extracts the inspection date/type/result, and automatically adds or updates that inspection on the lot calendar. Reinspections stay as separate calendar events. <strong>Parser v3</strong>.</div>
         </div>
 
         <div class="card inspection-email-sync-card">
           <div class="inspection-email-sync-head">
             <div>
               <strong>Microsoft Mail</strong>
-              <div class="muted" style="margin-top:4px">Approved sources: <strong>vallus.com</strong> and <strong>barrowcountydonotreply@eplmail.tylerapp.com</strong></div>
+              <div class="muted" style="margin-top:4px">Approved sources: <strong>vallus.com</strong> and <strong>eplmail.tylerapp.com</strong> (Barrow/Tyler)</div>
             </div>
             <span class="pill">Read only</span>
           </div>
@@ -6223,7 +6223,7 @@ function showAdminPanel(panel='contacts'){
 }
 
 
-const INSPECTION_EMAIL_ALLOWED_DOMAINS=['vallus.com'];
+const INSPECTION_EMAIL_ALLOWED_DOMAINS=['vallus.com','eplmail.tylerapp.com'];
 const INSPECTION_EMAIL_ALLOWED_SENDERS=['barrowcountydonotreply@eplmail.tylerapp.com'];
 let inspectionEmailSyncRunning=false;
 let inspectionEmailSyncLastResults=[];
@@ -6298,6 +6298,21 @@ function htmlToInspectionText(value){
 
 function inspectionEmailSenderAddress(message){
   return String(message?.from?.emailAddress?.address||'').trim().toLowerCase();
+}
+
+function inspectionEmailSenderName(message){
+  return String(message?.from?.emailAddress?.name||'').trim();
+}
+function isBarrowTylerSender(sender){
+  const value=String(sender||'').trim().toLowerCase();
+  return value==='barrowcountydonotreply@eplmail.tylerapp.com'
+    || value.endsWith('@eplmail.tylerapp.com');
+}
+function inspectionEmailSource(message){
+  const sender=inspectionEmailSenderAddress(message);
+  if(isBarrowTylerSender(sender))return 'Barrow County / Tyler';
+  if(sender.endsWith('@vallus.com') || sender==='vallus.com')return 'Right Choice / Vallus';
+  return sender||'Unknown';
 }
 
 function inspectionEmailAllowed(message){
@@ -6379,7 +6394,7 @@ function inspectionEmailFindLot(subject,body,sender=''){
 
   // Barrow County's Tyler emails identify the property by Permit Number + Address.
   // Match both against the lot record instead of depending on subdivision/lot wording.
-  if(senderAddress==='barrowcountydonotreply@eplmail.tylerapp.com'){
+  if(isBarrowTylerSender(senderAddress)){
     const exactMatches=lots.filter(lot=>{
       const permit=String(lot.permit_number||'').trim();
       const address=String(lot.address||'').trim();
@@ -6497,80 +6512,74 @@ function inspectionStatusFromWorksheetText(value){
   const raw=String(value||'');
   if(!raw.trim())return '';
 
-  // First favor an explicit Result/Status field from the worksheet.
-  const lines=raw.split(/\r?\n/).map(x=>x.replace(/\s+/g,' ').trim()).filter(Boolean);
-  const explicitPatterns=[
-    /\b(?:inspection\s+)?result(?:\s+code)?\s*[:\-]?\s*(passed|pass|approved|failed|fail|not approved|no go|cancelled|canceled)\b/i,
-    /\bresult\s+status\s*[:\-]?\s*(passed|pass|approved|failed|fail|not approved|no go|cancelled|canceled)\b/i,
-    /\bstatus\s*[:\-]?\s*(passed|pass|approved|failed|fail|not approved|no go|cancelled|canceled)\b/i
-  ];
+  const lines=raw.split(/\r?\n/)
+    .map(x=>x.replace(/\s+/g,' ').trim())
+    .filter(Boolean);
 
   const mapResult=value=>{
-    const v=String(value||'').toLowerCase();
-    if(v==='passed'||v==='pass'||v==='approved')return 'passed';
-    if(v==='failed'||v==='fail'||v==='not approved'||v==='no go')return 'failed';
-    if(v==='cancelled'||v==='canceled')return 'cancelled';
+    const v=normalizeInspectionEmailText(value);
+    if(/\b(passed|pass|approved|accepted|complete|completed)\b/.test(v))return 'passed';
+    if(/\b(failed|fail|not approved|disapproved|rejected|no go|correction required|corrections required|denied)\b/.test(v))return 'failed';
+    if(/\b(cancelled|canceled|void|voided)\b/.test(v))return 'cancelled';
     return '';
   };
 
-  for(const line of lines){
-    for(const pattern of explicitPatterns){
-      const match=line.match(pattern);
-      if(match){
-        const mapped=mapResult(match[1]);
+  // First choice: a result/status field and the value immediately beside it.
+  const fieldLabels=[
+    'inspection result','result code','result status','result',
+    'inspection status','status'
+  ];
+
+  for(let i=0;i<lines.length;i++){
+    const line=lines[i];
+
+    for(const label of fieldLabels){
+      const escaped=label.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+
+      // Same-line field/value: "Result: Passed", "Status Failed", etc.
+      const sameLine=line.match(new RegExp(`\\b${escaped}\\b\\s*[:#-]?\\s*(.*)$`,'i'));
+      if(sameLine){
+        const mapped=mapResult(sameLine[1]);
         if(mapped)return mapped;
+
+        // OCR often splits a two-column form into consecutive text rows.
+        for(let j=i+1;j<Math.min(lines.length,i+4);j++){
+          const mappedNext=mapResult(lines[j]);
+          if(mappedNext)return mappedNext;
+          if(fieldLabels.some(other=>new RegExp(`^${other}\\b`,'i').test(lines[j])))break;
+        }
       }
     }
   }
 
-  // Some generated worksheets put the value directly beside a short field label
-  // without punctuation. Search a limited window around Result/Status.
-  const normalized=raw.replace(/\s+/g,' ');
-  const fieldMatch=normalized.match(
-    /\b(?:inspection\s+)?(?:result|status)\b.{0,80}?\b(passed|pass|approved|failed|fail|not approved|no go|cancelled|canceled)\b/i
-  );
-  if(fieldMatch){
-    const mapped=mapResult(fieldMatch[1]);
+  // Second choice: inspect a bounded window around the words Result / Status.
+  // This avoids accidentally treating boilerplate such as "approved plans"
+  // elsewhere on the worksheet as the inspection outcome.
+  const flattened=raw.replace(/\s+/g,' ');
+  const windows=[
+    ...flattened.matchAll(/\b(?:inspection\s+)?result\b.{0,120}/ig),
+    ...flattened.matchAll(/\b(?:inspection\s+)?status\b.{0,120}/ig)
+  ];
+  for(const match of windows){
+    const mapped=mapResult(match[0]);
     if(mapped)return mapped;
   }
 
-  // Final conservative fallback: only accept a result when exactly one result
-  // family appears anywhere in the extracted worksheet.
+  // Final conservative fallback. Only accept a result if one result family
+  // occurs and there is nearby inspection/result context.
   const lower=normalizeInspectionEmailText(raw);
-  const hasFailed=/\b(no go|failed|fail|not approved)\b/.test(lower);
-  const hasPassed=/\b(passed|pass|approved)\b/.test(lower);
-  const hasCancelled=/\b(cancelled|canceled)\b/.test(lower);
+  const resultContext=/\b(inspection|result|status|inspector)\b/.test(lower);
+  if(!resultContext)return '';
 
-  const families=[hasFailed,hasPassed,hasCancelled].filter(Boolean).length;
+  const failed=/\b(failed|fail|not approved|disapproved|rejected|no go|correction required|corrections required|denied)\b/.test(lower);
+  const passed=/\b(passed|pass|approved|accepted)\b/.test(lower);
+  const cancelled=/\b(cancelled|canceled|void|voided)\b/.test(lower);
+  const families=[failed,passed,cancelled].filter(Boolean).length;
+
   if(families!==1)return '';
-  if(hasFailed)return 'failed';
-  if(hasPassed)return 'passed';
-  if(hasCancelled)return 'cancelled';
-  return '';
-}
-
-
-function worksheetDateToKey(value){
-  const raw=String(value||'').trim();
-  if(!raw)return '';
-
-  let m=raw.match(/\b(20\d{2})[-\/](\d{1,2})[-\/](\d{1,2})\b/);
-  if(m){
-    const y=Number(m[1]),mo=Number(m[2]),d=Number(m[3]);
-    if(mo>=1&&mo<=12&&d>=1&&d<=31)return `${y}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-  }
-
-  m=raw.match(/\b(\d{1,2})[\/\-](\d{1,2})[\/\-](20\d{2}|\d{2})\b/);
-  if(m){
-    const mo=Number(m[1]),d=Number(m[2]);
-    let y=Number(m[3]); if(y<100)y+=2000;
-    if(mo>=1&&mo<=12&&d>=1&&d<=31)return `${y}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-  }
-
-  const parsed=new Date(raw);
-  if(!Number.isNaN(parsed.getTime())){
-    return `${parsed.getFullYear()}-${String(parsed.getMonth()+1).padStart(2,'0')}-${String(parsed.getDate()).padStart(2,'0')}`;
-  }
+  if(failed)return 'failed';
+  if(passed)return 'passed';
+  if(cancelled)return 'cancelled';
   return '';
 }
 
@@ -6630,21 +6639,21 @@ function canonicalBarrowInspectionName(rawType,allText=''){
   const raw=normalizeInspectionEmailText(`${rawType||''} ${allText||''}`);
 
   const aliases=[
-    {terms:['slab plumbing','plumbing slab','under slab plumbing'],name:'Slab Plumbing Inspection'},
-    {terms:['slab inspection','concrete slab'],name:'Slab Inspection'},
-    {terms:['footing inspection','footer inspection','footing'],name:'Footing Inspection'},
-    {terms:['foundation inspection','foundation'],name:'Foundation Inspection'},
-    {terms:['framing inspection','frame inspection','framing'],name:'Framing Inspection'},
-    {terms:['rough mechanical','mechanical rough'],name:'Rough Mechanical Inspection'},
-    {terms:['rough electrical','electrical rough','rough electric'],name:'Rough Electrical Inspection'},
-    {terms:['rough plumbing','plumbing rough'],name:'Rough Plumbing Inspection'},
-    {terms:['gas rough','rough gas'],name:'Rough Gas Inspection'},
-    {terms:['insulation inspection'],name:'Insulation Inspection'},
-    {terms:['drywall inspection','sheetrock inspection'],name:'Drywall Inspection'},
-    {terms:['temp pole','temporary pole','temporary power'],name:'Temp Pole Inspection'},
-    {terms:['driveway inspection'],name:'Driveway Inspection'},
-    {terms:['final building inspection','building final inspection','final inspection'],name:'Final Building Inspection'},
-    {terms:['certificate of occupancy','co inspection','c o inspection','occupancy inspection'],name:'CO Inspection'}
+    {terms:['slab plumbing','plumbing slab','under slab plumbing','underground plumbing'],name:'Slab Plumbing Inspection'},
+    {terms:['slab inspection','concrete slab','slab reinforcement','slab prep'],name:'Slab Inspection'},
+    {terms:['footing inspection','footer inspection','footing','footer'],name:'Footing Inspection'},
+    {terms:['foundation inspection','foundation wall','foundation'],name:'Foundation Inspection'},
+    {terms:['framing inspection','frame inspection','building rough','rough framing','framing rough','framing'],name:'Framing Inspection'},
+    {terms:['rough mechanical','mechanical rough','mechanical rough in','hvac rough'],name:'Rough Mechanical Inspection'},
+    {terms:['rough electrical','electrical rough','rough electric','electrical rough in'],name:'Rough Electrical Inspection'},
+    {terms:['rough plumbing','plumbing rough','plumbing rough in'],name:'Rough Plumbing Inspection'},
+    {terms:['gas rough','rough gas','gas rough in'],name:'Rough Gas Inspection'},
+    {terms:['insulation inspection','insulation'],name:'Insulation Inspection'},
+    {terms:['drywall inspection','sheetrock inspection','gypsum inspection'],name:'Drywall Inspection'},
+    {terms:['temp pole','temporary pole','temporary power','temp power'],name:'Temp Pole Inspection'},
+    {terms:['driveway inspection','driveway'],name:'Driveway Inspection'},
+    {terms:['final building inspection','building final inspection','building final','final inspection'],name:'Final Building Inspection'},
+    {terms:['certificate of occupancy','co inspection','c o inspection','occupancy inspection','occupancy final'],name:'CO Inspection'}
   ];
 
   for(const alias of aliases){
@@ -6693,7 +6702,8 @@ function inspectionTypeFromWorksheetText(value){
 
 function inspectionWorksheetIsReinspection(value,subject=''){
   const text=normalizeInspectionEmailText(`${subject||''} ${value||''}`);
-  return /\b(reinspection|re inspection|reinspect|re inspect|recheck|re check)\b/.test(text);
+  return /\b(reinspection|re inspection|re inspect|reinspect|recheck|re check|second inspection|follow up inspection|followup inspection)\b/.test(text)
+    || /\bre inspection fee\b/.test(text);
 }
 
 function inspectionWorksheetDetails(value,subject=''){
@@ -6938,7 +6948,7 @@ async function syncOneInspectionEmail(message){
   const bodyText=htmlToInspectionText(detail?.body?.content||detail?.bodyPreview||'');
   const subject=detail?.subject||message.subject||'';
   const sender=inspectionEmailSenderAddress(detail||message);
-  const isBarrow=sender==='barrowcountydonotreply@eplmail.tylerapp.com';
+  const isBarrow=isBarrowTylerSender(sender);
   const received=inspectionEmailReceivedLabel(detail?.receivedDateTime||message.receivedDateTime);
 
   let worksheet={name:'',text:''};
@@ -7015,7 +7025,7 @@ async function syncOneInspectionEmail(message){
     return {
       kind,
       title:`${lot.lot_name} · ${result.item.name}`,
-      meta:`${category} ${result.created?'added to':'updated on'} calendar ${details.date} · ${inspectionStatusDisplay(details.status)}${worksheetMeta}`
+      meta:`${category} ${result.created?'added to':'updated on'} calendar ${details.date} · ${inspectionStatusDisplay(details.status)} · Detected type: ${details.baseName}${details.reinspection?' · Worksheet says reinspection':''}${worksheetMeta} · Sender: ${sender}`
     };
   }
 
@@ -7026,7 +7036,7 @@ async function syncOneInspectionEmail(message){
     return {
       kind:'unmatched',
       title:subject||'Inspection email',
-      meta:`${lot.lot_name} · ${sender}${received?' · '+received:''} · Could not uniquely match a schedule item`
+      meta:`${lot.lot_name} · Right Choice / Vallus path · Sender: ${sender}${received?' · '+received:''} · Could not uniquely match a schedule item`
     };
   }
 
