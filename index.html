@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="2026-09-23-inspection-email-diagnostics">
+<meta name="bowenbuilder-version" content="2026-09-23-inspection-email-parser-v6">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -2505,7 +2505,7 @@ button.teams-file-row:hover{border-color:#bdccdd}
       <div id="adminInspectionEmailPanel" class="hidden">
         <div class="card admin-note">
           <strong>Inspection Email Sync</strong>
-          <div class="muted" style="margin-top:5px">Reads approved inspection-result emails from your signed-in Microsoft mailbox and updates matching BowenBuilder inspection statuses. It processes Right Choice / Vallus emails by subdivision + lot. Every email from Tyler's eplmail.tylerapp.com domain is handled as a Barrow County worksheet report: BowenBuilder matches Permit Number + Address, reads the attached worksheet (including scanned PDFs/images with OCR), extracts the inspection date/type/result, and automatically adds or updates that inspection on the lot calendar. Reinspections stay as separate calendar events. <strong>Parser v3 + Diagnostics</strong>. Use <strong>Diagnose Email Parsing</strong> to inspect what BowenBuilder is actually seeing without changing any schedule data.</div>
+          <div class="muted" style="margin-top:5px">Reads approved inspection-result emails from your signed-in Microsoft mailbox and updates matching BowenBuilder inspection statuses. It processes Right Choice / Vallus emails by subdivision + lot. Barrow/Tyler includes the missing worksheet date parser identified by diagnostics. Right Choice/Vallus now reads the attached inspection report instead of relying only on the email body, detects GO / NO GO / Pass / Fail, recognizes Pre-Insulation Reinspect reports, and adds or updates the correct calendar event while keeping reinspections separate. <strong>Parser v6</strong>. Diagnose Email Parsing remains read-only.</div>
         </div>
 
         <div class="card inspection-email-sync-card">
@@ -6447,6 +6447,278 @@ function base64ToUint8Array(base64){
   return bytes;
 }
 
+
+function rightChoiceAttachmentScore(att){
+  const name=String(att?.name||'').toLowerCase();
+  const type=String(att?.contentType||'').toLowerCase();
+  let score=0;
+  if(name.includes('inspection'))score+=100;
+  if(name.includes('rightchoice') || name.includes('right choice'))score+=90;
+  if(name.includes('report'))score+=80;
+  if(name.includes('result'))score+=70;
+  if(name.endsWith('.pdf') || type.includes('pdf'))score+=40;
+  if(type.startsWith('image/'))score+=30;
+  if(att?.isInline)score-=1000;
+  return score;
+}
+
+async function readRightChoiceInspectionReport(messageId){
+  const list=await microsoftMailGraphJson(
+    `/me/messages/${encodeURIComponent(messageId)}/attachments?$select=id,name,contentType,size,isInline`
+  );
+
+  const attachments=(list?.value||[])
+    .filter(att=>!att?.isInline)
+    .sort((a,b)=>rightChoiceAttachmentScore(b)-rightChoiceAttachmentScore(a));
+
+  for(const att of attachments){
+    const name=String(att?.name||'').toLowerCase();
+    const type=String(att?.contentType||'').toLowerCase();
+    const likely=
+      name.includes('inspection')
+      || name.includes('rightchoice')
+      || name.includes('right choice')
+      || name.includes('report')
+      || name.includes('result')
+      || name.endsWith('.pdf')
+      || type.includes('pdf')
+      || type.startsWith('image/')
+      || name.endsWith('.txt')
+      || type.startsWith('text/');
+
+    if(!likely)continue;
+    if(Number(att?.size||0)>12*1024*1024)continue;
+
+    try{
+      const detail=await microsoftMailGraphJson(
+        `/me/messages/${encodeURIComponent(messageId)}/attachments/${encodeURIComponent(att.id)}`
+      );
+      if(!detail?.contentBytes)continue;
+
+      const file=new File(
+        [base64ToUint8Array(detail.contentBytes)],
+        detail?.name||att?.name||'rightchoice-inspection-report.pdf',
+        {type:detail?.contentType||att?.contentType||'application/octet-stream'}
+      );
+
+      const extracted=await aiReadFile(file);
+      if(String(extracted||'').trim()){
+        return {name:file.name,text:String(extracted).trim()};
+      }
+    }catch(err){
+      console.warn('Could not read Right Choice inspection report',att?.name,err);
+    }
+  }
+  return {name:'',text:''};
+}
+
+function rightChoiceStatusFromReport(subject,body,reportText){
+  const report=String(reportText||'');
+  const lines=report.split(/\r?\n/)
+    .map(x=>x.replace(/\s+/g,' ').trim())
+    .filter(Boolean);
+
+  const map=value=>{
+    const v=normalizeInspectionEmailText(value);
+    if(/\b(no go|nogo|failed|fail|not approved|rejected|reinspection required|re inspection required|corrections required)\b/.test(v))return 'failed';
+    if(/\b(passed|pass|approved|go)\b/.test(v))return 'passed';
+    if(/\b(cancelled|canceled)\b/.test(v))return 'cancelled';
+    if(/\bscheduled\b/.test(v))return 'scheduled';
+    if(/\brequested\b/.test(v))return 'requested';
+    return '';
+  };
+
+  const labels=[
+    'inspection result','result','inspection status','status',
+    'outcome','inspection outcome','disposition'
+  ];
+
+  for(let i=0;i<lines.length;i++){
+    for(const label of labels){
+      const escaped=label.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+      const match=lines[i].match(new RegExp(`\\b${escaped}\\b\\s*[:#-]?\\s*(.*)$`,'i'));
+      if(!match)continue;
+
+      const same=map(match[1]);
+      if(same)return same;
+
+      for(let j=i+1;j<Math.min(lines.length,i+4);j++){
+        const next=map(lines[j]);
+        if(next)return next;
+      }
+    }
+  }
+
+  // Right Choice sometimes prints only GO / NO GO on its own line.
+  for(const line of lines){
+    const normalized=normalizeInspectionEmailText(line);
+    if(normalized==='no go' || normalized==='nogo')return 'failed';
+    if(normalized==='go')return 'passed';
+    if(normalized==='passed' || normalized==='pass' || normalized==='approved')return 'passed';
+    if(normalized==='failed' || normalized==='fail' || normalized==='not approved')return 'failed';
+  }
+
+  return inspectionStatusFromEmailText(subject,`${body||''}\n${report}`);
+}
+
+function rightChoiceBaseInspectionName(subject,body,reportText){
+  const value=normalizeInspectionEmailText(`${subject||''} ${body||''} ${reportText||''}`);
+
+  if(/\b(pre insulation|preinsulation|pre insul|pre drywall|predrywall)\b/.test(value)){
+    return 'RightChoice Pre-Insulation Inspection';
+  }
+  if(/\bframing\b/.test(value) && /\binspection\b/.test(value)){
+    return 'RightChoice Framing Inspection';
+  }
+  if(/\bfinal\b/.test(value) && /\binspection\b/.test(value)){
+    return 'RightChoice Final Inspection';
+  }
+  return '';
+}
+
+function rightChoiceIsReinspection(subject,body,reportText){
+  const value=normalizeInspectionEmailText(`${subject||''} ${body||''} ${reportText||''}`);
+  return /\b(reinspection|re inspection|reinspect|re inspect|recheck|re check|second inspection|follow up inspection|followup inspection)\b/.test(value);
+}
+
+function rightChoiceInspectionDate(subject,body,reportText,receivedDateTime){
+  const reportDate=inspectionDateFromWorksheetText(reportText||'');
+  if(reportDate)return reportDate;
+
+  const raw=`${subject||''}\n${body||''}`;
+  const lines=raw.split(/\r?\n/).map(x=>x.replace(/\s+/g,' ').trim()).filter(Boolean);
+  const labels=['inspection date','date inspected','date of inspection','report date','completed date'];
+
+  for(let i=0;i<lines.length;i++){
+    for(const label of labels){
+      const escaped=label.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+      const match=lines[i].match(new RegExp(`\\b${escaped}\\b\\s*[:#-]?\\s*(.*)$`,'i'));
+      if(!match)continue;
+      const same=worksheetDateToKey(match[1]);
+      if(same)return same;
+      for(let j=i+1;j<Math.min(lines.length,i+3);j++){
+        const next=worksheetDateToKey(lines[j]);
+        if(next)return next;
+      }
+    }
+  }
+
+  if(receivedDateTime){
+    const d=new Date(receivedDateTime);
+    if(!Number.isNaN(d.getTime())){
+      return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    }
+  }
+  return '';
+}
+
+function findRightChoiceExistingCalendarItem(lot,baseName,dateKey,reinspection){
+  const target=baseInspectionNameForCompare(baseName);
+  const lotItems=items.filter(i=>String(i.lot_id)===String(lot.id));
+
+  const exact=lotItems.find(i=>
+    baseInspectionNameForCompare(i.name)===target
+    && (!dateKey || itemStartKey(i)===dateKey)
+    && scheduleItemIsReinspection(i)===!!reinspection
+  );
+  if(exact)return exact;
+
+  if(!reinspection){
+    const planned=lotItems.find(i=>{
+      const n=normalizeInspectionEmailText(i.name||'');
+      return !scheduleItemIsReinspection(i)
+        && (n.includes('rightchoice pre insulation') || n.includes('pre insulation'))
+        && !['passed','failed','cancelled'].includes(String(i.inspection_status||'').toLowerCase());
+    });
+    if(planned)return planned;
+  }
+
+  return null;
+}
+
+function findRightChoiceItemByEmailId(lotId,messageId){
+  const marker=`RightChoice email ID: ${messageId}`;
+  return items.find(i=>
+    String(i.lot_id)===String(lotId)
+    && String(i.notes||'').includes(marker)
+  )||null;
+}
+
+async function upsertRightChoiceCalendarInspection({
+  lot,messageId,baseName,status,dateKey,reinspection,reportName
+}){
+  let isReinspection=!!reinspection;
+
+  if(!isReinspection && findPriorFailedInspection(lot.id,baseName,dateKey)){
+    isReinspection=true;
+  }
+
+  let existing=findRightChoiceItemByEmailId(lot.id,messageId);
+  if(!existing){
+    existing=findRightChoiceExistingCalendarItem(lot,baseName,dateKey,isReinspection);
+  }
+
+  const name=isReinspection
+    ? (existing && scheduleItemIsReinspection(existing)
+        ? existing.name
+        : nextReinspectionName(lot.id,baseName))
+    : (existing?.name || baseName);
+
+  const marker=`RightChoice email ID: ${messageId}`;
+  const note=[
+    'Auto-synced from Right Choice / Vallus inspection report.',
+    isReinspection?'Reinspection.':'',
+    reportName?`Report: ${reportName}.`:'',
+    marker
+  ].filter(Boolean).join(' ');
+
+  const scheduleStatus=['passed','failed','cancelled'].includes(status)?'complete':'scheduled';
+
+  if(existing){
+    const notes=String(existing.notes||'').includes(marker)
+      ? String(existing.notes||'')
+      : [String(existing.notes||'').trim(),note].filter(Boolean).join('\n');
+
+    const {data,error}=await db.from('schedule_items')
+      .update({
+        name,
+        status:scheduleStatus,
+        starts_at:dateKey+'T12:00:00Z',
+        ends_at:dateKey+'T12:00:00Z',
+        inspection_status:status,
+        notes
+      })
+      .eq('id',existing.id)
+      .select()
+      .single();
+
+    if(error)throw error;
+    const pos=items.findIndex(i=>String(i.id)===String(existing.id));
+    if(pos>=0)items[pos]=data; else items.push(data);
+    return {item:data,created:false,reinspection:isReinspection};
+  }
+
+  const {data,error}=await db.from('schedule_items')
+    .insert({
+      lot_id:lot.id,
+      item_type:'Inspection',
+      name,
+      status:scheduleStatus,
+      crew:'',
+      starts_at:dateKey+'T12:00:00Z',
+      ends_at:dateKey+'T12:00:00Z',
+      location:lot.address||'',
+      inspection_status:status,
+      notes:note
+    })
+    .select()
+    .single();
+
+  if(error)throw error;
+  items.push(data);
+  return {item:data,created:true,reinspection:isReinspection};
+}
+
 function inspectionWorksheetAttachmentScore(att){
   const name=String(att?.name||'').toLowerCase();
   const type=String(att?.contentType||'').toLowerCase();
@@ -6588,6 +6860,36 @@ function inspectionStatusFromWorksheetText(value){
   if(failed)return 'failed';
   if(passed)return 'passed';
   if(cancelled)return 'cancelled';
+  return '';
+}
+
+
+function worksheetDateToKey(value){
+  const raw=String(value||'').trim();
+  if(!raw)return '';
+
+  let m=raw.match(/\b(20\d{2})[-\/](\d{1,2})[-\/](\d{1,2})\b/);
+  if(m){
+    const y=Number(m[1]),mo=Number(m[2]),d=Number(m[3]);
+    if(mo>=1&&mo<=12&&d>=1&&d<=31){
+      return `${y}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    }
+  }
+
+  m=raw.match(/\b(\d{1,2})[\/\-](\d{1,2})[\/\-](20\d{2}|\d{2})\b/);
+  if(m){
+    const mo=Number(m[1]),d=Number(m[2]);
+    let y=Number(m[3]);
+    if(y<100)y+=2000;
+    if(mo>=1&&mo<=12&&d>=1&&d<=31){
+      return `${y}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    }
+  }
+
+  const parsed=new Date(raw);
+  if(!Number.isNaN(parsed.getTime())){
+    return `${parsed.getFullYear()}-${String(parsed.getMonth()+1).padStart(2,'0')}-${String(parsed.getDate()).padStart(2,'0')}`;
+  }
   return '';
 }
 
@@ -6957,17 +7259,18 @@ async function syncOneInspectionEmail(message){
   const subject=detail?.subject||message.subject||'';
   const sender=inspectionEmailSenderAddress(detail||message);
   const isBarrow=isBarrowTylerSender(sender);
+  const isVallus=sender.endsWith('@vallus.com') || sender==='vallus.com';
   const received=inspectionEmailReceivedLabel(detail?.receivedDateTime||message.receivedDateTime);
 
-  let worksheet={name:'',text:''};
+  let report={name:'',text:''};
   let status='';
   let matchingText=bodyText;
   let details=null;
 
   if(isBarrow){
-    worksheet=await readBarrowInspectionWorksheet(detail?.id||message.id);
+    report=await readBarrowInspectionWorksheet(detail?.id||message.id);
 
-    if(!worksheet.text){
+    if(!report.text){
       return {
         kind:'unmatched',
         title:subject||'Barrow County inspection email',
@@ -6975,21 +7278,25 @@ async function syncOneInspectionEmail(message){
       };
     }
 
-    details=inspectionWorksheetDetails(worksheet.text,subject);
+    details=inspectionWorksheetDetails(report.text,subject);
     status=details.status;
-    matchingText=`${bodyText}\n${worksheet.text}`;
+    matchingText=`${bodyText}\n${report.text}`;
+  }else if(isVallus){
+    report=await readRightChoiceInspectionReport(detail?.id||message.id);
+    status=rightChoiceStatusFromReport(subject,bodyText,report.text);
+    matchingText=`${bodyText}\n${report.text||''}`;
   }else{
     status=inspectionStatusFromEmailText(subject,bodyText);
   }
 
   const lot=inspectionEmailFindLot(subject,matchingText,sender);
-  const worksheetMeta=isBarrow && worksheet.name ? ` · Worksheet: ${worksheet.name}` : '';
+  const reportMeta=report?.name ? ` · Report: ${report.name}` : '';
 
   if(!status){
     return {
       kind:'unmatched',
       title:subject||'Inspection email',
-      meta:`${sender}${received?' · '+received:''}${worksheetMeta} · Result/status not recognized${isBarrow?' on attached worksheet':''}`
+      meta:`${sender}${received?' · '+received:''}${reportMeta} · Result/status not recognized`
     };
   }
 
@@ -7000,7 +7307,7 @@ async function syncOneInspectionEmail(message){
     return {
       kind:'unmatched',
       title:subject||'Inspection email',
-      meta:`${sender}${received?' · '+received:''}${worksheetMeta} · ${reason}`
+      meta:`${sender}${received?' · '+received:''}${reportMeta} · ${reason}`
     };
   }
 
@@ -7009,14 +7316,14 @@ async function syncOneInspectionEmail(message){
       return {
         kind:'unmatched',
         title:subject||'Barrow County inspection email',
-        meta:`${lot.lot_name} · ${received||'email matched'}${worksheetMeta} · Inspection type could not be identified on the worksheet`
+        meta:`${lot.lot_name} · ${received||'email matched'}${reportMeta} · Inspection type could not be identified on the worksheet`
       };
     }
     if(!details?.date){
       return {
         kind:'unmatched',
         title:subject||'Barrow County inspection email',
-        meta:`${lot.lot_name} · ${details.baseName}${worksheetMeta} · Inspection date could not be identified on the worksheet`
+        meta:`${lot.lot_name} · ${details.baseName}${reportMeta} · Inspection date could not be identified on the worksheet`
       };
     }
 
@@ -7024,27 +7331,67 @@ async function syncOneInspectionEmail(message){
       lot,
       details,
       messageId:detail?.id||message.id,
-      worksheetName:worksheet.name,
+      worksheetName:report.name,
       receivedDateTime:detail?.receivedDateTime||message.receivedDateTime
     });
 
-    const kind=result.created?'updated':'matched';
     const category=result.reinspection?'Reinspection':'Inspection';
     return {
-      kind,
+      kind:result.created?'updated':'matched',
       title:`${lot.lot_name} · ${result.item.name}`,
-      meta:`${category} ${result.created?'added to':'updated on'} calendar ${details.date} · ${inspectionStatusDisplay(details.status)} · Detected type: ${details.baseName}${details.reinspection?' · Worksheet says reinspection':''}${worksheetMeta} · Sender: ${sender}`
+      meta:`${category} ${result.created?'added to':'updated on'} calendar ${details.date} · ${inspectionStatusDisplay(details.status)} · Detected type: ${details.baseName}${reportMeta} · Sender: ${sender}`
     };
   }
 
-  // Right Choice / Vallus behavior remains conservative: update an existing
-  // matching scheduled inspection; do not invent a new date from email text.
+  if(isVallus){
+    const baseName=rightChoiceBaseInspectionName(subject,bodyText,report.text);
+    if(!baseName){
+      return {
+        kind:'unmatched',
+        title:subject||'Right Choice inspection email',
+        meta:`${lot.lot_name} · Status ${inspectionStatusDisplay(status)} detected, but inspection type was not recognized${reportMeta}`
+      };
+    }
+
+    const reinspection=rightChoiceIsReinspection(subject,bodyText,report.text);
+    const dateKey=rightChoiceInspectionDate(
+      subject,
+      bodyText,
+      report.text,
+      detail?.receivedDateTime||message.receivedDateTime
+    );
+
+    if(!dateKey){
+      return {
+        kind:'unmatched',
+        title:subject||'Right Choice inspection email',
+        meta:`${lot.lot_name} · ${baseName} · Could not determine inspection date${reportMeta}`
+      };
+    }
+
+    const result=await upsertRightChoiceCalendarInspection({
+      lot,
+      messageId:detail?.id||message.id,
+      baseName,
+      status,
+      dateKey,
+      reinspection,
+      reportName:report.name||''
+    });
+
+    return {
+      kind:result.created?'updated':'matched',
+      title:`${lot.lot_name} · ${result.item.name}`,
+      meta:`Right Choice ${result.reinspection?'reinspection':'inspection'} ${result.created?'added to':'updated on'} calendar ${dateKey} · ${inspectionStatusDisplay(status)}${reportMeta} · Sender: ${sender}`
+    };
+  }
+
   const scheduleItem=inspectionEmailFindScheduleItem(lot,subject,bodyText);
   if(!scheduleItem){
     return {
       kind:'unmatched',
       title:subject||'Inspection email',
-      meta:`${lot.lot_name} · Right Choice / Vallus path · Sender: ${sender}${received?' · '+received:''} · Could not uniquely match a schedule item`
+      meta:`${lot.lot_name} · Sender: ${sender}${received?' · '+received:''} · Could not uniquely match a schedule item`
     };
   }
 
@@ -7074,26 +7421,23 @@ async function syncOneInspectionEmail(message){
   };
 }
 
-
-function diagnosticRightChoiceGuess(message,bodyText){
+function diagnosticRightChoiceGuess(message,bodyText,reportText=''){
   const sender=inspectionEmailSenderAddress(message);
   const senderName=inspectionEmailSenderName(message);
   const subject=String(message?.subject||'');
-  const blob=normalizeInspectionEmailText(`${sender} ${senderName} ${subject} ${bodyText||''}`);
+  const blob=normalizeInspectionEmailText(`${sender} ${senderName} ${subject} ${bodyText||''} ${reportText||''}`);
 
   const sourceHints=[];
   if(sender.endsWith('@vallus.com'))sourceHints.push('sender @vallus.com');
   if(blob.includes('vallus'))sourceHints.push('contains vallus');
   if(blob.includes('right choice') || blob.includes('rightchoice'))sourceHints.push('contains right choice');
   if(blob.includes('pre insulation') || blob.includes('preinsulation'))sourceHints.push('contains pre-insulation');
-  if(/\bno go\b/.test(blob))sourceHints.push('NO GO');
-  else if(/\bgo\b/.test(blob))sourceHints.push('GO');
-  if(/\bfailed\b|\bfail\b|\bnot approved\b/.test(blob))sourceHints.push('fail wording');
-  if(/\bpassed\b|\bpass\b|\bapproved\b/.test(blob))sourceHints.push('pass wording');
+  if(blob.includes('reinspect') || blob.includes('re inspection') || blob.includes('reinspection'))sourceHints.push('reinspection wording');
 
-  const lotMatch=inspectionEmailFindLot(subject,bodyText,sender);
-  const scheduleMatch=inspectionEmailFindScheduleItem(lotMatch,subject,bodyText);
-  const status=inspectionStatusFromEmailText(subject,bodyText);
+  const lotMatch=inspectionEmailFindLot(subject,`${bodyText||''}\n${reportText||''}`,sender);
+  const status=rightChoiceStatusFromReport(subject,bodyText,reportText);
+  const baseName=rightChoiceBaseInspectionName(subject,bodyText,reportText);
+  const dateKey=rightChoiceInspectionDate(subject,bodyText,reportText,message?.receivedDateTime);
 
   return {
     sender,
@@ -7103,7 +7447,9 @@ function diagnosticRightChoiceGuess(message,bodyText){
     status:status||'NOT DETECTED',
     lot:lotMatch?.lot_name||'NOT MATCHED',
     subdivision:lotMatch ? (subdivisions.find(s=>String(s.id)===String(lotMatch.subdivision_id))?.name||'') : '',
-    scheduleItem:scheduleMatch?.name||'NOT MATCHED'
+    scheduleItem:baseName||'NOT DETECTED',
+    date:dateKey||'NOT DETECTED',
+    reinspection:rightChoiceIsReinspection(subject,bodyText,reportText)?'YES':'NO'
   };
 }
 
@@ -7128,8 +7474,7 @@ async function diagnoseInspectionEmails(){
       const headline=normalizeInspectionEmailText(`${sender} ${senderName} ${msg.subject||''} ${msg.bodyPreview||''}`);
 
       const looksBarrow=isBarrowTylerSender(sender)
-        || headline.includes('barrow county')
-        || headline.includes('tyler');
+        || headline.includes('barrow county');
       const looksRightChoice=sender.endsWith('@vallus.com')
         || headline.includes('vallus')
         || headline.includes('right choice')
@@ -7169,22 +7514,30 @@ async function diagnoseInspectionEmails(){
           error:details?.error||''
         });
       }else{
-        const d=diagnosticRightChoiceGuess(detail,bodyText);
+        let rcReport={name:'',text:''};
+        let rcError='';
+        try{
+          rcReport=await readRightChoiceInspectionReport(detail.id);
+        }catch(err){
+          rcError=err?.message||String(err);
+        }
+
+        const d=diagnosticRightChoiceGuess(detail,bodyText,rcReport.text||'');
         rows.push({
-          kind:'RightChoice/Vallus candidate',
+          kind:'RightChoice/Vallus',
           sender:d.sender,
           senderName:d.senderName,
           subject:d.subject,
           received,
           status:d.status,
           type:d.sourceHints,
-          date:'—',
-          reinspection:/\b(reinspection|re inspection|reinspect|re inspect|recheck|re check)\b/.test(normalizeInspectionEmailText(`${detail.subject||''} ${bodyText}`))?'YES':'NO',
+          date:d.date,
+          reinspection:d.reinspection,
           lot:d.lot,
           subdivision:d.subdivision,
-          attachment:'—',
+          attachment:rcReport.name||'NO REPORT READ',
           scheduleItem:d.scheduleItem,
-          error:''
+          error:rcError
         });
       }
     }
@@ -7204,9 +7557,10 @@ async function diagnoseInspectionEmails(){
           <div class="diag-label">Detected status</div><div class="diag-value">${esc(r.status||'')}</div>
           <div class="diag-label">Detected lot</div><div class="diag-value">${esc(r.subdivision ? `${r.subdivision} · ${r.lot}` : r.lot||'')}</div>
           <div class="diag-label">${r.kind==='Barrow/Tyler'?'Detected type':'Parser hints'}</div><div class="diag-value">${esc(r.type||'')}</div>
-          ${r.scheduleItem!==undefined?`<div class="diag-label">Matched schedule item</div><div class="diag-value">${esc(r.scheduleItem||'')}</div>`:''}
+          ${r.scheduleItem!==undefined?`<div class="diag-label">Detected inspection</div><div class="diag-value">${esc(r.scheduleItem||'')}</div>`:''}
           <div class="diag-label">Reinspection</div><div class="diag-value">${esc(r.reinspection||'NO')}</div>
-          ${r.kind==='Barrow/Tyler'?`<div class="diag-label">Detected date</div><div class="diag-value">${esc(r.date||'')}</div><div class="diag-label">Worksheet</div><div class="diag-value">${esc(r.attachment||'')}</div>`:''}
+          <div class="diag-label">Detected date</div><div class="diag-value">${esc(r.date||'—')}</div>
+          <div class="diag-label">${r.kind==='Barrow/Tyler'?'Worksheet':'Report attachment'}</div><div class="diag-value">${esc(r.attachment||'')}</div>
           ${r.error?`<div class="diag-label">Error</div><div class="diag-value">${esc(r.error)}</div>`:''}
         </div>
       </div>
