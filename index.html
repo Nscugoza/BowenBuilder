@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="2026-09-23-barrow-permit-address-sync-overview-fixed">
+<meta name="bowenbuilder-version" content="2026-09-23-barrow-worksheet-inspection-sync">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -2228,6 +2228,7 @@ button.teams-file-row:hover{border-color:#bdccdd}
 .overview-inspection-line.passed{background:#edf9f2;border-color:#a9d9be;color:#1f704b}
 .overview-inspection-line.failed{background:#fdeceb;border-color:#efaaa4;color:#a1271d}
 .overview-inspection-line.cancelled{background:#f2f4f7;border-color:#d0d5dd;color:#667085}
+.overview-inspection-line.not_linked{background:#f8fafc;border-color:#d9e0e8;color:#667085}
 
 </style>
 </head>
@@ -2498,7 +2499,7 @@ button.teams-file-row:hover{border-color:#bdccdd}
       <div id="adminInspectionEmailPanel" class="hidden">
         <div class="card admin-note">
           <strong>Inspection Email Sync</strong>
-          <div class="muted" style="margin-top:5px">Reads approved inspection-result emails from your signed-in Microsoft mailbox and updates matching BowenBuilder inspection statuses. It automatically processes Right Choice / Vallus emails by subdivision + lot, and Barrow County Tyler emails by Permit Number + Address.</div>
+          <div class="muted" style="margin-top:5px">Reads approved inspection-result emails from your signed-in Microsoft mailbox and updates matching BowenBuilder inspection statuses. It processes Right Choice / Vallus emails by subdivision + lot. For Barrow County Tyler emails, it matches Permit Number + Address and reads the attached inspection worksheet to determine the inspection result.</div>
         </div>
 
         <div class="card inspection-email-sync-card">
@@ -5191,8 +5192,10 @@ function showLot(preserveScroll=false){
    const sd=i.starts_at?new Date(i.starts_at).toLocaleDateString():'';
    const ed=i.ends_at?new Date(i.ends_at).toLocaleDateString():'';
    const comm=overviewCommunicationMarks(i);
-   const inspectionLabel=inspectionStatusDisplay(i.inspection_status);
-   const inspectionClass=esc(String(i.inspection_status||'').toLowerCase());
+   const rawInspectionStatus=String(i.inspection_status||'not_linked').toLowerCase();
+   const inspectionNamedItem=/inspection/i.test(String(i.name||''));
+   const inspectionLabel=inspectionStatusDisplay(rawInspectionStatus) || (inspectionNamedItem?'Not linked':'');
+   const inspectionClass=esc(rawInspectionStatus||'not_linked');
    return `<div class="schedule-card overview-schedule-card">
      <div class="overview-comm-badges">
        <span class="overview-comm-badge ${comm?.email?'active':''}" data-overview-email-badge="${i.id}">E</span>
@@ -6412,6 +6415,138 @@ function inspectionEmailFindLot(subject,body,sender=''){
   return candidates.length===1?candidates[0]:null;
 }
 
+
+function base64ToUint8Array(base64){
+  const clean=String(base64||'').replace(/\s+/g,'');
+  const binary=atob(clean);
+  const bytes=new Uint8Array(binary.length);
+  for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);
+  return bytes;
+}
+
+function inspectionWorksheetAttachmentScore(att){
+  const name=String(att?.name||'').toLowerCase();
+  const type=String(att?.contentType||'').toLowerCase();
+  let score=0;
+  if(name.includes('inspection worksheet'))score+=100;
+  else if(name.includes('worksheet'))score+=80;
+  else if(name.includes('inspection'))score+=60;
+  if(name.endsWith('.pdf') || type.includes('pdf'))score+=30;
+  else if(name.endsWith('.docx'))score+=15;
+  else if(name.endsWith('.txt') || type.startsWith('text/'))score+=10;
+  if(att?.isInline)score-=1000;
+  return score;
+}
+
+async function readBarrowInspectionWorksheet(messageId){
+  const list=await microsoftMailGraphJson(`/me/messages/${encodeURIComponent(messageId)}/attachments?$select=id,name,contentType,size,isInline`);
+  const attachments=(list?.value||[])
+    .filter(att=>!att?.isInline)
+    .sort((a,b)=>inspectionWorksheetAttachmentScore(b)-inspectionWorksheetAttachmentScore(a));
+
+  // Prefer a clearly named worksheet/inspection file. If Tyler sends only one PDF,
+  // accept that PDF as the worksheet.
+  const likely=attachments.filter(att=>{
+    const name=String(att?.name||'').toLowerCase();
+    const type=String(att?.contentType||'').toLowerCase();
+    return name.includes('worksheet')
+      || name.includes('inspection')
+      || name.endsWith('.pdf')
+      || type.includes('pdf')
+      || name.endsWith('.docx')
+      || name.endsWith('.txt')
+      || type.startsWith('text/');
+  });
+
+  for(const att of likely){
+    try{
+      // Keep mailbox reads bounded; inspection worksheets should be small.
+      if(Number(att?.size||0)>12*1024*1024)continue;
+
+      const detail=await microsoftMailGraphJson(
+        `/me/messages/${encodeURIComponent(messageId)}/attachments/${encodeURIComponent(att.id)}`
+      );
+      const contentBytes=detail?.contentBytes;
+      if(!contentBytes)continue;
+
+      const bytes=base64ToUint8Array(contentBytes);
+      const file=new File(
+        [bytes],
+        detail?.name||att?.name||'inspection-worksheet.pdf',
+        {type:detail?.contentType||att?.contentType||'application/octet-stream'}
+      );
+
+      const extracted=await aiReadFile(file);
+      if(String(extracted||'').trim()){
+        return {
+          name:file.name,
+          text:String(extracted).trim()
+        };
+      }
+    }catch(err){
+      console.warn('Could not read inspection worksheet attachment',att?.name,err);
+    }
+  }
+
+  return {name:'',text:''};
+}
+
+function inspectionStatusFromWorksheetText(value){
+  const raw=String(value||'');
+  if(!raw.trim())return '';
+
+  // First favor an explicit Result/Status field from the worksheet.
+  const lines=raw.split(/\r?\n/).map(x=>x.replace(/\s+/g,' ').trim()).filter(Boolean);
+  const explicitPatterns=[
+    /\b(?:inspection\s+)?result(?:\s+code)?\s*[:\-]?\s*(passed|pass|approved|failed|fail|not approved|no go|cancelled|canceled)\b/i,
+    /\bresult\s+status\s*[:\-]?\s*(passed|pass|approved|failed|fail|not approved|no go|cancelled|canceled)\b/i,
+    /\bstatus\s*[:\-]?\s*(passed|pass|approved|failed|fail|not approved|no go|cancelled|canceled)\b/i
+  ];
+
+  const mapResult=value=>{
+    const v=String(value||'').toLowerCase();
+    if(v==='passed'||v==='pass'||v==='approved')return 'passed';
+    if(v==='failed'||v==='fail'||v==='not approved'||v==='no go')return 'failed';
+    if(v==='cancelled'||v==='canceled')return 'cancelled';
+    return '';
+  };
+
+  for(const line of lines){
+    for(const pattern of explicitPatterns){
+      const match=line.match(pattern);
+      if(match){
+        const mapped=mapResult(match[1]);
+        if(mapped)return mapped;
+      }
+    }
+  }
+
+  // Some generated worksheets put the value directly beside a short field label
+  // without punctuation. Search a limited window around Result/Status.
+  const normalized=raw.replace(/\s+/g,' ');
+  const fieldMatch=normalized.match(
+    /\b(?:inspection\s+)?(?:result|status)\b.{0,80}?\b(passed|pass|approved|failed|fail|not approved|no go|cancelled|canceled)\b/i
+  );
+  if(fieldMatch){
+    const mapped=mapResult(fieldMatch[1]);
+    if(mapped)return mapped;
+  }
+
+  // Final conservative fallback: only accept a result when exactly one result
+  // family appears anywhere in the extracted worksheet.
+  const lower=normalizeInspectionEmailText(raw);
+  const hasFailed=/\b(no go|failed|fail|not approved)\b/.test(lower);
+  const hasPassed=/\b(passed|pass|approved)\b/.test(lower);
+  const hasCancelled=/\b(cancelled|canceled)\b/.test(lower);
+
+  const families=[hasFailed,hasPassed,hasCancelled].filter(Boolean).length;
+  if(families!==1)return '';
+  if(hasFailed)return 'failed';
+  if(hasPassed)return 'passed';
+  if(hasCancelled)return 'cancelled';
+  return '';
+}
+
 function inspectionEmailFindScheduleItem(lot,subject,body){
   if(!lot)return null;
   const text=normalizeInspectionEmailText(`${subject||''} ${body||''}`);
@@ -6483,28 +6618,71 @@ async function syncOneInspectionEmail(message){
   const detail=await microsoftMailGraphJson(`/me/messages/${encodeURIComponent(message.id)}?$select=id,subject,from,receivedDateTime,body,bodyPreview`);
   const bodyText=htmlToInspectionText(detail?.body?.content||detail?.bodyPreview||'');
   const subject=detail?.subject||message.subject||'';
-  const status=inspectionStatusFromEmailText(subject,bodyText);
   const sender=inspectionEmailSenderAddress(detail||message);
-  const lot=inspectionEmailFindLot(subject,bodyText,sender);
-  const scheduleItem=inspectionEmailFindScheduleItem(lot,subject,bodyText);
+  const isBarrow=sender==='barrowcountydonotreply@eplmail.tylerapp.com';
   const received=inspectionEmailReceivedLabel(detail?.receivedDateTime||message.receivedDateTime);
 
-  if(!status){
-    return {kind:'unmatched',title:subject||'Inspection email',meta:`${sender}${received?' · '+received:''} · Result/status not recognized`};
+  let worksheet={name:'',text:''};
+  let status='';
+  let matchingText=bodyText;
+
+  if(isBarrow){
+    worksheet=await readBarrowInspectionWorksheet(detail?.id||message.id);
+
+    if(!worksheet.text){
+      return {
+        kind:'unmatched',
+        title:subject||'Barrow County inspection email',
+        meta:`${sender}${received?' · '+received:''} · Attached inspection worksheet could not be read`
+      };
+    }
+
+    // For Barrow County, the inspection result comes from the attached worksheet.
+    // The email body is still useful for Permit Number + Address matching.
+    status=inspectionStatusFromWorksheetText(worksheet.text);
+    matchingText=`${bodyText}\n${worksheet.text}`;
+  }else{
+    status=inspectionStatusFromEmailText(subject,bodyText);
   }
+
+  const lot=inspectionEmailFindLot(subject,matchingText,sender);
+  const scheduleItem=inspectionEmailFindScheduleItem(lot,subject,matchingText);
+  const worksheetMeta=isBarrow && worksheet.name ? ` · Worksheet: ${worksheet.name}` : '';
+
+  if(!status){
+    return {
+      kind:'unmatched',
+      title:subject||'Inspection email',
+      meta:`${sender}${received?' · '+received:''}${worksheetMeta} · Result/status not recognized${isBarrow?' on attached worksheet':''}`
+    };
+  }
+
   if(!lot){
-    const reason=sender==='barrowcountydonotreply@eplmail.tylerapp.com'
+    const reason=isBarrow
       ? 'Could not uniquely match Permit Number + Address to a BowenBuilder lot'
       : 'Could not uniquely match a subdivision and lot';
-    return {kind:'unmatched',title:subject||'Inspection email',meta:`${sender}${received?' · '+received:''} · ${reason}`};
+    return {
+      kind:'unmatched',
+      title:subject||'Inspection email',
+      meta:`${sender}${received?' · '+received:''}${worksheetMeta} · ${reason}`
+    };
   }
+
   if(!scheduleItem){
-    return {kind:'unmatched',title:subject||'Inspection email',meta:`${lot.lot_name} · ${sender}${received?' · '+received:''} · Could not uniquely match a schedule item`};
+    return {
+      kind:'unmatched',
+      title:subject||'Inspection email',
+      meta:`${lot.lot_name} · ${sender}${received?' · '+received:''}${worksheetMeta} · Could not uniquely match a schedule item`
+    };
   }
 
   const oldStatus=String(scheduleItem.inspection_status||'').toLowerCase();
   if(oldStatus===status){
-    return {kind:'matched',title:`${lot.lot_name} · ${scheduleItem.name}`,meta:`Already ${inspectionStatusDisplay(status)} · ${received||'email matched'}`};
+    return {
+      kind:'matched',
+      title:`${lot.lot_name} · ${scheduleItem.name}`,
+      meta:`Already ${inspectionStatusDisplay(status)} · ${received||'email matched'}${worksheetMeta}`
+    };
   }
 
   const {data,error}=await db.from('schedule_items')
@@ -6517,7 +6695,11 @@ async function syncOneInspectionEmail(message){
   const index=items.findIndex(i=>String(i.id)===String(scheduleItem.id));
   if(index>=0)items[index]=data;
 
-  return {kind:'updated',title:`${lot.lot_name} · ${scheduleItem.name}`,meta:`Inspection updated: ${inspectionStatusDisplay(oldStatus)||'Not linked'} → ${inspectionStatusDisplay(status)} · ${received||'email matched'}`};
+  return {
+    kind:'updated',
+    title:`${lot.lot_name} · ${scheduleItem.name}`,
+    meta:`Inspection updated: ${inspectionStatusDisplay(oldStatus)||'Not linked'} → ${inspectionStatusDisplay(status)} · ${received||'email matched'}${worksheetMeta}`
+  };
 }
 
 async function runInspectionEmailSync({silent=false}={}){
