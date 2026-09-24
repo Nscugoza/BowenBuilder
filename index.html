@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="2026-09-24-linked-messages-include-completed">
+<meta name="bowenbuilder-version" content="2026-09-24-prime-touchup-final-drywall-alias-fix">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -2724,7 +2724,6 @@ button.teams-file-row:hover{border-color:#bdccdd}
     <option value="Rough Cleaning and Pressure Wash">Rough Cleaning and Pressure Wash</option>
     <option value="Install Landscaping">Install Landscaping</option>
     <option value="Centcom">Centcom</option>
-    <option value="Final Sheetrock Touch Up">Final Sheetrock Touch Up</option>
     <option value="Order Gutters">Order Gutters</option>
     <option value="Wood or LVP Floors">Wood or LVP Floors</option>
     <option value="Mirrors, Shelves, Shower Door">Mirrors, Shelves, Shower Door</option>
@@ -6809,10 +6808,30 @@ const LINKED_SCHEDULE_COMMUNICATION_GROUPS=[
   ['Install Tile','Install Wood Floor','Carpet Install']
 ];
 
+function linkedScheduleCanonicalName(name){
+  let value=String(name||'')
+    .trim()
+    .toLowerCase()
+    .replace(/[–—]/g,'-')
+    .replace(/\s+/g,' ');
+
+  const aliases={
+    'prime touch-up':'prime touch up',
+    'prime touchup':'prime touch up',
+    'final drywall touch-up':'final drywall touch up',
+    'final drywall touchup':'final drywall touch up',
+    'final sheetrock touch up':'final drywall touch up',
+    'final sheetrock touch-up':'final drywall touch up',
+    'final sheetrock touchup':'final drywall touch up'
+  };
+
+  return aliases[value]||value;
+}
+
 function linkedScheduleGroupForName(name){
-  const target=String(name||'').trim().toLowerCase();
+  const target=linkedScheduleCanonicalName(name);
   return LINKED_SCHEDULE_COMMUNICATION_GROUPS.find(group=>
-    group.some(x=>String(x).trim().toLowerCase()===target)
+    group.some(x=>linkedScheduleCanonicalName(x)===target)
   )||null;
 }
 
@@ -6821,11 +6840,12 @@ function linkedScheduleItemsForItem(item){
   const group=linkedScheduleGroupForName(item.name);
   if(!group)return [item];
 
-  const names=new Set(group.map(x=>String(x).trim().toLowerCase()));
-  return items
+  const names=new Set(group.map(linkedScheduleCanonicalName));
+
+  const matches=items
     .filter(x=>
       String(x.lot_id)===String(item.lot_id) &&
-      names.has(String(x.name||'').trim().toLowerCase())
+      names.has(linkedScheduleCanonicalName(x.name))
     )
     .sort((a,b)=>{
       const ad=dateInputValue(a.starts_at)||'9999-12-31';
@@ -6833,6 +6853,24 @@ function linkedScheduleItemsForItem(item){
       if(ad!==bd)return ad.localeCompare(bd);
       return String(a.name||'').localeCompare(String(b.name||''));
     });
+
+  // If both an old legacy "Final Sheetrock Touch Up" record and a newer
+  // "Final Drywall Touch Up" record exist on the same lot, don't send the
+  // same logical task twice. Prefer the current naming.
+  const deduped=new Map();
+  for(const match of matches){
+    const key=linkedScheduleCanonicalName(match.name);
+    const prior=deduped.get(key);
+    if(!prior){
+      deduped.set(key,match);
+      continue;
+    }
+    const priorIsCurrent=String(prior.name||'').trim().toLowerCase()===key;
+    const matchIsCurrent=String(match.name||'').trim().toLowerCase()===key;
+    if(!priorIsCurrent && matchIsCurrent)deduped.set(key,match);
+  }
+
+  return [...deduped.values()];
 }
 
 function linkedScheduleItemsForSelectedDate(){
@@ -6874,7 +6912,10 @@ function linkedScheduleMessageBody(lotId,linkedItems,fallbackBody){
           weekday:'long',month:'long',day:'numeric',year:'numeric'
         })
       : 'Date not set';
-    lines.push(`- ${item.name}: ${pretty}`);
+    const displayName=linkedScheduleCanonicalName(item.name)==='final drywall touch up'
+      ? 'Final Drywall Touch Up'
+      : item.name;
+    lines.push(`- ${displayName}: ${pretty}`);
   });
 
   const options=includedOptionsLinesForMessage(lot);
