@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="2026-09-24-overview-quick-status">
+<meta name="bowenbuilder-version" content="2026-09-24-today-tomorrow-quick-status">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -2226,6 +2226,14 @@ button.teams-file-row:hover{border-color:#bdccdd}
   color:#a1271d;
 }
 
+
+.subdivision-agenda-quick-actions{
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px;
+  margin-top:10px;
+}
+
 </style>
 </head>
 <body>
@@ -3674,11 +3682,20 @@ function renderSubdivisionAgendaDay(title,dateKey){
    const lot=lots.find(l=>String(l.id)===String(i.lot_id));
    const sd=dateInputValue(i.starts_at),ed=dateInputValue(i.ends_at)||sd;
    const dateRange=sd===ed?subdivisionPrettyDate(sd):`${subdivisionPrettyDate(sd)} → ${subdivisionPrettyDate(ed)}`;
+   const inspectionRaw=String(i.inspection_status||'not_linked').toLowerCase();
+   const inspectionLabel=inspectionStatusDisplay(inspectionRaw);
+   const isInspectionItem=
+     String(i.item_type||'').toLowerCase()==='inspection'
+     || /inspection/i.test(String(i.name||''))
+     || !['','not_linked'].includes(inspectionRaw);
+   const isComplete=String(i.status||'').toLowerCase()==='complete';
+   const canQuickEdit=canEditSubdivision(lot?.subdivision_id);
    return `<div class="subdivision-agenda-card">
      <div class="subdivision-agenda-card-top">
        <div>
          <div class="subdivision-agenda-lot">${esc(lot?.lot_name||'Lot')}</div>
          <h4>${esc(i.name||i.item_type||'Scheduled Work')}</h4>
+         ${inspectionLabel?`<div class="overview-inspection-result ${esc(inspectionRaw)}">Inspection: ${esc(inspectionLabel)}</div>`:''}
        </div>
        <span class="schedule-status-pill ${esc(i.status||'scheduled')}">${esc(statusDisplay(i.status))}</span>
      </div>
@@ -3687,6 +3704,13 @@ function renderSubdivisionAgendaDay(title,dateKey){
        ${i.crew?`Crew: ${esc(i.crew)}<br>`:''}
        ${esc(dateRange)}
      </div>
+     ${canQuickEdit?`<div class="subdivision-agenda-quick-actions">
+       ${isInspectionItem?`
+         <button class="overview-quick-btn passed ${inspectionRaw==='passed'?'active':''}" type="button" data-agenda-inspection-status="${esc(i.id)}" data-agenda-status="passed">✓ Passed</button>
+         <button class="overview-quick-btn failed ${inspectionRaw==='failed'?'active':''}" type="button" data-agenda-inspection-status="${esc(i.id)}" data-agenda-status="failed">✕ Failed</button>
+       `:''}
+       <button class="overview-quick-btn complete ${isComplete?'active':''}" type="button" data-agenda-complete="${esc(i.id)}" ${isComplete?'disabled':''}>${isComplete?'✓ Completed':'Mark Complete'}</button>
+     </div>`:''}
      <div class="subdivision-agenda-actions">
        <button class="secondary" type="button" data-agenda-open-lot="${esc(i.lot_id)}">Open Lot</button>
      </div>
@@ -3701,6 +3725,54 @@ function renderSubdivisionAgendaDay(title,dateKey){
    <div class="subdivision-agenda-list">${cards}</div>
  </section>`;
 }
+
+async function quickSetAgendaInspectionStatus(id,status){
+  const item=items.find(i=>String(i.id)===String(id));
+  if(!item)return;
+  if(!requireEditPermission(subdivisionForLot(item.lot_id)))return;
+
+  const normalized=String(status||'').toLowerCase();
+  if(!['passed','failed'].includes(normalized))return;
+  if(String(item.inspection_status||'').toLowerCase()===normalized)return;
+
+  const {data,error}=await db.from('schedule_items')
+    .update({inspection_status:normalized})
+    .eq('id',item.id)
+    .select()
+    .single();
+
+  if(error){
+    alert(error.message);
+    return;
+  }
+
+  const pos=items.findIndex(i=>String(i.id)===String(item.id));
+  if(pos>=0)items[pos]=data;
+  renderSubdivisionAgenda();
+}
+
+async function quickCompleteAgendaScheduleItem(id){
+  const item=items.find(i=>String(i.id)===String(id));
+  if(!item)return;
+  if(!requireEditPermission(subdivisionForLot(item.lot_id)))return;
+  if(String(item.status||'').toLowerCase()==='complete')return;
+
+  const {data,error}=await db.from('schedule_items')
+    .update({status:'complete'})
+    .eq('id',item.id)
+    .select()
+    .single();
+
+  if(error){
+    alert(error.message);
+    return;
+  }
+
+  const pos=items.findIndex(i=>String(i.id)===String(item.id));
+  if(pos>=0)items[pos]=data;
+  renderSubdivisionAgenda();
+}
+
 function renderSubdivisionAgenda(){
  const root=$('subdivisionAgenda');
  if(!root)return;
@@ -3719,6 +3791,15 @@ function renderSubdivisionAgenda(){
      currentLot=btn.dataset.agendaOpenLot;
      showLot();
    };
+ });
+ root.querySelectorAll('[data-agenda-inspection-status]').forEach(btn=>{
+   btn.onclick=()=>quickSetAgendaInspectionStatus(
+     btn.dataset.agendaInspectionStatus,
+     btn.dataset.agendaStatus
+   );
+ });
+ root.querySelectorAll('[data-agenda-complete]').forEach(btn=>{
+   btn.onclick=()=>quickCompleteAgendaScheduleItem(btn.dataset.agendaComplete);
  });
 }
 function subdivisionOpenPunchoutItems(){
