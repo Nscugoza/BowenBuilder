@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="2026-09-24-today-tomorrow-quick-status">
+<meta name="bowenbuilder-version" content="2026-09-24-desktop-swipe-delete-height-fix">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -577,6 +577,12 @@ dialog::backdrop{background:rgba(7,21,39,.7);backdrop-filter:blur(4px)}
   position:relative;
   overflow:hidden;
   border-radius:21px;
+
+  /* Keep each swipe wrapper only as tall as its own lot card.
+     CSS Grid otherwise stretches shorter cards to the tallest card in the row,
+     which made the red delete area extend below the card on desktop. */
+  align-self:start;
+  height:auto;
 }
 .lot-delete-action{
   position:absolute;
@@ -607,8 +613,13 @@ dialog::backdrop{background:rgba(7,21,39,.7);backdrop-filter:blur(4px)}
   pointer-events:none;
 }
 @media(min-width:900px){
+  .lot-swipe-wrap{
+    align-self:start;
+  }
   .lot-delete-action{
     width:86px;
+    top:0;
+    bottom:0;
   }
   .lot-swipe-wrap:hover .lot-delete-action{
     filter:brightness(1.03);
