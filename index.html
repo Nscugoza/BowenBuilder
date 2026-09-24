@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="2026-09-24-prime-linked-group-updated">
+<meta name="bowenbuilder-version" content="2026-09-24-calendar-item-email-text">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -2245,6 +2245,29 @@ button.teams-file-row:hover{border-color:#bdccdd}
   margin-top:10px;
 }
 
+
+.calendar-item-email-btn,
+.calendar-item-text-btn{
+  font-weight:800;
+}
+@media(max-width:640px){
+  .calendar-item-actions{
+    width:100%;
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:7px;
+    margin-top:8px;
+  }
+  .calendar-item-actions button{
+    width:100%;
+    min-width:0;
+  }
+  .bb-calendar-selected-item{
+    flex-direction:column;
+    align-items:stretch;
+  }
+}
+
 </style>
 </head>
 <body>
@@ -2459,8 +2482,8 @@ button.teams-file-row:hover{border-color:#bdccdd}
             </div>
             <div class="calendar-day-actions">
               <button id="calendarCalledInSelected" class="secondary" type="button">✓ Mark Called In</button>
-              <button id="calendarEmailSelected" class="secondary" type="button">✉ Email Date</button>
-              <button id="calendarTextSelected" class="secondary" type="button">💬 Text Date</button>
+              <button id="calendarEmailSelected" class="secondary" type="button">✉ Email All</button>
+              <button id="calendarTextSelected" class="secondary" type="button">💬 Text All</button>
               <button id="calendarAddSelected" class="primary" type="button">+ Add Item</button>
             </div>
           </div>
@@ -7898,11 +7921,29 @@ function renderSelectedScheduleDay(){
          <div class="bb-calendar-selected-meta">${esc(statusDisplay(i.status))}${i.crew?' · '+esc(i.crew):''}${inspectionStatusDisplay(i.inspection_status)?' · Inspection: '+esc(inspectionStatusDisplay(i.inspection_status)):''}</div>
        </div>
        <div class="calendar-item-actions">
+         <button class="secondary calendar-item-email-btn" type="button" data-calendar-email-item="${i.id}">✉ Email</button>
+         <button class="secondary calendar-item-text-btn" type="button" data-calendar-text-item="${i.id}">💬 Text</button>
          <button class="calendar-move-btn" type="button" data-calendar-move="${i.id}">Move</button>
          <button class="secondary" type="button" data-calendar-edit="${i.id}">Edit</button>
        </div>
      </div>
    </div>`).join(''):'<div class="muted">Nothing scheduled for this day.</div>';
+
+ document.querySelectorAll('[data-calendar-email-item]').forEach(b=>b.onclick=async e=>{
+   e.preventDefault();
+   e.stopPropagation();
+   const row=b.closest('.bb-swipe-row');
+   if(row?.classList.contains('swiped'))row.classList.remove('swiped');
+   await emailOverviewScheduleItem(b.dataset.calendarEmailItem);
+ });
+
+ document.querySelectorAll('[data-calendar-text-item]').forEach(b=>b.onclick=async e=>{
+   e.preventDefault();
+   e.stopPropagation();
+   const row=b.closest('.bb-swipe-row');
+   if(row?.classList.contains('swiped'))row.classList.remove('swiped');
+   await textOverviewScheduleItem(b.dataset.calendarTextItem);
+ });
 
  document.querySelectorAll('[data-calendar-move]').forEach(b=>b.onclick=e=>{
    e.preventDefault();
