@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="2026-09-23-rollback-pre-email">
+<meta name="bowenbuilder-version" content="2026-09-24-overview-quick-status">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -2164,6 +2164,66 @@ button.teams-file-row:hover{border-color:#bdccdd}
     font-size:8px;
     margin-top:1px;
   }
+}
+
+
+.overview-quick-actions{
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px;
+  margin-top:9px;
+}
+.overview-quick-btn{
+  border:1px solid #d5dde7;
+  background:#fff;
+  color:#334155;
+  border-radius:10px;
+  padding:7px 10px;
+  font-size:12px;
+  font-weight:850;
+  line-height:1;
+}
+.overview-quick-btn:hover{filter:brightness(.98)}
+.overview-quick-btn.passed.active{
+  background:#edf9f2;
+  border-color:#9fd2b5;
+  color:#1f704b;
+}
+.overview-quick-btn.failed.active{
+  background:#fdeceb;
+  border-color:#eeaaa5;
+  color:#a1271d;
+}
+.overview-quick-btn.complete.active{
+  background:#eaf2fb;
+  border-color:#aac8e6;
+  color:#174f86;
+}
+.overview-quick-btn:disabled{
+  opacity:.72;
+  cursor:default;
+}
+.overview-inspection-result{
+  display:inline-flex;
+  align-items:center;
+  margin-top:7px;
+  padding:5px 8px;
+  border-radius:999px;
+  font-size:12px;
+  font-weight:850;
+  border:1px solid #d5dde7;
+  background:#f8fafc;
+  color:#475467;
+}
+.overview-inspection-result.passed{
+  background:#edf9f2;
+  border-color:#9fd2b5;
+  color:#1f704b;
+}
+.overview-inspection-result.failed{
+  background:#fdeceb;
+  border-color:#eeaaa5;
+  color:#a1271d;
 }
 
 </style>
@@ -5036,6 +5096,54 @@ function openPowerCompanyBubble(lotId=currentLot){
  overlay.setAttribute('aria-hidden','false');
 }
 
+
+async function quickSetOverviewInspectionStatus(id,status){
+  const item=items.find(i=>String(i.id)===String(id));
+  if(!item)return;
+  if(!requireEditPermission(subdivisionForLot(item.lot_id)))return;
+
+  const normalized=String(status||'').toLowerCase();
+  if(!['passed','failed'].includes(normalized))return;
+  if(String(item.inspection_status||'').toLowerCase()===normalized)return;
+
+  const {data,error}=await db.from('schedule_items')
+    .update({inspection_status:normalized})
+    .eq('id',item.id)
+    .select()
+    .single();
+
+  if(error){
+    alert(error.message);
+    return;
+  }
+
+  const pos=items.findIndex(i=>String(i.id)===String(item.id));
+  if(pos>=0)items[pos]=data;
+  showLot(true);
+}
+
+async function quickCompleteOverviewScheduleItem(id){
+  const item=items.find(i=>String(i.id)===String(id));
+  if(!item)return;
+  if(!requireEditPermission(subdivisionForLot(item.lot_id)))return;
+  if(String(item.status||'').toLowerCase()==='complete')return;
+
+  const {data,error}=await db.from('schedule_items')
+    .update({status:'complete'})
+    .eq('id',item.id)
+    .select()
+    .single();
+
+  if(error){
+    alert(error.message);
+    return;
+  }
+
+  const pos=items.findIndex(i=>String(i.id)===String(item.id));
+  if(pos>=0)items[pos]=data;
+  showLot(true);
+}
+
 function showLot(preserveScroll=false){
  const savedWindowY=window.scrollY||0;
  const mainScrollEl=document.querySelector('main');
@@ -5095,12 +5203,39 @@ function showLot(preserveScroll=false){
    const sd=i.starts_at?new Date(i.starts_at).toLocaleDateString():'';
    const ed=i.ends_at?new Date(i.ends_at).toLocaleDateString():'';
    const comm=overviewCommunicationMarks(i);
+   const inspectionRaw=String(i.inspection_status||'not_linked').toLowerCase();
+   const inspectionLabel=inspectionStatusDisplay(inspectionRaw);
+   const isInspectionItem=
+     String(i.item_type||'').toLowerCase()==='inspection'
+     || /inspection/i.test(String(i.name||''))
+     || !['','not_linked'].includes(inspectionRaw);
+   const isComplete=String(i.status||'').toLowerCase()==='complete';
+   const quickActions=editAllowed?`
+     <div class="overview-quick-actions">
+       ${isInspectionItem?`
+         <button class="overview-quick-btn passed ${inspectionRaw==='passed'?'active':''}" type="button" data-quick-inspection-status="${i.id}" data-quick-status="passed">✓ Passed</button>
+         <button class="overview-quick-btn failed ${inspectionRaw==='failed'?'active':''}" type="button" data-quick-inspection-status="${i.id}" data-quick-status="failed">✕ Failed</button>
+       `:''}
+       <button class="overview-quick-btn complete ${isComplete?'active':''}" type="button" data-quick-complete="${i.id}" ${isComplete?'disabled':''}>${isComplete?'✓ Completed':'Mark Complete'}</button>
+     </div>`:'';
    return `<div class="schedule-card overview-schedule-card">
      <div class="overview-comm-badges">
        <span class="overview-comm-badge ${comm?.email?'active':''}" data-overview-email-badge="${i.id}">E</span>
        <span class="overview-comm-badge ${comm?.text?'active':''}" data-overview-text-badge="${i.id}">T</span>
      </div>
-     <div><span class="schedule-status-pill ${esc(i.status)}">${esc((i.status||'').replaceAll('_',' ').replace(/\b\w/g,c=>c.toUpperCase()))}</span><h4>${esc(i.name)}</h4><div class="schedule-meta">${esc(i.item_type)}${i.crew?' · '+esc(i.crew):''}<br>${sd}${ed&&ed!==sd?' → '+ed:''}</div></div><div class="schedule-actions overview-schedule-actions"><button class="iconbtn" type="button" data-overview-email="${i.id}">Email</button><button class="iconbtn" type="button" data-overview-text="${i.id}">Text</button><button class="iconbtn" type="button" data-edit-schedule="${i.id}">Edit</button></div></div>`;
+     <div>
+       <span class="schedule-status-pill ${esc(i.status)}">${esc((i.status||'').replaceAll('_',' ').replace(/\b\w/g,c=>c.toUpperCase()))}</span>
+       <h4>${esc(i.name)}</h4>
+       ${inspectionLabel?`<div class="overview-inspection-result ${esc(inspectionRaw)}">Inspection: ${esc(inspectionLabel)}</div>`:''}
+       <div class="schedule-meta">${esc(i.item_type)}${i.crew?' · '+esc(i.crew):''}<br>${sd}${ed&&ed!==sd?' → '+ed:''}</div>
+       ${quickActions}
+     </div>
+     <div class="schedule-actions overview-schedule-actions">
+       <button class="iconbtn" type="button" data-overview-email="${i.id}">Email</button>
+       <button class="iconbtn" type="button" data-overview-text="${i.id}">Text</button>
+       <button class="iconbtn" type="button" data-edit-schedule="${i.id}">Edit</button>
+     </div>
+   </div>`;
  }).join(''):'<div class="card muted">No schedule items yet.</div>';
  document.querySelectorAll('[data-overview-email]').forEach(btn=>{
    btn.onclick=()=>emailOverviewScheduleItem(btn.dataset.overviewEmail);
@@ -5110,6 +5245,16 @@ function showLot(preserveScroll=false){
  });
  document.querySelectorAll('[data-edit-schedule]').forEach(btn=>{
    btn.onclick=()=>openScheduleDialogLive(btn.dataset.editSchedule);
+ });
+
+ document.querySelectorAll('[data-quick-inspection-status]').forEach(btn=>{
+   btn.onclick=()=>quickSetOverviewInspectionStatus(
+     btn.dataset.quickInspectionStatus,
+     btn.dataset.quickStatus
+   );
+ });
+ document.querySelectorAll('[data-quick-complete]').forEach(btn=>{
+   btn.onclick=()=>quickCompleteOverviewScheduleItem(btn.dataset.quickComplete);
  });
 
  // Load saved E/T marks without rebuilding the Overview screen.
