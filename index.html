@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="2026-09-24-desktop-swipe-delete-height-fix">
+<meta name="bowenbuilder-version" content="2026-09-24-schedule-items-linked-messages">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -2662,13 +2662,32 @@ button.teams-file-row:hover{border-color:#bdccdd}
     <option value="Run Gas">Run Gas</option>
     <option value="Front and Back Porch Install">Front and Back Porch Install</option>
     <option value="Drywall">Drywall</option>
+    <option value="Prime">Prime</option>
     <option value="Cabinet Install">Cabinet Install</option>
+    <option value="Drop Trim">Drop Trim</option>
+    <option value="Install Trim">Install Trim</option>
+    <option value="Prime Touch Up">Prime Touch Up</option>
+    <option value="Caulk & Paint - Interior">Caulk & Paint - Interior</option>
+    <option value="A/C Set & Trim">A/C Set & Trim</option>
+    <option value="Garage Door Install">Garage Door Install</option>
+    <option value="Install Tile">Install Tile</option>
+    <option value="Drop Shoe & Lock">Drop Shoe & Lock</option>
+    <option value="Install Wood Floor">Install Wood Floor</option>
+    <option value="Drop Appliances">Drop Appliances</option>
+    <option value="Install Shoe & Lock">Install Shoe & Lock</option>
+    <option value="Plumbing Trim">Plumbing Trim</option>
+    <option value="Electrical Trim">Electrical Trim</option>
+    <option value="A/C Start-Up">A/C Start-Up</option>
+    <option value="Blow Attic">Blow Attic</option>
+    <option value="Blower Door Test">Blower Door Test</option>
+    <option value="Final Drywall Touch Up">Final Drywall Touch Up</option>
+    <option value="Carpet Install">Carpet Install</option>
+    <option value="Final Paint">Final Paint</option>
     <option value="Trim Delivery">Trim Delivery</option>
     <option value="Trim Install">Trim Install</option>
     <option value="Inside/Outside Paint">Inside/Outside Paint</option>
     <option value="Sheetrock Skim Coat after Priming">Sheetrock Skim Coat after Priming</option>
     <option value="Vinyl in Bathrooms and Laundry Room">Vinyl in Bathrooms and Laundry Room</option>
-    <option value="Install Tile">Install Tile</option>
     <option value="Measure Mirrors, Shelves, Shower Door">Measure Mirrors, Shelves, Shower Door</option>
     <option value="Final Grade">Final Grade</option>
     <option value="Driveway">Driveway</option>
@@ -2676,10 +2695,8 @@ button.teams-file-row:hover{border-color:#bdccdd}
     <option value="Light Delivery">Light Delivery</option>
     <option value="Order Garage Doors">Order Garage Doors</option>
     <option value="HVAC Trim">HVAC Trim</option>
-    <option value="Plumbing Trim">Plumbing Trim</option>
     <option value="Electric Trim">Electric Trim</option>
     <option value="HVAC Startup">HVAC Startup</option>
-    <option value="Blower Door Test">Blower Door Test</option>
     <option value="Smart Home Trim">Smart Home Trim</option>
     <option value="Rough Cleaning and Pressure Wash">Rough Cleaning and Pressure Wash</option>
     <option value="Install Landscaping">Install Landscaping</option>
@@ -2689,7 +2706,6 @@ button.teams-file-row:hover{border-color:#bdccdd}
     <option value="Wood or LVP Floors">Wood or LVP Floors</option>
     <option value="Mirrors, Shelves, Shower Door">Mirrors, Shelves, Shower Door</option>
     <option value="Shoe Mold and Lockout">Shoe Mold and Lockout</option>
-    <option value="Garage Door Install">Garage Door Install</option>
     <option value="Carpet">Carpet</option>
     <option value="Install Shutters">Install Shutters</option>
     <option value="Install Mail Box">Install Mail Box</option>
@@ -6751,7 +6767,12 @@ function refreshOverviewCommunicationBadges(itemId){
 
 
 const LINKED_SCHEDULE_COMMUNICATION_GROUPS=[
-  ['Trim Install','Shoe Mold and Lockout']
+  ['Trim Install','Shoe Mold and Lockout'],
+  ['Prime','Prime Touch Up','Final Drywall Touch Up'],
+  ['Drop Trim','Drop Shoe & Lock'],
+  ['Install Trim','Install Shoe & Lock'],
+  ['A/C Set & Trim','A/C Start-Up'],
+  ['Install Tile','Install Wood Floor','Carpet Install']
 ];
 
 function linkedScheduleGroupForName(name){
