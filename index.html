@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="2026-09-23-inspection-email-parser-v6">
+<meta name="bowenbuilder-version" content="2026-09-23-inspection-email-parser-v7">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -2505,7 +2505,7 @@ button.teams-file-row:hover{border-color:#bdccdd}
       <div id="adminInspectionEmailPanel" class="hidden">
         <div class="card admin-note">
           <strong>Inspection Email Sync</strong>
-          <div class="muted" style="margin-top:5px">Reads approved inspection-result emails from your signed-in Microsoft mailbox and updates matching BowenBuilder inspection statuses. It processes Right Choice / Vallus emails by subdivision + lot. Barrow/Tyler includes the missing worksheet date parser identified by diagnostics. Right Choice/Vallus now reads the attached inspection report instead of relying only on the email body, detects GO / NO GO / Pass / Fail, recognizes Pre-Insulation Reinspect reports, and adds or updates the correct calendar event while keeping reinspections separate. <strong>Parser v6</strong>. Diagnose Email Parsing remains read-only.</div>
+          <div class="muted" style="margin-top:5px">Reads approved inspection-result emails from your signed-in Microsoft mailbox and updates matching BowenBuilder inspection statuses. It processes Right Choice / Vallus emails by subdivision + lot. Barrow/Tyler keeps the working worksheet parser. Right Choice/Vallus now treats <strong>Reinspect</strong> in the subject as a failed result, treats <strong>GO</strong> as passed and <strong>NO GO</strong> as failed, ignores quoted email history so a normal <strong>Re:</strong> reply is not misclassified as a reinspection, and processes inspection emails oldest-to-newest so reinspection history stays in order. <strong>Parser v7</strong>. Diagnose Email Parsing remains read-only.</div>
         </div>
 
         <div class="card inspection-email-sync-card">
@@ -6512,57 +6512,103 @@ async function readRightChoiceInspectionReport(messageId){
   return {name:'',text:''};
 }
 
-function rightChoiceStatusFromReport(subject,body,reportText){
-  const report=String(reportText||'');
-  const lines=report.split(/\r?\n/)
-    .map(x=>x.replace(/\s+/g,' ').trim())
-    .filter(Boolean);
 
-  const map=value=>{
-    const v=normalizeInspectionEmailText(value);
-    if(/\b(no go|nogo|failed|fail|not approved|rejected|reinspection required|re inspection required|corrections required)\b/.test(v))return 'failed';
-    if(/\b(passed|pass|approved|go)\b/.test(v))return 'passed';
-    if(/\b(cancelled|canceled)\b/.test(v))return 'cancelled';
-    if(/\bscheduled\b/.test(v))return 'scheduled';
-    if(/\brequested\b/.test(v))return 'requested';
+function rightChoiceFreshBody(body){
+  const raw=String(body||'').replace(/\r/g,'');
+  if(!raw)return '';
+
+  const markers=[
+    /\n-{2,}\s*Original Message\s*-{2,}/i,
+    /\n_{5,}\s*\n/i,
+    /\nOn\s.+?\swrote:\s*\n/i,
+    /\nFrom:\s*[^\n]+\nSent:\s*[^\n]+/i,
+    /\nFrom:\s*[^\n]+\nDate:\s*[^\n]+/i
+  ];
+
+  let cut=raw.length;
+  for(const pattern of markers){
+    const match=pattern.exec(raw);
+    if(match && match.index>20)cut=Math.min(cut,match.index);
+  }
+  return raw.slice(0,cut).trim();
+}
+
+function rightChoiceStatusFromReport(subject,body,reportText){
+  const subjectText=normalizeInspectionEmailText(subject||'');
+  const freshBody=rightChoiceFreshBody(body);
+  const report=String(reportText||'');
+
+  // Right Choice uses "Reinspect" as an outcome. If the subject itself says
+  // Reinspect/Reinspection, the inspection did not pass.
+  if(/\b(reinspect|re inspection|reinspection|re inspect|no go|nogo|failed|fail|not approved)\b/.test(subjectText)){
+    return 'failed';
+  }
+
+  // Subject-level pass wording.
+  if(/\b(passed|pass|approved)\b/.test(subjectText))return 'passed';
+  if(/\bgo\b/.test(subjectText) && !/\bno go\b/.test(subjectText))return 'passed';
+
+  const parseText=value=>{
+    const raw=String(value||'');
+    if(!raw.trim())return '';
+
+    const lines=raw.split(/\r?\n/)
+      .map(x=>x.replace(/\s+/g,' ').trim())
+      .filter(Boolean);
+
+    const map=value=>{
+      const v=normalizeInspectionEmailText(value);
+      if(/\b(no go|nogo|reinspect|re inspection|reinspection|failed|fail|not approved|rejected|corrections required)\b/.test(v))return 'failed';
+      if(/\b(passed|pass|approved|go)\b/.test(v))return 'passed';
+      if(/\b(cancelled|canceled)\b/.test(v))return 'cancelled';
+      if(/\bscheduled\b/.test(v))return 'scheduled';
+      if(/\brequested\b/.test(v))return 'requested';
+      return '';
+    };
+
+    const labels=[
+      'inspection result','result','inspection status','status',
+      'outcome','inspection outcome','disposition'
+    ];
+
+    for(let i=0;i<lines.length;i++){
+      for(const label of labels){
+        const escaped=label.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+        const match=lines[i].match(new RegExp(`\\b${escaped}\\b\\s*[:#-]?\\s*(.*)$`,'i'));
+        if(!match)continue;
+
+        const same=map(match[1]);
+        if(same)return same;
+
+        for(let j=i+1;j<Math.min(lines.length,i+4);j++){
+          const next=map(lines[j]);
+          if(next)return next;
+        }
+      }
+    }
+
+    // Stand-alone result rows.
+    for(const line of lines){
+      const normalized=normalizeInspectionEmailText(line);
+      if(['no go','nogo','reinspect','re inspection','reinspection','failed','fail','not approved'].includes(normalized))return 'failed';
+      if(['go','passed','pass','approved'].includes(normalized))return 'passed';
+      if(['cancelled','canceled'].includes(normalized))return 'cancelled';
+    }
+
+    // Conservative phrase fallback within only the current message/report.
+    const normalized=normalizeInspectionEmailText(raw);
+    if(/\b(no go|nogo|reinspect|re inspection|reinspection|failed|not approved|corrections required)\b/.test(normalized))return 'failed';
+    if(/\b(passed|approved)\b/.test(normalized))return 'passed';
     return '';
   };
 
-  const labels=[
-    'inspection result','result','inspection status','status',
-    'outcome','inspection outcome','disposition'
-  ];
-
-  for(let i=0;i<lines.length;i++){
-    for(const label of labels){
-      const escaped=label.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
-      const match=lines[i].match(new RegExp(`\\b${escaped}\\b\\s*[:#-]?\\s*(.*)$`,'i'));
-      if(!match)continue;
-
-      const same=map(match[1]);
-      if(same)return same;
-
-      for(let j=i+1;j<Math.min(lines.length,i+4);j++){
-        const next=map(lines[j]);
-        if(next)return next;
-      }
-    }
-  }
-
-  // Right Choice sometimes prints only GO / NO GO on its own line.
-  for(const line of lines){
-    const normalized=normalizeInspectionEmailText(line);
-    if(normalized==='no go' || normalized==='nogo')return 'failed';
-    if(normalized==='go')return 'passed';
-    if(normalized==='passed' || normalized==='pass' || normalized==='approved')return 'passed';
-    if(normalized==='failed' || normalized==='fail' || normalized==='not approved')return 'failed';
-  }
-
-  return inspectionStatusFromEmailText(subject,`${body||''}\n${report}`);
+  // Prefer a report if one exists, then the fresh unquoted email body.
+  return parseText(report) || parseText(freshBody);
 }
 
 function rightChoiceBaseInspectionName(subject,body,reportText){
-  const value=normalizeInspectionEmailText(`${subject||''} ${body||''} ${reportText||''}`);
+  const freshBody=rightChoiceFreshBody(body);
+  const value=normalizeInspectionEmailText(`${subject||''} ${freshBody} ${reportText||''}`);
 
   if(/\b(pre insulation|preinsulation|pre insul|pre drywall|predrywall)\b/.test(value)){
     return 'RightChoice Pre-Insulation Inspection';
@@ -6577,15 +6623,24 @@ function rightChoiceBaseInspectionName(subject,body,reportText){
 }
 
 function rightChoiceIsReinspection(subject,body,reportText){
-  const value=normalizeInspectionEmailText(`${subject||''} ${body||''} ${reportText||''}`);
-  return /\b(reinspection|re inspection|reinspect|re inspect|recheck|re check|second inspection|follow up inspection|followup inspection)\b/.test(value);
+  const subjectText=normalizeInspectionEmailText(subject||'');
+
+  // "Re:" is just an email reply prefix. It is NOT a reinspection.
+  if(/\b(reinspect|re inspection|reinspection|re inspect|recheck|re check)\b/.test(subjectText)){
+    return true;
+  }
+
+  const freshBody=normalizeInspectionEmailText(rightChoiceFreshBody(body));
+  const report=normalizeInspectionEmailText(reportText||'');
+
+  return /\b(reinspect|re inspection|reinspection|re inspect|recheck|re check|second inspection|follow up inspection|followup inspection)\b/.test(`${freshBody} ${report}`);
 }
 
 function rightChoiceInspectionDate(subject,body,reportText,receivedDateTime){
   const reportDate=inspectionDateFromWorksheetText(reportText||'');
   if(reportDate)return reportDate;
 
-  const raw=`${subject||''}\n${body||''}`;
+  const raw=`${subject||''}\n${rightChoiceFreshBody(body)}`;
   const lines=raw.split(/\r?\n/).map(x=>x.replace(/\s+/g,' ').trim()).filter(Boolean);
   const labels=['inspection date','date inspected','date of inspection','report date','completed date'];
 
@@ -7425,14 +7480,17 @@ function diagnosticRightChoiceGuess(message,bodyText,reportText=''){
   const sender=inspectionEmailSenderAddress(message);
   const senderName=inspectionEmailSenderName(message);
   const subject=String(message?.subject||'');
-  const blob=normalizeInspectionEmailText(`${sender} ${senderName} ${subject} ${bodyText||''} ${reportText||''}`);
+  const freshBody=rightChoiceFreshBody(bodyText);
+  const blob=normalizeInspectionEmailText(`${sender} ${senderName} ${subject} ${freshBody} ${reportText||''}`);
 
   const sourceHints=[];
   if(sender.endsWith('@vallus.com'))sourceHints.push('sender @vallus.com');
   if(blob.includes('vallus'))sourceHints.push('contains vallus');
   if(blob.includes('right choice') || blob.includes('rightchoice'))sourceHints.push('contains right choice');
   if(blob.includes('pre insulation') || blob.includes('preinsulation'))sourceHints.push('contains pre-insulation');
-  if(blob.includes('reinspect') || blob.includes('re inspection') || blob.includes('reinspection'))sourceHints.push('reinspection wording');
+  const subjectNorm=normalizeInspectionEmailText(subject);
+  if(/\b(reinspect|re inspection|reinspection|re inspect)\b/.test(subjectNorm))sourceHints.push('SUBJECT says Reinspect = Failed');
+  else if(blob.includes('reinspect') || blob.includes('re inspection') || blob.includes('reinspection'))sourceHints.push('current-message reinspection wording');
 
   const lotMatch=inspectionEmailFindLot(subject,`${bodyText||''}\n${reportText||''}`,sender);
   const status=rightChoiceStatusFromReport(subject,bodyText,reportText);
@@ -7535,7 +7593,7 @@ async function diagnoseInspectionEmails(){
           reinspection:d.reinspection,
           lot:d.lot,
           subdivision:d.subdivision,
-          attachment:rcReport.name||'NO REPORT READ',
+          attachment:rcReport.name||'No attachment — email text used',
           scheduleItem:d.scheduleItem,
           error:rcError
         });
@@ -7587,7 +7645,9 @@ async function runInspectionEmailSync({silent=false}={}){
 
   try{
     const days=Math.max(1,Number($('inspectionEmailDays')?.value||30));
-    const messages=await fetchInspectionEmailCandidates(days);
+    const messages=(await fetchInspectionEmailCandidates(days))
+      .slice()
+      .sort((a,b)=>new Date(a.receivedDateTime||0)-new Date(b.receivedDateTime||0));
     const results=[];
 
     for(const message of messages){
