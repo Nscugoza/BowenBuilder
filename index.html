@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="2026-09-24-calendar-item-email-text">
+<meta name="bowenbuilder-version" content="2026-09-24-calendar-item-email-text-fixed">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -6105,6 +6105,11 @@ function shouldIncludePlansForSelectedDate(channel){
     (channel==='email' ? !!row.include_plans_email : !!row.include_plans_text)
   );
 }
+
+function shouldIncludePlansForItem(name,channel){
+  const row=scheduleContactForItemName(name);
+  return channel==='email' ? !!row?.include_plans_email : !!row?.include_plans_text;
+}
 async function currentLotPlansShareUrl(){
   const lot=activeLotInfo();
   if(!lot)return '';
@@ -6123,6 +6128,11 @@ function shouldIncludeRenderingForSelectedDate(channel){
     workNames.has(row.schedule_item) &&
     (channel==='email' ? !!row.include_rendering_email : !!row.include_rendering_text)
   );
+}
+
+function shouldIncludeRenderingForItem(name,channel){
+  const row=scheduleContactForItemName(name);
+  return channel==='email' ? !!row?.include_rendering_email : !!row?.include_rendering_text;
 }
 async function currentLotRenderingShareUrl(){
   const lot=activeLotInfo();
@@ -7580,6 +7590,101 @@ async function sendMicrosoftGraphEmail({to,subject,body}){
   throw new Error(detail||`Microsoft could not send the email (${response.status}).`);
 }
 
+
+function emailCalendarScheduleItemNow(itemId){
+  try{
+    const item=items.find(i=>String(i.id)===String(itemId));
+    if(!item)return;
+
+    const linkedItems=linkedScheduleItemsForItem(item);
+    const workNames=[...new Set(linkedItems.map(x=>x.name))];
+
+    const includePlans=shouldIncludePlansForItem(item.name,'email');
+    const includeRendering=shouldIncludeRenderingForItem(item.name,'email');
+    const sameLotCache=overviewShareCache && overviewShareCache.lotId===item.lot_id;
+    const planUrl=(includePlans && sameLotCache)?(overviewShareCache.plansUrl||''):'';
+    const renderingUrl=(includeRendering && sameLotCache)?(overviewShareCache.renderingUrl||''):'';
+
+    const msg=overviewScheduleItemMessage(
+      item,
+      planUrl,
+      includePlans && !!planUrl,
+      renderingUrl,
+      includeRendering && !!renderingUrl
+    );
+    if(!msg)return;
+
+    const recipients=mappedRecipientsForWork(workNames);
+    const ccRecipients=mappedCcRecipientsForWork(workNames);
+
+    if(!recipients.length){
+      alert(`No email recipient is assigned to "${item.name}" in Admin → Schedule Contacts.`);
+      return;
+    }
+
+    const to=recipients.join(',');
+    const cc=ccRecipients.join(',');
+    let body=customScheduleMessageForItem(item,'email',msg);
+    body=linkedScheduleMessageBody(item.lot_id,linkedItems,body);
+
+    const lot=lots.find(l=>String(l.id)===String(item.lot_id));
+    const subject=linkedItems.length>1
+      ? `${lot?.lot_name||'Lot'} - Schedule Update`
+      : msg.subject;
+
+    const mailParams=[];
+    if(cc)mailParams.push(`cc=${encodeURIComponent(cc)}`);
+    mailParams.push(`subject=${encodeURIComponent(subject)}`);
+    mailParams.push(`body=${encodeURIComponent(body)}`);
+
+    launchCalendarComposer(`mailto:${encodeURIComponent(to)}?${mailParams.join('&')}`);
+  }catch(err){
+    console.error('Calendar item email failed:',err);
+    alert(err?.message||String(err));
+  }
+}
+
+function textCalendarScheduleItemNow(itemId){
+  try{
+    const item=items.find(i=>String(i.id)===String(itemId));
+    if(!item)return;
+
+    const linkedItems=linkedScheduleItemsForItem(item);
+    const workNames=[...new Set(linkedItems.map(x=>x.name))];
+
+    const includePlans=shouldIncludePlansForItem(item.name,'text');
+    const includeRendering=shouldIncludeRenderingForItem(item.name,'text');
+    const sameLotCache=overviewShareCache && overviewShareCache.lotId===item.lot_id;
+    const planUrl=(includePlans && sameLotCache)?(overviewShareCache.plansUrl||''):'';
+    const renderingUrl=(includeRendering && sameLotCache)?(overviewShareCache.renderingUrl||''):'';
+
+    const msg=overviewScheduleItemMessage(
+      item,
+      planUrl,
+      includePlans && !!planUrl,
+      renderingUrl,
+      includeRendering && !!renderingUrl
+    );
+    if(!msg)return;
+
+    const phones=mappedPhonesForWork(workNames);
+    if(!phones.length){
+      alert(`No phone number is assigned to "${item.name}" in Admin → Schedule Contacts.`);
+      return;
+    }
+
+    const recipient=phones.join(',');
+    let body=customScheduleMessageForItem(item,'text',msg);
+    body=linkedScheduleMessageBody(item.lot_id,linkedItems,body);
+
+    const separator=/iPad|iPhone|iPod/.test(navigator.userAgent)?'&':'?';
+    launchCalendarComposer(`sms:${recipient}${separator}body=${encodeURIComponent(body)}`);
+  }catch(err){
+    console.error('Calendar item text failed:',err);
+    alert(err?.message||String(err));
+  }
+}
+
 async function emailOverviewScheduleItem(itemId){
   const item=items.find(i=>String(i.id)===String(itemId));
   if(!item)return;
@@ -7929,20 +8034,20 @@ function renderSelectedScheduleDay(){
      </div>
    </div>`).join(''):'<div class="muted">Nothing scheduled for this day.</div>';
 
- document.querySelectorAll('[data-calendar-email-item]').forEach(b=>b.onclick=async e=>{
+ document.querySelectorAll('[data-calendar-email-item]').forEach(b=>b.onclick=e=>{
    e.preventDefault();
    e.stopPropagation();
    const row=b.closest('.bb-swipe-row');
    if(row?.classList.contains('swiped'))row.classList.remove('swiped');
-   await emailOverviewScheduleItem(b.dataset.calendarEmailItem);
+   emailCalendarScheduleItemNow(b.dataset.calendarEmailItem);
  });
 
- document.querySelectorAll('[data-calendar-text-item]').forEach(b=>b.onclick=async e=>{
+ document.querySelectorAll('[data-calendar-text-item]').forEach(b=>b.onclick=e=>{
    e.preventDefault();
    e.stopPropagation();
    const row=b.closest('.bb-swipe-row');
    if(row?.classList.contains('swiped'))row.classList.remove('swiped');
-   await textOverviewScheduleItem(b.dataset.calendarTextItem);
+   textCalendarScheduleItemNow(b.dataset.calendarTextItem);
  });
 
  document.querySelectorAll('[data-calendar-move]').forEach(b=>b.onclick=e=>{
@@ -8027,6 +8132,10 @@ async function showScheduleView(mode=scheduleViewMode,preserveScroll=false){
  const selected=dateFromKey(scheduleSelectedDate);
  if(selected)scheduleCalendarCursor=new Date(selected.getFullYear(),selected.getMonth(),1);
  await loadCalendarCalledInMarks();
+ await loadScheduleContacts();
+ if(!overviewShareCache || overviewShareCache.lotId!==currentLot){
+   await warmOverviewCommunicationData();
+ }
  setScheduleViewMode(mode);
  if(preserveScroll){
    requestAnimationFrame(()=>window.scrollTo({top:preservedScrollY,left:0,behavior:'auto'}));
