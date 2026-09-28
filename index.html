@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="2026-09-28-session-refresh-guard">
+<meta name="bowenbuilder-version" content="2026-09-28-pdf-plan-share-tax-id">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -2528,6 +2528,10 @@ button.teams-file-row:hover{border-color:#bdccdd}
         <div class="card admin-note">
           <strong>Subdivision Power Companies</strong>
           <div class="muted" style="margin-top:5px">Set the electric utility shown on every lot in a subdivision. The lot button opens a contact bubble with tap-to-call and tap-to-email options.</div>
+        </div>
+        <div class="card" style="margin-top:12px">
+          <div class="muted" style="font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.04em">B&amp;B Tax ID#</div>
+          <div style="font-size:24px;font-weight:900;color:var(--navy);margin-top:4px">4842</div>
         </div>
         <div id="adminPowerNotice" class="notice hidden" style="margin:12px 0"></div>
         <div id="adminPowerList" class="admin-power-list"></div>
@@ -6167,6 +6171,97 @@ async function currentLotPlansShareUrl(){
   return lot.plans_url||'';
 }
 
+function safeShareFileName(value,fallback='Plans'){
+  const clean=String(value||'')
+    .replace(/[\/\\:*?"<>|]+/g,' ')
+    .replace(/\s+/g,' ')
+    .trim();
+  return clean||fallback;
+}
+
+async function lotPlansShareFile(lotId=currentLot){
+  const lot=lots.find(l=>String(l.id)===String(lotId));
+  if(!lot?.plans_file_path)return null;
+
+  const {data,error}=await db.storage
+    .from('lot-documents')
+    .download(lot.plans_file_path);
+
+  if(error)throw error;
+  if(!data)return null;
+
+  const rawPath=String(lot.plans_file_path||'');
+  const pathName=rawPath.split('/').pop()||'';
+  const pathExt=(pathName.match(/\.([A-Za-z0-9]{2,5})$/)||[])[1]?.toLowerCase();
+  const mime=String(data.type||'').toLowerCase();
+
+  let ext=pathExt||'';
+  if(!ext){
+    if(mime==='application/pdf')ext='pdf';
+    else if(mime==='image/jpeg')ext='jpg';
+    else if(mime==='image/png')ext='png';
+    else if(mime==='image/webp')ext='webp';
+  }
+  if(!ext)ext='pdf';
+
+  const fileName=`${safeShareFileName(lot.lot_name||'Lot')} - Plans.${ext}`;
+  const type=data.type || (ext==='pdf'?'application/pdf':'application/octet-stream');
+  return new File([data],fileName,{type});
+}
+
+function canShareBowenBuilderFile(file){
+  if(!file || typeof navigator.share!=='function')return false;
+  if(typeof navigator.canShare==='function'){
+    try{return navigator.canShare({files:[file]});}
+    catch(_){return false}
+  }
+  return false;
+}
+
+function shareBowenBuilderFileNow(file,title,body){
+  if(!canShareBowenBuilderFile(file))return false;
+  try{
+    const sharePromise=navigator.share({
+      files:[file],
+      title:title||file.name||'BowenBuilder',
+      text:body||''
+    });
+    Promise.resolve(sharePromise).catch(err=>{
+      if(err?.name!=='AbortError'){
+        console.error('BowenBuilder file share failed:',err);
+        alert('The plan PDF could not be shared. Try again, or open Plans from the lot and share it manually.');
+      }
+    });
+    return true;
+  }catch(err){
+    console.error('BowenBuilder file share failed:',err);
+    return false;
+  }
+}
+
+function plansAttachmentForLot(lotId){
+  if(
+    overviewShareCache &&
+    String(overviewShareCache.lotId)===String(lotId) &&
+    overviewShareCache.plansFile
+  ){
+    return overviewShareCache.plansFile;
+  }
+  return null;
+}
+
+function plansAttachmentStillLoading(lotId){
+  return !!(
+    overviewShareCache &&
+    String(overviewShareCache.lotId)===String(lotId) &&
+    overviewShareCache.plansFileStatus==='loading'
+  );
+}
+
+function lotHasUploadedPlans(lotId){
+  return !!lots.find(l=>String(l.id)===String(lotId))?.plans_file_path;
+}
+
 function shouldIncludeRenderingForSelectedDate(channel){
   const workNames=new Set(selectedWorkNames());
   return scheduleContacts.some(row=>
@@ -6662,34 +6757,78 @@ async function saveAdminScheduleContact(scheduleItem){
 let overviewShareCache={
   lotId:null,
   plansUrl:'',
+  plansFile:null,
+  plansFileStatus:'idle',
   renderingUrl:'',
   warming:false
 };
 
+async function warmOverviewPlansFile(lotId=currentLot){
+  const lot=lots.find(l=>String(l.id)===String(lotId));
+  if(!lot?.plans_file_path)return;
+
+  if(String(overviewShareCache.lotId)!==String(lotId))return;
+  if(overviewShareCache.plansFile || overviewShareCache.plansFileStatus==='loading')return;
+
+  overviewShareCache.plansFileStatus='loading';
+  try{
+    const file=await lotPlansShareFile(lotId);
+    if(String(overviewShareCache.lotId)===String(lotId)){
+      overviewShareCache.plansFile=file||null;
+      overviewShareCache.plansFileStatus=file?'ready':'missing';
+    }
+  }catch(err){
+    console.warn('Plan PDF preload failed:',err);
+    if(String(overviewShareCache.lotId)===String(lotId)){
+      overviewShareCache.plansFile=null;
+      overviewShareCache.plansFileStatus='error';
+    }
+  }
+}
+
 async function warmOverviewCommunicationData(){
   const lotId=currentLot;
   if(!lotId)return;
+
+  if(String(overviewShareCache.lotId)!==String(lotId)){
+    overviewShareCache={
+      lotId,
+      plansUrl:'',
+      plansFile:null,
+      plansFileStatus:'idle',
+      renderingUrl:'',
+      warming:false
+    };
+  }
+
+  if(overviewShareCache.warming)return;
+  overviewShareCache.warming=true;
+
   try{
-    // Contacts are cached in scheduleContacts for synchronous button taps.
+    // Contacts are cached so Email/Text taps can immediately open native UI.
     await loadScheduleContacts();
 
-    if(overviewShareCache.lotId!==lotId){
-      overviewShareCache={lotId,plansUrl:'',renderingUrl:'',warming:true};
-      const [plansUrl,renderingUrl]=await Promise.all([
-        currentLotPlansShareUrl().catch(()=> ''),
-        currentLotRenderingShareUrl().catch(()=> '')
-      ]);
-      if(currentLot===lotId){
-        overviewShareCache={
-          lotId,
-          plansUrl:plansUrl||'',
-          renderingUrl:renderingUrl||'',
-          warming:false
-        };
-      }
+    const [plansUrl,renderingUrl]=await Promise.all([
+      currentLotPlansShareUrl().catch(()=> ''),
+      currentLotRenderingShareUrl().catch(()=> '')
+    ]);
+
+    if(String(currentLot)===String(lotId) && String(overviewShareCache.lotId)===String(lotId)){
+      overviewShareCache.plansUrl=plansUrl||'';
+      overviewShareCache.renderingUrl=renderingUrl||'';
     }
-  }catch(_){
-    if(overviewShareCache.lotId===lotId)overviewShareCache.warming=false;
+
+    // Only preload the potentially large Plans file when at least one Admin
+    // contact mapping actually has Include Plans enabled.
+    const shouldPreloadPlans=
+      !!lots.find(l=>String(l.id)===String(lotId))?.plans_file_path &&
+      scheduleContacts.some(row=>!!row.include_plans_email || !!row.include_plans_text);
+
+    if(shouldPreloadPlans)void warmOverviewPlansFile(lotId);
+  }finally{
+    if(String(overviewShareCache.lotId)===String(lotId)){
+      overviewShareCache.warming=false;
+    }
   }
 }
 
@@ -7692,8 +7831,24 @@ function emailCalendarScheduleItemNow(itemId){
 
     const includePlans=shouldIncludePlansForItem(item.name,'email');
     const includeRendering=shouldIncludeRenderingForItem(item.name,'email');
-    const sameLotCache=overviewShareCache && overviewShareCache.lotId===item.lot_id;
-    const planUrl=(includePlans && sameLotCache)?(overviewShareCache.plansUrl||''):'';
+    const sameLotCache=overviewShareCache && String(overviewShareCache.lotId)===String(item.lot_id);
+    const plansFile=includePlans?plansAttachmentForLot(item.lot_id):null;
+    const uploadedPlans=includePlans && lotHasUploadedPlans(item.lot_id);
+
+    if(uploadedPlans && !plansFile){
+      if(overviewShareCache?.plansFileStatus!=='error')void warmOverviewPlansFile(item.lot_id);
+      alert(
+        overviewShareCache?.plansFileStatus==='error'
+          ? 'BowenBuilder could not load the plan PDF. Open Plans from the lot and share it manually.'
+          : 'BowenBuilder is preparing the plan PDF. Try Email again in a moment.'
+      );
+      return;
+    }
+
+    const attachPlans=!!plansFile && canShareBowenBuilderFile(plansFile);
+    const planUrl=(!attachPlans && includePlans && !uploadedPlans && sameLotCache)
+      ?(overviewShareCache.plansUrl||'')
+      :'';
     const renderingUrl=(includeRendering && sameLotCache)?(overviewShareCache.renderingUrl||''):'';
 
     const msg=overviewScheduleItemMessage(
@@ -7723,6 +7878,13 @@ function emailCalendarScheduleItemNow(itemId){
       ? `${lot?.lot_name||'Lot'} - Schedule Update`
       : msg.subject;
 
+    if(attachPlans){
+      if(!shareBowenBuilderFileNow(plansFile,subject,body)){
+        alert('This device cannot attach the plan PDF directly. Open Plans from the lot and share it manually.');
+      }
+      return;
+    }
+
     const mailParams=[];
     if(cc)mailParams.push(`cc=${encodeURIComponent(cc)}`);
     mailParams.push(`subject=${encodeURIComponent(subject)}`);
@@ -7745,8 +7907,24 @@ function textCalendarScheduleItemNow(itemId){
 
     const includePlans=shouldIncludePlansForItem(item.name,'text');
     const includeRendering=shouldIncludeRenderingForItem(item.name,'text');
-    const sameLotCache=overviewShareCache && overviewShareCache.lotId===item.lot_id;
-    const planUrl=(includePlans && sameLotCache)?(overviewShareCache.plansUrl||''):'';
+    const sameLotCache=overviewShareCache && String(overviewShareCache.lotId)===String(item.lot_id);
+    const plansFile=includePlans?plansAttachmentForLot(item.lot_id):null;
+    const uploadedPlans=includePlans && lotHasUploadedPlans(item.lot_id);
+
+    if(uploadedPlans && !plansFile){
+      if(overviewShareCache?.plansFileStatus!=='error')void warmOverviewPlansFile(item.lot_id);
+      alert(
+        overviewShareCache?.plansFileStatus==='error'
+          ? 'BowenBuilder could not load the plan PDF. Open Plans from the lot and share it manually.'
+          : 'BowenBuilder is preparing the plan PDF. Try Text again in a moment.'
+      );
+      return;
+    }
+
+    const attachPlans=!!plansFile && canShareBowenBuilderFile(plansFile);
+    const planUrl=(!attachPlans && includePlans && !uploadedPlans && sameLotCache)
+      ?(overviewShareCache.plansUrl||'')
+      :'';
     const renderingUrl=(includeRendering && sameLotCache)?(overviewShareCache.renderingUrl||''):'';
 
     const msg=overviewScheduleItemMessage(
@@ -7768,6 +7946,18 @@ function textCalendarScheduleItemNow(itemId){
     let body=customScheduleMessageForItem(item,'text',msg);
     body=linkedScheduleMessageBody(item.lot_id,linkedItems,body);
 
+    const lot=lots.find(l=>String(l.id)===String(item.lot_id));
+    const subject=linkedItems.length>1
+      ? `${lot?.lot_name||'Lot'} - Schedule Update`
+      : msg.subject;
+
+    if(attachPlans){
+      if(!shareBowenBuilderFileNow(plansFile,subject,body)){
+        alert('This device cannot attach the plan PDF directly. Open Plans from the lot and share it manually.');
+      }
+      return;
+    }
+
     const separator=/iPad|iPhone|iPod/.test(navigator.userAgent)?'&':'?';
     launchCalendarComposer(`sms:${recipient}${separator}body=${encodeURIComponent(body)}`);
   }catch(err){
@@ -7776,90 +7966,157 @@ function textCalendarScheduleItemNow(itemId){
   }
 }
 
-async function emailOverviewScheduleItem(itemId){
-  const item=items.find(i=>String(i.id)===String(itemId));
-  if(!item)return;
+function emailOverviewScheduleItem(itemId){
+  try{
+    const item=items.find(i=>String(i.id)===String(itemId));
+    if(!item)return;
 
-  await loadScheduleContacts();
-  const linkedItems=linkedScheduleItemsForItem(item);
-  const workNames=[...new Set(linkedItems.map(x=>x.name))];
+    if(overviewShareCache?.warming){
+      alert('BowenBuilder is preparing the schedule contacts. Try Email again in a moment.');
+      return;
+    }
 
-  const includePlans=shouldIncludePlansForItem(item.name,'email');
-  const includeRendering=shouldIncludeRenderingForItem(item.name,'email');
-  const sameLotCache=overviewShareCache && overviewShareCache.lotId===item.lot_id;
-  const planUrl=(includePlans && sameLotCache)?(overviewShareCache.plansUrl||''):'';
-  const renderingUrl=(includeRendering && sameLotCache)?(overviewShareCache.renderingUrl||''):'';
+    const linkedItems=linkedScheduleItemsForItem(item);
+    const workNames=[...new Set(linkedItems.map(x=>x.name))];
 
-  const msg=overviewScheduleItemMessage(
-    item,
-    planUrl,
-    includePlans && !!planUrl,
-    renderingUrl,
-    includeRendering && !!renderingUrl
-  );
-  if(!msg)return;
+    const includePlans=shouldIncludePlansForItem(item.name,'email');
+    const includeRendering=shouldIncludeRenderingForItem(item.name,'email');
+    const sameLotCache=overviewShareCache && String(overviewShareCache.lotId)===String(item.lot_id);
+    const plansFile=includePlans?plansAttachmentForLot(item.lot_id):null;
+    const uploadedPlans=includePlans && lotHasUploadedPlans(item.lot_id);
 
-  const recipients=mappedRecipientsForWork(workNames);
-  const ccRecipients=mappedCcRecipientsForWork(workNames);
-  if(!recipients.length){
-    alert('No email recipient is assigned to this schedule item in Admin → Schedule Contacts.');
-    return;
+    if(uploadedPlans && !plansFile){
+      if(overviewShareCache?.plansFileStatus!=='error')void warmOverviewPlansFile(item.lot_id);
+      alert(
+        overviewShareCache?.plansFileStatus==='error'
+          ? 'BowenBuilder could not load the plan PDF. Open Plans from the lot and share it manually.'
+          : 'BowenBuilder is preparing the plan PDF. Try Email again in a moment.'
+      );
+      return;
+    }
+
+    const attachPlans=!!plansFile && canShareBowenBuilderFile(plansFile);
+    const planUrl=(!attachPlans && includePlans && !uploadedPlans && sameLotCache)
+      ?(overviewShareCache.plansUrl||'')
+      :'';
+    const renderingUrl=(includeRendering && sameLotCache)?(overviewShareCache.renderingUrl||''):'';
+
+    const msg=overviewScheduleItemMessage(
+      item,
+      planUrl,
+      includePlans && !!planUrl,
+      renderingUrl,
+      includeRendering && !!renderingUrl
+    );
+    if(!msg)return;
+
+    const recipients=mappedRecipientsForWork(workNames);
+    const ccRecipients=mappedCcRecipientsForWork(workNames);
+    if(!recipients.length){
+      alert('No email recipient is assigned to this schedule item in Admin → Schedule Contacts.');
+      return;
+    }
+
+    const to=recipients.join(',');
+    const cc=ccRecipients.join(',');
+    let body=customScheduleMessageForItem(item,'email',msg);
+    body=linkedScheduleMessageBody(item.lot_id,linkedItems,body);
+
+    const lot=lots.find(l=>String(l.id)===String(item.lot_id));
+    const subject=linkedItems.length>1
+      ? `${lot?.lot_name||'Lot'} - Schedule Update`
+      : msg.subject;
+
+    if(attachPlans){
+      if(!shareBowenBuilderFileNow(plansFile,subject,body)){
+        alert('This device cannot attach the plan PDF directly. Open Plans from the lot and share it manually.');
+      }
+      return;
+    }
+
+    const mailParams=[];
+    if(cc)mailParams.push(`cc=${encodeURIComponent(cc)}`);
+    mailParams.push(`subject=${encodeURIComponent(subject)}`);
+    mailParams.push(`body=${encodeURIComponent(body)}`);
+    launchCalendarComposer(`mailto:${encodeURIComponent(to)}?${mailParams.join('&')}`);
+  }catch(err){
+    console.error('Overview email failed:',err);
+    alert(err?.message||String(err));
   }
-
-  const to=recipients.join(',');
-  const cc=ccRecipients.join(',');
-  let body=customScheduleMessageForItem(item,'email',msg);
-  body=linkedScheduleMessageBody(item.lot_id,linkedItems,body);
-
-  const lot=lots.find(l=>String(l.id)===String(item.lot_id));
-  const subject=linkedItems.length>1
-    ? `${lot?.lot_name||'Lot'} - Schedule Update`
-    : msg.subject;
-
-  const mailParams=[];
-  if(cc)mailParams.push(`cc=${encodeURIComponent(cc)}`);
-  mailParams.push(`subject=${encodeURIComponent(subject)}`);
-  mailParams.push(`body=${encodeURIComponent(body)}`);
-  const href=`mailto:${encodeURIComponent(to)}?${mailParams.join('&')}`;
-  launchCalendarComposer(href);
 }
 
-async function textOverviewScheduleItem(itemId){
-  const item=items.find(i=>String(i.id)===String(itemId));
-  if(!item)return;
+function textOverviewScheduleItem(itemId){
+  try{
+    const item=items.find(i=>String(i.id)===String(itemId));
+    if(!item)return;
 
-  await loadScheduleContacts();
-  const linkedItems=linkedScheduleItemsForItem(item);
-  const workNames=[...new Set(linkedItems.map(x=>x.name))];
+    if(overviewShareCache?.warming){
+      alert('BowenBuilder is preparing the schedule contacts. Try Text again in a moment.');
+      return;
+    }
 
-  const includePlans=shouldIncludePlansForItem(item.name,'text');
-  const includeRendering=shouldIncludeRenderingForItem(item.name,'text');
-  const sameLotCache=overviewShareCache && overviewShareCache.lotId===item.lot_id;
-  const planUrl=(includePlans && sameLotCache)?(overviewShareCache.plansUrl||''):'';
-  const renderingUrl=(includeRendering && sameLotCache)?(overviewShareCache.renderingUrl||''):'';
+    const linkedItems=linkedScheduleItemsForItem(item);
+    const workNames=[...new Set(linkedItems.map(x=>x.name))];
 
-  const msg=overviewScheduleItemMessage(
-    item,
-    planUrl,
-    includePlans && !!planUrl,
-    renderingUrl,
-    includeRendering && !!renderingUrl
-  );
-  if(!msg)return;
+    const includePlans=shouldIncludePlansForItem(item.name,'text');
+    const includeRendering=shouldIncludeRenderingForItem(item.name,'text');
+    const sameLotCache=overviewShareCache && String(overviewShareCache.lotId)===String(item.lot_id);
+    const plansFile=includePlans?plansAttachmentForLot(item.lot_id):null;
+    const uploadedPlans=includePlans && lotHasUploadedPlans(item.lot_id);
 
-  const phones=mappedPhonesForWork(workNames);
-  if(!phones.length){
-    alert('No phone number is assigned to this schedule item in Admin → Schedule Contacts.');
-    return;
+    if(uploadedPlans && !plansFile){
+      if(overviewShareCache?.plansFileStatus!=='error')void warmOverviewPlansFile(item.lot_id);
+      alert(
+        overviewShareCache?.plansFileStatus==='error'
+          ? 'BowenBuilder could not load the plan PDF. Open Plans from the lot and share it manually.'
+          : 'BowenBuilder is preparing the plan PDF. Try Text again in a moment.'
+      );
+      return;
+    }
+
+    const attachPlans=!!plansFile && canShareBowenBuilderFile(plansFile);
+    const planUrl=(!attachPlans && includePlans && !uploadedPlans && sameLotCache)
+      ?(overviewShareCache.plansUrl||'')
+      :'';
+    const renderingUrl=(includeRendering && sameLotCache)?(overviewShareCache.renderingUrl||''):'';
+
+    const msg=overviewScheduleItemMessage(
+      item,
+      planUrl,
+      includePlans && !!planUrl,
+      renderingUrl,
+      includeRendering && !!renderingUrl
+    );
+    if(!msg)return;
+
+    const phones=mappedPhonesForWork(workNames);
+    if(!phones.length){
+      alert('No phone number is assigned to this schedule item in Admin → Schedule Contacts.');
+      return;
+    }
+
+    const recipient=phones.join(',');
+    let body=customScheduleMessageForItem(item,'text',msg);
+    body=linkedScheduleMessageBody(item.lot_id,linkedItems,body);
+
+    const lot=lots.find(l=>String(l.id)===String(item.lot_id));
+    const subject=linkedItems.length>1
+      ? `${lot?.lot_name||'Lot'} - Schedule Update`
+      : msg.subject;
+
+    if(attachPlans){
+      if(!shareBowenBuilderFileNow(plansFile,subject,body)){
+        alert('This device cannot attach the plan PDF directly. Open Plans from the lot and share it manually.');
+      }
+      return;
+    }
+
+    const separator=/iPad|iPhone|iPod/.test(navigator.userAgent)?'&':'?';
+    launchCalendarComposer(`sms:${recipient}${separator}body=${encodeURIComponent(body)}`);
+  }catch(err){
+    console.error('Overview text failed:',err);
+    alert(err?.message||String(err));
   }
-
-  const recipient=phones.join(',');
-  let body=customScheduleMessageForItem(item,'text',msg);
-  body=linkedScheduleMessageBody(item.lot_id,linkedItems,body);
-
-  const separator=/iPad|iPhone|iPod/.test(navigator.userAgent)?'&':'?';
-  const href=`sms:${recipient}${separator}body=${encodeURIComponent(body)}`;
-  launchCalendarComposer(href);
 }
 
 function selectedDateScheduleItems(){
@@ -7985,21 +8242,40 @@ function setCalendarCommunicationLocal(kind,dateKey,lotId=currentLot){
   }
 }
 
-async function emailSelectedCalendarDate(){
+function emailSelectedCalendarDate(){
   try{
     if(!scheduleSelectedDate){
       alert('Select a calendar date first.');
       return;
     }
+    if(overviewShareCache?.warming){
+      alert('BowenBuilder is preparing the schedule contacts. Try Email All again in a moment.');
+      return;
+    }
 
-    await loadScheduleContacts();
     const linkedItems=linkedScheduleItemsForSelectedDate();
     const workNames=[...new Set(linkedItems.map(x=>x.name))];
 
     const includePlans=shouldIncludePlansForSelectedDate('email');
     const includeRendering=shouldIncludeRenderingForSelectedDate('email');
-    const sameLotCache=overviewShareCache && overviewShareCache.lotId===currentLot;
-    const planUrl=(includePlans && sameLotCache)?(overviewShareCache.plansUrl||''):'';
+    const sameLotCache=overviewShareCache && String(overviewShareCache.lotId)===String(currentLot);
+    const plansFile=includePlans?plansAttachmentForLot(currentLot):null;
+    const uploadedPlans=includePlans && lotHasUploadedPlans(currentLot);
+
+    if(uploadedPlans && !plansFile){
+      if(overviewShareCache?.plansFileStatus!=='error')void warmOverviewPlansFile(currentLot);
+      alert(
+        overviewShareCache?.plansFileStatus==='error'
+          ? 'BowenBuilder could not load the plan PDF. Open Plans from the lot and share it manually.'
+          : 'BowenBuilder is preparing the plan PDF. Try Email All again in a moment.'
+      );
+      return;
+    }
+
+    const attachPlans=!!plansFile && canShareBowenBuilderFile(plansFile);
+    const planUrl=(!attachPlans && includePlans && !uploadedPlans && sameLotCache)
+      ?(overviewShareCache.plansUrl||'')
+      :'';
     const renderingUrl=(includeRendering && sameLotCache)?(overviewShareCache.renderingUrl||''):'';
 
     const msg=selectedDateMessage(
@@ -8030,33 +8306,58 @@ async function emailSelectedCalendarDate(){
       ? `${lot?.lot_name||'Lot'} - Schedule Update`
       : msg.subject;
 
+    if(attachPlans){
+      if(!shareBowenBuilderFileNow(plansFile,subject,body)){
+        alert('This device cannot attach the plan PDF directly. Open Plans from the lot and share it manually.');
+      }
+      return;
+    }
+
     const mailParams=[];
     if(cc)mailParams.push(`cc=${encodeURIComponent(cc)}`);
     mailParams.push(`subject=${encodeURIComponent(subject)}`);
     mailParams.push(`body=${encodeURIComponent(body)}`);
-    const href=`mailto:${encodeURIComponent(to)}?${mailParams.join('&')}`;
-    launchCalendarComposer(href);
+    launchCalendarComposer(`mailto:${encodeURIComponent(to)}?${mailParams.join('&')}`);
   }catch(err){
     console.error('Calendar Email Date draft failed:',err);
     alert(err?.message||String(err));
   }
 }
 
-async function textSelectedCalendarDate(){
+function textSelectedCalendarDate(){
   try{
     if(!scheduleSelectedDate){
       alert('Select a calendar date first.');
       return;
     }
+    if(overviewShareCache?.warming){
+      alert('BowenBuilder is preparing the schedule contacts. Try Text All again in a moment.');
+      return;
+    }
 
-    await loadScheduleContacts();
     const linkedItems=linkedScheduleItemsForSelectedDate();
     const workNames=[...new Set(linkedItems.map(x=>x.name))];
 
     const includePlans=shouldIncludePlansForSelectedDate('text');
     const includeRendering=shouldIncludeRenderingForSelectedDate('text');
-    const sameLotCache=overviewShareCache && overviewShareCache.lotId===currentLot;
-    const planUrl=(includePlans && sameLotCache)?(overviewShareCache.plansUrl||''):'';
+    const sameLotCache=overviewShareCache && String(overviewShareCache.lotId)===String(currentLot);
+    const plansFile=includePlans?plansAttachmentForLot(currentLot):null;
+    const uploadedPlans=includePlans && lotHasUploadedPlans(currentLot);
+
+    if(uploadedPlans && !plansFile){
+      if(overviewShareCache?.plansFileStatus!=='error')void warmOverviewPlansFile(currentLot);
+      alert(
+        overviewShareCache?.plansFileStatus==='error'
+          ? 'BowenBuilder could not load the plan PDF. Open Plans from the lot and share it manually.'
+          : 'BowenBuilder is preparing the plan PDF. Try Text All again in a moment.'
+      );
+      return;
+    }
+
+    const attachPlans=!!plansFile && canShareBowenBuilderFile(plansFile);
+    const planUrl=(!attachPlans && includePlans && !uploadedPlans && sameLotCache)
+      ?(overviewShareCache.plansUrl||'')
+      :'';
     const renderingUrl=(includeRendering && sameLotCache)?(overviewShareCache.renderingUrl||''):'';
 
     const msg=selectedDateMessage(
@@ -8080,9 +8381,20 @@ async function textSelectedCalendarDate(){
     let body=selectedDateCustomMessage('text',msg);
     body=linkedScheduleMessageBody(currentLot,linkedItems,body);
 
+    const lot=lots.find(l=>String(l.id)===String(currentLot));
+    const subject=linkedItems.length>1
+      ? `${lot?.lot_name||'Lot'} - Schedule Update`
+      : msg.subject;
+
+    if(attachPlans){
+      if(!shareBowenBuilderFileNow(plansFile,subject,body)){
+        alert('This device cannot attach the plan PDF directly. Open Plans from the lot and share it manually.');
+      }
+      return;
+    }
+
     const separator=/iPad|iPhone|iPod/.test(navigator.userAgent)?'&':'?';
-    const href=`sms:${recipient}${separator}body=${encodeURIComponent(body)}`;
-    launchCalendarComposer(href);
+    launchCalendarComposer(`sms:${recipient}${separator}body=${encodeURIComponent(body)}`);
   }catch(err){
     console.error('Calendar Text Date draft failed:',err);
     alert(err?.message||String(err));
