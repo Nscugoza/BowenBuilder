@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="2026-09-28-pdf-plan-share-tax-id">
+<meta name="bowenbuilder-version" content="2026-09-28-subdivision-tax-id-power-bubble">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -2126,6 +2126,34 @@ button.teams-file-row:hover{border-color:#bdccdd}
 .power-company-bubble{width:min(440px,100%);background:#fff;border:1px solid var(--border);border-radius:24px;padding:18px;box-shadow:0 24px 70px rgba(6,25,45,.28)}
 .power-company-bubble-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px}
 .power-company-bubble-head strong{font-size:20px;color:var(--navy)}
+.power-company-title-block{min-width:0;flex:1}
+.power-company-tax{
+  flex:0 0 auto;
+  min-width:92px;
+  border:1px solid #dbe3ee;
+  border-radius:14px;
+  background:#f7fafe;
+  padding:7px 10px;
+  text-align:center;
+  line-height:1.05;
+}
+.power-company-tax small{
+  display:block;
+  color:var(--muted);
+  font-size:9px;
+  font-weight:800;
+  letter-spacing:.03em;
+  text-transform:uppercase;
+  white-space:nowrap;
+}
+.power-company-tax strong{
+  display:block;
+  margin-top:4px;
+  color:#174f86;
+  font-size:18px;
+  font-weight:900;
+  white-space:nowrap;
+}
 .power-company-close{border:0;background:#eef3f8;color:#415069;border-radius:12px;width:40px;height:40px;font-size:24px;line-height:1;flex:0 0 auto}
 .power-company-actions{display:grid;gap:10px}
 .power-company-contact{display:flex;align-items:center;gap:12px;text-decoration:none;color:var(--text);border:1px solid var(--border);border-radius:16px;padding:14px;background:#f9fbfd;min-width:0}
@@ -2143,6 +2171,12 @@ button.teams-file-row:hover{border-color:#bdccdd}
 .admin-power-fields label{margin:0}
 .admin-power-actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-top:12px}
 .admin-power-status{font-size:12px;min-height:17px;margin-top:8px}
+@media(max-width:520px){
+  .power-company-bubble-head{gap:8px}
+  .power-company-tax{min-width:86px;padding:7px 8px}
+  .power-company-tax small{font-size:8px}
+  .power-company-tax strong{font-size:17px}
+}
 @media(max-width:700px){
   .power-company-overlay{align-items:flex-end}
   .power-company-bubble{border-radius:22px}
@@ -2569,9 +2603,13 @@ button.teams-file-row:hover{border-color:#bdccdd}
 <div id="powerCompanyOverlay" class="power-company-overlay hidden" aria-hidden="true">
   <div class="power-company-bubble" role="dialog" aria-modal="true" aria-labelledby="powerCompanyBubbleName">
     <div class="power-company-bubble-head">
-      <div>
+      <div class="power-company-title-block">
         <strong id="powerCompanyBubbleName">Power Company</strong>
         <div id="powerCompanyBubbleSubdivision" class="muted"></div>
+      </div>
+      <div id="powerCompanyBubbleTax" class="power-company-tax hidden" aria-label="B and B Tax ID">
+        <small>B&amp;B Tax ID#</small>
+        <strong id="powerCompanyBubbleTaxValue"></strong>
       </div>
       <button id="powerCompanyClose" class="power-company-close" type="button" aria-label="Close power company contacts">×</button>
     </div>
@@ -5214,6 +5252,7 @@ function powerCompanyForSubdivision(subdivision){
  let name=String(subdivision.power_company_name||'').trim();
  let phone=String(subdivision.power_company_phone||'').trim();
  let email=String(subdivision.power_company_email||'').trim();
+ let taxId=String(subdivision.tax_id||'').trim();
 
  // Backward-compatible fallback so GoldFinch keeps Jackson EMC until the SQL is run.
  if(!schemaReady && String(subdivision.name||'').trim().toLowerCase()==='goldfinch farms'){
@@ -5221,8 +5260,9 @@ function powerCompanyForSubdivision(subdivision){
    phone='18004623692';
    email='Info@jacksonemc.com';
  }
+ if(!taxId)taxId='4842';
  if(!name || (!phone && !email))return null;
- return {name,phone,email,subdivisionName:subdivision.name||'Subdivision'};
+ return {name,phone,email,taxId,subdivisionName:subdivision.name||'Subdivision'};
 }
 function powerCompanyForLot(lot){
  const sub=subdivisions.find(s=>String(s.id)===String(lot?.subdivision_id));
@@ -5264,6 +5304,13 @@ function openPowerCompanyBubble(lotId=currentLot){
  if(!overlay||!actions)return;
  $('powerCompanyBubbleName').textContent=company.name;
  $('powerCompanyBubbleSubdivision').textContent=company.subdivisionName;
+ const taxWrap=$('powerCompanyBubbleTax');
+ const taxValue=$('powerCompanyBubbleTaxValue');
+ if(taxWrap&&taxValue){
+   const taxId=String(company.taxId||'').trim();
+   taxValue.textContent=taxId;
+   taxWrap.classList.toggle('hidden',!taxId);
+ }
  const parts=[];
  if(company.phone){
    parts.push(`<a class="power-company-contact" href="${esc(powerCompanyPhoneHref(company.phone))}"><span class="power-company-icon">☎</span><span><small>Call</small><strong>${esc(formatPowerCompanyPhone(company.phone))}</strong></span></a>`);
@@ -6435,7 +6482,14 @@ async function setAdminSubdivisionPermission(userId,subdivisionId,kind,value,che
 
 function adminPowerCompanyValue(subdivision){
  const configured=powerCompanyForSubdivision(subdivision);
- return configured||{name:'',phone:'',email:'',subdivisionName:subdivision?.name||''};
+ if(configured)return configured;
+ return {
+   name:'',
+   phone:'',
+   email:'',
+   taxId:String(subdivision?.tax_id||'4842').trim(),
+   subdivisionName:subdivision?.name||''
+ };
 }
 function renderAdminPowerCompanies(){
  const list=$('adminPowerList');
@@ -6450,6 +6504,11 @@ function renderAdminPowerCompanies(){
        <label>Power Company Name<input data-power-name value="${esc(c.name||'')}" placeholder="e.g. Jackson EMC"></label>
        <label>Phone Number<input data-power-phone inputmode="tel" value="${esc(c.phone||'')}" placeholder="e.g. 1-800-462-3692"></label>
        <label>Email Address<input data-power-email inputmode="email" value="${esc(c.email||'')}" placeholder="e.g. Info@company.com"></label>
+     </div>
+     <div style="margin-top:10px">
+       <label>B&amp;B Tax ID#
+         <input data-power-tax-id inputmode="numeric" value="${esc(c.taxId||'')}" placeholder="e.g. 4842">
+       </label>
      </div>
      <div class="admin-power-actions">
        <button class="secondary" type="button" data-power-clear="${esc(sub.id)}">Clear</button>
@@ -6467,37 +6526,51 @@ async function saveAdminPowerCompany(subdivisionId,clear=false){
  const card=document.querySelector(`[data-power-card="${CSS.escape(String(subdivisionId))}"]`);
  if(!card)return;
  const status=card.querySelector('[data-power-status]');
+ const taxId=String(card.querySelector('[data-power-tax-id]')?.value||'').trim();
  const name=clear?'':String(card.querySelector('[data-power-name]')?.value||'').trim();
  const phone=clear?'':String(card.querySelector('[data-power-phone]')?.value||'').trim();
  const email=clear?'':String(card.querySelector('[data-power-email]')?.value||'').trim();
+
  if(!clear){
-   if(!name){alert('Enter the power company name.');return}
-   if(!phone&&!email){alert('Enter a phone number or email address.');return}
+   if((phone||email) && !name){alert('Enter the power company name.');return}
+   if(name && !phone&&!email){alert('Enter a phone number or email address for the power company.');return}
    if(email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){alert('Enter a valid email address.');return}
  }
- if(status)status.textContent=clear?'Clearing…':'Saving…';
- const {error}=await db.rpc('bowenbuilder_admin_set_power_company',{
+ if(status)status.textContent=clear?'Clearing power company…':'Saving…';
+
+ const {error}=await db.rpc('bowenbuilder_admin_set_power_company_v2',{
    p_subdivision_id:subdivisionId,
    p_company_name:name,
    p_phone:phone,
-   p_email:email
+   p_email:email,
+   p_tax_id:taxId
  });
  if(error){
-   if(status)status.textContent='Could not save. Run the Power Companies Supabase SQL if it has not been added yet.';
+   if(status)status.textContent='Could not save.';
    alert(error.message);
    return;
  }
+
  const sub=subdivisions.find(s=>String(s.id)===String(subdivisionId));
  if(sub){
    sub.power_company_name=name||null;
    sub.power_company_phone=phone||null;
    sub.power_company_email=email||null;
+   sub.tax_id=taxId||null;
  }
+
+ // "Clear" only removes the utility contact. It intentionally keeps the
+ // Tax ID field so B&B's Tax ID remains visible for that subdivision.
  if(clear){
-   const n=card.querySelector('[data-power-name]'),p=card.querySelector('[data-power-phone]'),e=card.querySelector('[data-power-email]');
-   if(n)n.value='';if(p)p.value='';if(e)e.value='';
+   const n=card.querySelector('[data-power-name]');
+   const p=card.querySelector('[data-power-phone]');
+   const e=card.querySelector('[data-power-email]');
+   if(n)n.value='';
+   if(p)p.value='';
+   if(e)e.value='';
  }
- if(status)status.textContent=clear?'Power company removed.':'Saved.';
+ if(status)status.textContent=clear?'Power company removed. Tax ID kept.':'Saved ✓';
+
  if(currentLot){
    const lot=lots.find(l=>String(l.id)===String(currentLot));
    if(lot)configurePowerCompanyButton(lot);
