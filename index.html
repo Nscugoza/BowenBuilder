@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="2026-09-28-subdivision-tax-id-power-bubble">
+<meta name="bowenbuilder-version" content="2026-09-28-checklist-status-system">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -1378,10 +1378,45 @@ button.danger:hover{filter:brightness(.96)}
 
 
 .checklist-list{display:grid;gap:8px;margin-top:12px}
-.checklist-row{display:flex;align-items:center;gap:10px;border:1px solid #e4e7ec;border-radius:12px;padding:10px 12px;background:#fff}
+.checklist-row{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  border:1px solid #e4e7ec;
+  border-left-width:6px;
+  border-radius:12px;
+  padding:10px 12px;
+  background:#fff;
+  transition:border-color .15s,background .15s;
+}
+.checklist-row.checklist-status-not_started{border-left-color:#98a2b3}
+.checklist-row.checklist-status-in_progress{border-left-color:#e0b400;background:#fffdf4}
+.checklist-row.checklist-status-needs_attention{border-left-color:#d92d20;background:#fff7f6}
+.checklist-row.checklist-status-complete{border-left-color:#12b76a;background:#f6fdf9}
 .checklist-row input[type="checkbox"]{width:20px;height:20px;margin:0;flex:0 0 auto}
-.checklist-row-label{font-weight:700;color:#344054;flex:1}
+.checklist-row-label{font-weight:700;color:#344054;flex:1;min-width:0}
 .checklist-custom-row .checklist-row-label{font-style:italic}
+.checklist-status-select{
+  flex:0 0 auto;
+  width:auto;
+  min-width:118px;
+  max-width:145px;
+  padding:7px 28px 7px 9px;
+  border-radius:999px;
+  font-size:12px;
+  font-weight:800;
+  border:1px solid #d0d5dd;
+  background:#f8fafc;
+  color:#475467;
+}
+.checklist-status-select.status-not_started{background:#f2f4f7;border-color:#d0d5dd;color:#475467}
+.checklist-status-select.status-in_progress{background:#fff7d6;border-color:#ead071;color:#765b00}
+.checklist-status-select.status-needs_attention{background:#fdeceb;border-color:#efaaa4;color:#a1271d}
+.checklist-status-select.status-complete{background:#edf9f2;border-color:#a9d9be;color:#1f704b}
+@media(max-width:620px){
+  .checklist-row{align-items:flex-start}
+  .checklist-status-select{min-width:112px;max-width:124px;font-size:11px;padding-left:8px}
+}
 
 @media(max-width:620px){
   .lot-checklist-head{align-items:flex-start;gap:10px;flex-wrap:wrap}
@@ -3218,6 +3253,9 @@ const DEFAULT_LOT_CHECKLIST_ITEMS=[
   'Install Island Pipe for Island if Necessary',
   'Order Steps (2nd Floor Decking)',
   '24” x 14” Soap Niche (54” off floor)',
+  'Blocking installed for secondary bath tubs',
+  'Blocking added for master tub',
+  'Blocking added for shower glass',
   'Bolt down walls',
   '2 - 4” square washers & 1/2” anchors on each side of garage portal'
 ];
@@ -5495,16 +5533,63 @@ function showLot(preserveScroll=false){
  });
 }
 
+const LOT_CHECKLIST_STATUS_OPTIONS=[
+  ['not_started','Not Started'],
+  ['in_progress','In Progress'],
+  ['needs_attention','Needs Attention'],
+  ['complete','Complete']
+];
+
+function normalizeLotChecklistStatus(item){
+  const raw=String(item?.status||'').trim().toLowerCase();
+  if(LOT_CHECKLIST_STATUS_OPTIONS.some(([value])=>value===raw))return raw;
+  return item?.complete?'complete':'not_started';
+}
+
 function lotChecklistData(lot){
   const raw=Array.isArray(lot?.checklist_items)?lot.checklist_items:[];
   const standard=DEFAULT_LOT_CHECKLIST_ITEMS.map(name=>{
     const existing=raw.find(x=>x && x.name===name && !x.custom);
-    return {name,complete:!!existing?.complete,custom:false};
+    const status=normalizeLotChecklistStatus(existing);
+    return {
+      name,
+      status,
+      complete:status==='complete',
+      custom:false
+    };
   });
   const custom=raw
     .filter(x=>x && x.custom && String(x.name||'').trim())
-    .map(x=>({name:String(x.name).trim(),complete:!!x.complete,custom:true}));
+    .map(x=>{
+      const status=normalizeLotChecklistStatus(x);
+      return {
+        name:String(x.name).trim(),
+        status,
+        complete:status==='complete',
+        custom:true
+      };
+    });
   return [...standard,...custom];
+}
+
+function checklistStatusSelectHtml(item,index,editable){
+  const status=normalizeLotChecklistStatus(item);
+  return `<select
+    class="checklist-status-select status-${status}"
+    data-checklist-status-index="${index}"
+    ${editable?'':'disabled'}>
+    ${LOT_CHECKLIST_STATUS_OPTIONS.map(([value,label])=>
+      `<option value="${value}" ${status===value?'selected':''}>${label}</option>`
+    ).join('')}
+  </select>`;
+}
+
+function updateChecklistRowStatusVisual(row,statusSelect,status){
+  if(!row)return;
+  LOT_CHECKLIST_STATUS_OPTIONS.forEach(([value])=>{
+    row.classList.toggle(`checklist-status-${value}`,value===status);
+    if(statusSelect)statusSelect.classList.toggle(`status-${value}`,value===status);
+  });
 }
 
 async function saveLotChecklist(items){
@@ -5525,48 +5610,86 @@ function renderLotChecklist(){
   const rows=lotChecklistData(lot);
   const editable=canEditSubdivision(lot.subdivision_id);
 
-  host.innerHTML=rows.map((item,index)=>`
+  host.innerHTML=rows.map((item,index)=>{
+    const status=normalizeLotChecklistStatus(item);
+    return `
     <div class="checklist-swipe-wrap ${item.custom&&editable?'is-custom':''}" ${item.custom&&editable?`data-checklist-swipe="${index}"`:''}>
       ${item.custom&&editable?`<div class="checklist-swipe-delete">Delete</div>`:''}
-      <div class="checklist-row ${item.custom?'checklist-custom-row':''}">
+      <div class="checklist-row checklist-status-${status} ${item.custom?'checklist-custom-row':''}">
         <input type="checkbox"
           data-checklist-index="${index}"
-          ${item.complete?'checked':''}
+          ${status==='complete'?'checked':''}
           ${editable?'':'disabled'}>
         <div class="checklist-row-label">${esc(item.name)}${lotChecklistSpec(item.name)?`<div class="checklist-spec">${esc(lotChecklistSpec(item.name))}</div>`:''}</div>
+        ${checklistStatusSelectHtml(item,index,editable)}
       </div>
     </div>
-  `).join('');
+  `}).join('');
 
   $('addCustomChecklistItem').classList.toggle('hidden',!editable);
 
+  async function saveChecklistStatus(index,status){
+    const current=lotChecklistData(lot);
+    if(!current[index])return false;
+
+    current[index]={
+      ...current[index],
+      status,
+      complete:status==='complete'
+    };
+
+    suppressLocalLotRealtimeId=currentLot;
+    suppressLocalLotRealtimeUntil=Date.now()+1500;
+
+    const {error}=await db.from('lots')
+      .update({checklist_items:current})
+      .eq('id',currentLot);
+
+    if(error){
+      alert(error.message);
+      return false;
+    }
+
+    lot.checklist_items=current;
+    return true;
+  }
+
   host.querySelectorAll('[data-checklist-index]').forEach(box=>{
     box.onchange=async()=>{
-      const current=lotChecklistData(lot);
       const index=Number(box.dataset.checklistIndex);
-      if(!current[index])return;
+      const row=box.closest('.checklist-row');
+      const statusSelect=row?.querySelector('[data-checklist-status-index]');
+      const previousStatus=String(statusSelect?.value||'not_started');
+      const nextStatus=box.checked?'complete':'not_started';
 
-      const previous=!box.checked;
-      current[index]={...current[index],complete:box.checked};
+      if(statusSelect)statusSelect.value=nextStatus;
+      updateChecklistRowStatusVisual(row,statusSelect,nextStatus);
 
-      // Update locally and save without allowing our own Realtime echo
-      // to rebuild the entire lot page.
-      suppressLocalLotRealtimeId=currentLot;
-      suppressLocalLotRealtimeUntil=Date.now()+1500;
-
-      const {error}=await db.from('lots')
-        .update({checklist_items:current})
-        .eq('id',currentLot);
-
-      if(error){
-        box.checked=previous;
-        alert(error.message);
-        return;
+      if(!(await saveChecklistStatus(index,nextStatus))){
+        box.checked=previousStatus==='complete';
+        if(statusSelect)statusSelect.value=previousStatus;
+        updateChecklistRowStatusVisual(row,statusSelect,previousStatus);
       }
+    };
+  });
 
-      lot.checklist_items=current;
+  host.querySelectorAll('[data-checklist-status-index]').forEach(select=>{
+    select.onchange=async()=>{
+      const index=Number(select.dataset.checklistStatusIndex);
+      const row=select.closest('.checklist-row');
+      const box=row?.querySelector('[data-checklist-index]');
+      const current=lotChecklistData(lot);
+      const previousStatus=normalizeLotChecklistStatus(current[index]);
+      const nextStatus=String(select.value||'not_started');
 
+      if(box)box.checked=nextStatus==='complete';
+      updateChecklistRowStatusVisual(row,select,nextStatus);
 
+      if(!(await saveChecklistStatus(index,nextStatus))){
+        select.value=previousStatus;
+        if(box)box.checked=previousStatus==='complete';
+        updateChecklistRowStatusVisual(row,select,previousStatus);
+      }
     };
   });
 
@@ -5596,8 +5719,8 @@ function renderLotChecklist(){
     };
 
     row.addEventListener('pointerdown',e=>{
-      // Keep normal checkbox taps working.
-      if(e.target.closest('input,button,a'))return;
+      // Keep checkbox, status menu, buttons and links working normally.
+      if(e.target.closest('input,select,button,a'))return;
       pointerId=e.pointerId;
       startX=e.clientX;
       startY=e.clientY;
@@ -5624,7 +5747,6 @@ function renderLotChecklist(){
         horizontal=true;
       }
 
-      // Custom checklist items only slide left.
       dx=Math.min(0,Math.max(-92,moveX));
       row.style.transform=`translateX(${dx}px)`;
     });
@@ -5639,7 +5761,6 @@ function renderLotChecklist(){
       dragging=false;
       pointerId=null;
 
-      // Reveal Delete after a deliberate left swipe.
       if(horizontal && dx<=-42)revealRow();
       else closeRow();
     };
@@ -5652,7 +5773,6 @@ function renderLotChecklist(){
       closeRow();
     });
 
-    // Tapping the revealed red Delete button asks for confirmation.
     if(deleteArea){
       deleteArea.addEventListener('click',async e=>{
         e.preventDefault();
@@ -5671,7 +5791,7 @@ async function addCustomChecklistItem(){
   if(!name)return;
 
   const current=lotChecklistData(lot);
-  current.push({name,complete:false,custom:true});
+  current.push({name,status:'not_started',complete:false,custom:true});
   if(await saveLotChecklist(current))renderLotChecklist();
 }
 
