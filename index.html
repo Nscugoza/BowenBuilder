@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="2026-09-24-prime-touchup-final-drywall-alias-fix">
+<meta name="bowenbuilder-version" content="2026-09-28-session-refresh-guard">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -3646,6 +3646,52 @@ async function signIn(){
  });
  if(error) alert(error.message);
 }
+
+function bowenBuilderSessionExpiredMessage(){
+  return 'Your BowenBuilder session has expired. Please sign out and sign back in with Microsoft. Your changes have not been saved.';
+}
+
+async function ensureBowenBuilderSession({showAlert=true,forceRefresh=false}={}){
+  try{
+    const {data,error}=await db.auth.getSession();
+    if(error)console.warn('BowenBuilder session check failed:',error);
+
+    let session=data?.session||null;
+    const expiresAt=Number(session?.expires_at||0);
+    const expiresSoon=!expiresAt || (expiresAt*1000)<=Date.now()+60000;
+
+    if(session?.access_token && !forceRefresh && !expiresSoon){
+      currentAuthUserId=String(session.user?.id||currentAuthUserId||'');
+      return session;
+    }
+
+    const refreshed=await db.auth.refreshSession();
+    session=refreshed?.data?.session||null;
+
+    if(session?.access_token){
+      currentAuthUserId=String(session.user?.id||currentAuthUserId||'');
+      return session;
+    }
+
+    if(showAlert)alert(bowenBuilderSessionExpiredMessage());
+    return null;
+  }catch(err){
+    console.warn('BowenBuilder session refresh failed:',err);
+    if(showAlert)alert(bowenBuilderSessionExpiredMessage());
+    return null;
+  }
+}
+
+function isBowenBuilderAuthOrRlsError(error){
+  const code=String(error?.code||'');
+  const msg=String(error?.message||'').toLowerCase();
+  return code==='42501'
+    || msg.includes('row-level security')
+    || msg.includes('jwt')
+    || msg.includes('not authenticated')
+    || msg.includes('unauthorized');
+}
+
 
 function captureCalendarViewState(){
   const calendarVisible=$('scheduleView') && !$('scheduleView').classList.contains('hidden') && scheduleViewMode==='calendar';
@@ -7581,7 +7627,11 @@ try{
   db.auth.onAuthStateChange((event,session)=>{
     try{
       if(session?.provider_token)localStorage.setItem('bowenbuilder_ms_provider_token',session.provider_token);
-      if(event==='SIGNED_OUT')localStorage.removeItem('bowenbuilder_ms_provider_token');
+      if(session?.user?.id)currentAuthUserId=String(session.user.id);
+      if(event==='SIGNED_OUT'){
+        localStorage.removeItem('bowenbuilder_ms_provider_token');
+        currentAuthUserId='';
+      }
     }catch(_){ }
   });
 }catch(_){ }
@@ -8232,46 +8282,86 @@ async function deleteScheduleItemLive(){
 
 async function saveSchedule(e){
  e.preventDefault();
- const id=$('scheduleId').value;
- const startDate=$('scheduleStart').value;
- const endDate=$('scheduleEnd').value;
- if(!startDate||!endDate){alert('Please enter a start and end date.');return}
- if(endDate<startDate){alert('End date must be on or after start date.');return}
 
- const payload={
-  lot_id:$('scheduleLot').value,
-  item_type:$('scheduleType').value,
-  name:($('scheduleName').value==='__custom__' ? $('scheduleCustomName').value.trim() : $('scheduleName').value.trim()),
-  status:$('scheduleStatus').value.toLowerCase().replaceAll(' ','_'),
-  crew:$('scheduleCrew').value.trim(),
-  starts_at:startDate+'T12:00:00Z',
-  ends_at:endDate+'T12:00:00Z',
-  location:$('scheduleLocation').value.trim(),
-  inspection_status:$('inspectionStatus').value.toLowerCase().replaceAll(' ','_'),
-  notes:$('scheduleNotes').value.trim()
- };
- if(!payload.name){alert('Please enter a schedule item name.');return}
+ const saveButton=$('scheduleForm')?.querySelector('button[type="submit"]');
+ const originalSaveText=saveButton?.textContent||'Save Item';
 
- const q=id
-   ? db.from('schedule_items').update(payload).eq('id',id).select().single()
-   : db.from('schedule_items').insert(payload).select().single();
+ if(saveButton){
+   saveButton.disabled=true;
+   saveButton.textContent='Saving...';
+ }
 
- const {data,error}=await q;
- if(error){alert(error.message);return}
+ try{
+   // iPhone Safari can occasionally keep the BowenBuilder UI open after the
+   // Supabase session has expired. Verify/refresh the session before any write.
+   const session=await ensureBowenBuilderSession({showAlert:true});
+   if(!session)return;
 
- $('scheduleDialog').close();
- const returnToSchedule=scheduleContext==='schedule';
- const returnSubdivision=currentSubdivision;
+   const id=$('scheduleId').value;
+   const startDate=$('scheduleStart').value;
+   const endDate=$('scheduleEnd').value;
+   if(!startDate||!endDate){alert('Please enter a start and end date.');return}
+   if(endDate<startDate){alert('End date must be on or after start date.');return}
 
- if(returnToSchedule){
-   // Keep the calendar exactly where the user was. We deliberately do not
-   // change selected day/month to the edited item's date here.
-   await refreshPreservingCalendar();
- }else{
-   await load();
-   currentSubdivision=lots.find(l=>l.id===payload.lot_id)?.subdivision_id||returnSubdivision;
-   currentLot=payload.lot_id;
-   showLot();
+   const payload={
+    lot_id:$('scheduleLot').value,
+    item_type:$('scheduleType').value,
+    name:($('scheduleName').value==='__custom__' ? $('scheduleCustomName').value.trim() : $('scheduleName').value.trim()),
+    status:$('scheduleStatus').value.toLowerCase().replaceAll(' ','_'),
+    crew:$('scheduleCrew').value.trim(),
+    starts_at:startDate+'T12:00:00Z',
+    ends_at:endDate+'T12:00:00Z',
+    location:$('scheduleLocation').value.trim(),
+    inspection_status:$('inspectionStatus').value.toLowerCase().replaceAll(' ','_'),
+    notes:$('scheduleNotes').value.trim()
+   };
+   if(!payload.name){alert('Please enter a schedule item name.');return}
+
+   const writeSchedule=()=>id
+     ? db.from('schedule_items').update(payload).eq('id',id).select().single()
+     : db.from('schedule_items').insert(payload).select().single();
+
+   let result=await writeSchedule();
+
+   // If the token expired between the pre-save check and the database request,
+   // refresh once and retry the exact same write. Never retry more than once.
+   if(result.error && isBowenBuilderAuthOrRlsError(result.error)){
+     const refreshed=await ensureBowenBuilderSession({showAlert:false,forceRefresh:true});
+     if(refreshed)result=await writeSchedule();
+   }
+
+   if(result.error){
+     if(isBowenBuilderAuthOrRlsError(result.error)){
+       const {data:{session:checkSession}}=await db.auth.getSession();
+       if(!checkSession?.access_token){
+         alert(bowenBuilderSessionExpiredMessage());
+       }else{
+         alert('BowenBuilder could not save this schedule item because your account does not currently have permission to edit this subdivision.');
+       }
+     }else{
+       alert(result.error.message);
+     }
+     return;
+   }
+
+   $('scheduleDialog').close();
+   const returnToSchedule=scheduleContext==='schedule';
+   const returnSubdivision=currentSubdivision;
+
+   if(returnToSchedule){
+     // Keep the calendar exactly where the user was.
+     await refreshPreservingCalendar();
+   }else{
+     await load();
+     currentSubdivision=lots.find(l=>l.id===payload.lot_id)?.subdivision_id||returnSubdivision;
+     currentLot=payload.lot_id;
+     showLot();
+   }
+ }finally{
+   if(saveButton){
+     saveButton.disabled=false;
+     saveButton.textContent=originalSaveText;
+   }
  }
 }
 $('msLogin').onclick=signIn;
@@ -8279,6 +8369,7 @@ $('loginForm').onsubmit=e=>{e.preventDefault();signIn()};
 
 document.addEventListener('visibilitychange',()=>{
   if(document.visibilityState==='visible'){
+    ensureBowenBuilderSession({showAlert:false}).catch(()=>{});
     updateMyLastSeen();
     updateAppPresenceLocation();
   }else{
