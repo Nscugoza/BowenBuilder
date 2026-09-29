@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="2026-09-28-checklist-status-system">
+<meta name="bowenbuilder-version" content="2026-09-29-realtime-preserve-calendar-month">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -3265,16 +3265,152 @@ let realtimeRefreshTimer=null;
 let suppressLocalLotRealtimeId=null;
 let suppressLocalLotRealtimeUntil=0;
 
+function realtimeChangedLotId(payload){
+  return payload?.new?.lot_id
+    || payload?.old?.lot_id
+    || payload?.new?.id
+    || payload?.old?.id
+    || null;
+}
+
+function realtimeLotSubdivisionId(lotId){
+  return lots.find(l=>String(l.id)===String(lotId))?.subdivision_id||null;
+}
+
 function handleLotsRealtime(payload){
   const changedLot=payload?.new?.id||payload?.old?.id||null;
+
   if(
     changedLot &&
-    changedLot===suppressLocalLotRealtimeId &&
+    String(changedLot)===String(suppressLocalLotRealtimeId) &&
     Date.now()<suppressLocalLotRealtimeUntil
   ){
     return;
   }
+
+  const screen=currentScreen();
+
+  // A lot change elsewhere should never kick somebody out of, or visibly
+  // refresh, the calendar/lot they are actively working in.
+  if((screen==='schedule' || screen==='lot') && changedLot){
+    if(String(changedLot)!==String(currentLot))return;
+  }
+
+  if(screen==='lots' && changedLot){
+    const changedSubdivision=
+      payload?.new?.subdivision_id
+      || payload?.old?.subdivision_id
+      || realtimeLotSubdivisionId(changedLot);
+
+    if(
+      changedSubdivision &&
+      String(changedSubdivision)!==String(currentSubdivision)
+    ){
+      return;
+    }
+  }
+
   scheduleRealtimeReload();
+}
+
+function handleScheduleItemsRealtime(payload){
+  const changedLot=payload?.new?.lot_id||payload?.old?.lot_id||null;
+  const screen=currentScreen();
+
+  // Calendars are lot-specific. Only refresh an open calendar when the
+  // schedule change belongs to the exact lot that user currently has open.
+  if(screen==='schedule' || screen==='lot'){
+    if(!changedLot || String(changedLot)!==String(currentLot))return;
+    scheduleRealtimeReload();
+    return;
+  }
+
+  // The subdivision lot screen shows schedule counts / Today & Tomorrow.
+  // Refresh only when the changed lot belongs to the subdivision being viewed.
+  if(screen==='lots'){
+    const changedSubdivision=realtimeLotSubdivisionId(changedLot);
+    if(
+      changedSubdivision &&
+      String(changedSubdivision)===String(currentSubdivision)
+    ){
+      scheduleRealtimeReload();
+    }
+    return;
+  }
+
+  // Schedule changes do not alter the subdivision landing screen or Admin.
+}
+
+function handleCalendarMarksRealtime(payload){
+  const changedLot=payload?.new?.lot_id||payload?.old?.lot_id||null;
+  const screen=currentScreen();
+
+  // Called In / E / T marks are only relevant to the currently open lot.
+  if(screen==='schedule' || screen==='lot'){
+    if(changedLot && String(changedLot)===String(currentLot)){
+      scheduleRealtimeReload();
+    }
+  }
+}
+
+function handlePunchoutRealtime(payload){
+  const changedLot=payload?.new?.lot_id||payload?.old?.lot_id||null;
+  const screen=currentScreen();
+
+  // Punchout changes should never refresh an open schedule calendar.
+  if(screen==='schedule')return;
+
+  if(screen==='lot'){
+    if(changedLot && String(changedLot)===String(currentLot)){
+      scheduleRealtimeReload();
+    }
+    return;
+  }
+
+  // Only the subdivision Punchout panel needs live punchout changes.
+  if(screen==='lots' && subdivisionViewMode==='punchout'){
+    const changedSubdivision=realtimeLotSubdivisionId(changedLot);
+    if(
+      changedSubdivision &&
+      String(changedSubdivision)===String(currentSubdivision)
+    ){
+      scheduleRealtimeReload();
+    }
+  }
+}
+
+function handlePunchoutPhotosRealtime(payload){
+  const screen=currentScreen();
+
+  // Photo activity has nothing to do with an open calendar.
+  if(screen==='schedule')return;
+
+  const punchoutItemId=
+    payload?.new?.punchout_item_id
+    || payload?.old?.punchout_item_id
+    || null;
+
+  const punchout=punchouts.find(
+    p=>String(p.id)===String(punchoutItemId)
+  );
+  const changedLot=punchout?.lot_id||null;
+
+  if(screen==='lot'){
+    if(changedLot && String(changedLot)===String(currentLot)){
+      scheduleRealtimeReload();
+    }
+    return;
+  }
+
+  if(screen==='lots' && subdivisionViewMode==='punchout'){
+    const changedSubdivision=realtimeLotSubdivisionId(changedLot);
+    if(
+      changedSubdivision &&
+      String(changedSubdivision)===String(currentSubdivision)
+    ){
+      scheduleRealtimeReload();
+    }
+  }
 }
 
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -3380,6 +3516,12 @@ function scheduleRealtimeReload(){
     const keepSub=currentSubdivision;
     const keepLot=currentLot;
     const screen=currentScreen();
+    const keepCalendarSelectedDate=scheduleSelectedDate||'';
+    const keepCalendarCursor=
+      scheduleCalendarCursor instanceof Date && !Number.isNaN(scheduleCalendarCursor.getTime())
+        ? scheduleCalendarCursor.getTime()
+        : null;
+    const keepScheduleViewMode=scheduleViewMode;
 
     const [{data:s,error:se},{data:l,error:le},{data:i,error:ie},{data:p,error:pe},{data:pp,error:ppe},{data:pr,error:pre}]=await Promise.all([
       db.from('subdivisions').select('*').order('name'),
@@ -3400,10 +3542,24 @@ function scheduleRealtimeReload(){
     currentSubdivision=keepSub;
     currentLot=keepLot;
 
-    if(screen==='lot' && currentLot && lots.some(x=>x.id===currentLot)) showLot(true);
-    else if(screen==='lots' && currentSubdivision) showLots();
-    else if(screen==='schedule' && currentLot && lots.some(x=>x.id===currentLot)) showScheduleView(scheduleViewMode,true);
-    else if(screen==='subdivisions') showSubs();
+    if(screen==='lot' && currentLot && lots.some(x=>x.id===currentLot)){
+      showLot(true);
+    }else if(screen==='lots' && currentSubdivision){
+      showLots();
+    }else if(screen==='schedule' && currentLot && lots.some(x=>x.id===currentLot)){
+      // A same-lot realtime change should update the events in place without
+      // changing the month/date the other person is currently looking at.
+      scheduleViewMode=keepScheduleViewMode;
+      scheduleSelectedDate=keepCalendarSelectedDate;
+      if(keepCalendarCursor!==null)scheduleCalendarCursor=new Date(keepCalendarCursor);
+      await showScheduleView(keepScheduleViewMode,true);
+      scheduleSelectedDate=keepCalendarSelectedDate;
+      if(keepCalendarCursor!==null)scheduleCalendarCursor=new Date(keepCalendarCursor);
+      if(keepScheduleViewMode==='calendar')renderScheduleCalendar();
+      else renderScheduleListView();
+    }else if(screen==='subdivisions'){
+      showSubs();
+    }
   },180);
 }
 
@@ -3412,10 +3568,10 @@ function startRealtimeUpdates(){
   realtimeChannel=db.channel('bowenbuilder-db-live')
     .on('postgres_changes',{event:'*',schema:'public',table:'subdivisions'},scheduleRealtimeReload)
     .on('postgres_changes',{event:'*',schema:'public',table:'lots'},handleLotsRealtime)
-    .on('postgres_changes',{event:'*',schema:'public',table:'schedule_items'},scheduleRealtimeReload)
-      .on('postgres_changes',{event:'*',schema:'public',table:'lot_calendar_marks'},scheduleRealtimeReload)
-    .on('postgres_changes',{event:'*',schema:'public',table:'punchout_items'},scheduleRealtimeReload)
-    .on('postgres_changes',{event:'*',schema:'public',table:'punchout_photos'},scheduleRealtimeReload)
+    .on('postgres_changes',{event:'*',schema:'public',table:'schedule_items'},handleScheduleItemsRealtime)
+    .on('postgres_changes',{event:'*',schema:'public',table:'lot_calendar_marks'},handleCalendarMarksRealtime)
+    .on('postgres_changes',{event:'*',schema:'public',table:'punchout_items'},handlePunchoutRealtime)
+    .on('postgres_changes',{event:'*',schema:'public',table:'punchout_photos'},handlePunchoutPhotosRealtime)
     .subscribe();
 }
 
@@ -8725,8 +8881,15 @@ async function showScheduleView(mode=scheduleViewMode,preserveScroll=false){
  }
  wireScheduleInspectionExternal();
  if(!scheduleSelectedDate)scheduleSelectedDate=localDateKey(new Date());
- const selected=dateFromKey(scheduleSelectedDate);
- if(selected)scheduleCalendarCursor=new Date(selected.getFullYear(),selected.getMonth(),1);
+
+ // Only jump the calendar cursor to the selected date when the user is
+ // intentionally opening the calendar. Realtime/in-place refreshes pass
+ // preserveScroll=true and must keep whatever month that user is viewing.
+ if(!preserveScroll || !(scheduleCalendarCursor instanceof Date) || Number.isNaN(scheduleCalendarCursor.getTime())){
+   const selected=dateFromKey(scheduleSelectedDate);
+   if(selected)scheduleCalendarCursor=new Date(selected.getFullYear(),selected.getMonth(),1);
+ }
+
  await loadCalendarCalledInMarks();
  await loadScheduleContacts();
  if(!overviewShareCache || overviewShareCache.lotId!==currentLot){
