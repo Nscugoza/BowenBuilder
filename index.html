@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="2026-10-01-goldfinch-standard-features-crew-resources">
+<meta name="bowenbuilder-version" content="2026-10-01-included-options-checkboxes">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -2340,6 +2340,77 @@ button.teams-file-row:hover{border-color:#bdccdd}
   }
 }
 
+
+.lot-options-editor{
+  margin-top:2px;
+  border:1px solid #dbe3ee;
+  border-radius:16px;
+  padding:14px;
+  background:#fbfcfe;
+}
+.lot-options-editor-title{
+  font-weight:850;
+  color:var(--navy);
+  font-size:15px;
+  margin-bottom:10px;
+}
+.lot-options-quick-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
+}
+.lot-option-check{
+  display:flex;
+  align-items:flex-start;
+  gap:9px;
+  border:1px solid #dbe3ee;
+  border-radius:12px;
+  padding:10px 11px;
+  background:#fff;
+  margin:0;
+  cursor:pointer;
+}
+.lot-option-check input{
+  width:19px;
+  height:19px;
+  margin:1px 0 0;
+  flex:0 0 auto;
+}
+.lot-option-check span{
+  font-size:13px;
+  font-weight:750;
+  color:#344054;
+  line-height:1.3;
+}
+.lot-option-check:has(input:checked){
+  border-color:#83acd5;
+  background:#f1f7fd;
+}
+.lot-options-always{
+  margin:10px 0;
+  border:1px solid #cfe1d7;
+  border-radius:12px;
+  padding:10px 11px;
+  background:#f5fbf7;
+}
+.lot-options-always-label{
+  font-size:11px;
+  font-weight:850;
+  text-transform:uppercase;
+  letter-spacing:.04em;
+  color:#397352;
+}
+.lot-options-always-items{
+  margin-top:4px;
+  font-size:13px;
+  font-weight:750;
+  color:#315942;
+  line-height:1.4;
+}
+@media(max-width:620px){
+  .lot-options-quick-grid{grid-template-columns:1fr}
+}
+
 </style>
 </head>
 <body>
@@ -2680,7 +2751,24 @@ button.teams-file-row:hover{border-color:#bdccdd}
     </div>
     <input id="decoUrl" type="hidden">
   </div>
-  <label>Included Options<textarea id="includedOptions" rows="4"></textarea></label>
+  <div class="lot-options-editor">
+    <div class="lot-options-editor-title">Included Options</div>
+    <div class="lot-options-quick-grid">
+      <label class="lot-option-check"><input type="checkbox" data-lot-option="3rd Car Garage"><span>3rd Car Garage</span></label>
+      <label class="lot-option-check"><input type="checkbox" data-lot-option="Large Shower w/rain shower head &amp; bench"><span>Large Shower w/rain shower head &amp; bench</span></label>
+      <label class="lot-option-check"><input type="checkbox" data-lot-option="Standard Tile Shower &amp; Garden Tub w/Skirt"><span>Standard Tile Shower &amp; Garden Tub w/Skirt</span></label>
+      <label class="lot-option-check"><input type="checkbox" data-lot-option="White Farm Sink"><span>White Farm Sink</span></label>
+      <label class="lot-option-check"><input type="checkbox" data-lot-option="Built-ins"><span>Built-ins</span></label>
+      <label class="lot-option-check"><input type="checkbox" data-lot-option="Mud bench"><span>Mud bench</span></label>
+    </div>
+    <div class="lot-options-always">
+      <div class="lot-options-always-label">Always shown on every lot</div>
+      <div class="lot-options-always-items">Black Hardware · Black Fixtures · White Decor Switches &amp; Receptacles</div>
+    </div>
+    <label>Other Included Options
+      <textarea id="includedOptions" rows="3" placeholder="Type any additional options here..."></textarea>
+    </label>
+  </div>
   <div class="two">
     <div class="teams-doc-link-field">
       <div class="teams-doc-link-head"><strong>HLP</strong><span id="hlpTeamsSelection" class="muted">Not linked</span></div>
@@ -3020,8 +3108,8 @@ function crewDateLabel(value){
   return new Date(`${key}T12:00:00`).toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric',year:'numeric'});
 }
 function crewOptionsHtml(raw){
-  const vals=String(raw||'').split(/\r?\n|;|,/).map(x=>x.replace(/^[\s•\-*]+/,'').trim()).filter(Boolean);
-  return vals.length?`<ul style="margin:6px 0 0;padding-left:20px">${vals.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:'<span class="muted">None listed</span>';
+  const vals=includedOptionsList(raw);
+  return `<ul style="margin:6px 0 0;padding-left:20px">${vals.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`;
 }
 function crewSafeImageSrc(value){
   const raw=String(value||'').trim();
@@ -3479,15 +3567,81 @@ function requireDeletePermission(subdivisionId=currentSubdivision){
 }
 
 
+const LOT_INCLUDED_OPTION_CHOICES=[
+  '3rd Car Garage',
+  'Large Shower w/rain shower head & bench',
+  'Standard Tile Shower & Garden Tub w/Skirt',
+  'White Farm Sink',
+  'Built-ins',
+  'Mud bench'
+];
+
+const LOT_ALWAYS_INCLUDED_OPTIONS=[
+  'Black Hardware',
+  'Black Fixtures',
+  'White Decor Switches & Receptacles'
+];
+
+function parseStoredIncludedOptions(value){
+  return String(value||'')
+    .split(/\r?\n|;|,/)
+    .map(x=>x.replace(/^[\s•\-*]+/,'').trim())
+    .filter(Boolean);
+}
+
+function uniqueIncludedOptions(values){
+  const seen=new Set();
+  const result=[];
+  (values||[]).forEach(value=>{
+    const clean=String(value||'').trim();
+    const key=clean.toLowerCase();
+    if(!clean || seen.has(key))return;
+    seen.add(key);
+    result.push(clean);
+  });
+  return result;
+}
+
+function includedOptionsList(value,{includeAlways=true}={}){
+  const stored=parseStoredIncludedOptions(value);
+  return uniqueIncludedOptions([
+    ...stored,
+    ...(includeAlways?LOT_ALWAYS_INCLUDED_OPTIONS:[])
+  ]);
+}
+
 function includedOptionsBullets(value){
- const raw=String(value||'').trim();
- if(!raw)return '<span class="muted">None added</span>';
- const items=raw
-   .split(/\r?\n|;|,/)
-   .map(x=>x.replace(/^[\s•\-*]+/,'').trim())
-   .filter(Boolean);
- if(!items.length)return '<span class="muted">None added</span>';
- return `<ul class="included-options-list">${items.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`;
+  const items=includedOptionsList(value);
+  return `<ul class="included-options-list">${items.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`;
+}
+
+function setIncludedOptionsEditor(value){
+  const stored=parseStoredIncludedOptions(value);
+  const selected=new Set(stored.map(x=>x.toLowerCase()));
+
+  document.querySelectorAll('[data-lot-option]').forEach(box=>{
+    box.checked=selected.has(String(box.dataset.lotOption||'').toLowerCase());
+  });
+
+  const known=new Set([
+    ...LOT_INCLUDED_OPTION_CHOICES,
+    ...LOT_ALWAYS_INCLUDED_OPTIONS
+  ].map(x=>x.toLowerCase()));
+
+  const other=stored.filter(x=>!known.has(x.toLowerCase()));
+  if($('includedOptions'))$('includedOptions').value=other.join('\n');
+}
+
+function getIncludedOptionsEditorValue(){
+  const checked=[...document.querySelectorAll('[data-lot-option]:checked')]
+    .map(box=>String(box.dataset.lotOption||'').trim())
+    .filter(Boolean);
+
+  const typed=parseStoredIncludedOptions($('includedOptions')?.value||'');
+
+  // Do not store the "always on every lot" items in each lot row. They are
+  // appended dynamically everywhere BowenBuilder displays/sends options.
+  return uniqueIncludedOptions([...checked,...typed]).join('\n');
 }
 function currentScreen(){
   if(!$('lotView').classList.contains('hidden')) return 'lot';
@@ -4397,7 +4551,7 @@ function showLots(){
     <h3>${esc(l.lot_name)}</h3>
     <div class="muted">${esc(l.address||l.plan_name||'Address not added')}</div>
     <div class="muted">${esc(l.plan_name||'Plan not added')}</div>
-    ${l.included_options?`<div class="muted" style="margin-top:8px"><strong>Included Options:</strong>${includedOptionsBullets(l.included_options)}</div>`:''}
+    <div class="muted" style="margin-top:8px"><strong>Included Options:</strong>${includedOptionsBullets(l.included_options)}</div>
     <div class="muted" style="margin-top:10px">${items.filter(i=>i.lot_id===l.id).length} schedule items</div>
   </button>
 </div>`).join('');
@@ -7515,12 +7669,7 @@ function linkedScheduleMessageBody(lotId,linkedItems,fallbackBody){
 }
 
 function includedOptionsLinesForMessage(lot){
-  const raw=String(lot?.options||lot?.included_options||'').trim();
-  if(!raw)return [];
-  return raw
-    .split(/\r?\n|;|,/)
-    .map(x=>x.replace(/^[\s•\-*]+/,'').trim())
-    .filter(Boolean);
+  return includedOptionsList(lot?.options||lot?.included_options||'');
 }
 
 function overviewScheduleItemMessage(item,planUrl='',includePlans=false,renderingUrl='',includeRendering=false){
@@ -9318,11 +9467,12 @@ function openLotDialogLive(id=''){
     $('county').value=l.county||'';
     $('permitUrl').value=l.permit_url||'';
     $('decoUrl').value=l.deco_url||'';
-    $('includedOptions').value=l.included_options||'';
+    setIncludedOptionsEditor(l.included_options||'');
     $('hlpUrl').value=l.hlp_url||'';
     $('lgpUrl').value=l.lgp_url||'';
   } else {
     $('county').value='Barrow County, GA';
+    setIncludedOptionsEditor('');
   }
 
   refreshAllLotTeamsDocFields();
@@ -9361,7 +9511,7 @@ $('lotForm').onsubmit=async e=>{
     county:$('county').value.trim()||null,
     permit_url:$('permitUrl').value.trim()||null,
     deco_url:$('decoUrl').value.trim()||null,
-    included_options:$('includedOptions').value.trim()||null,
+    included_options:getIncludedOptionsEditorValue()||null,
     hlp_url:$('hlpUrl').value.trim()||null,
     lgp_url:$('lgpUrl').value.trim()||null
   };
@@ -9440,7 +9590,7 @@ $('emailLot').onclick=()=>{
     `Plan: ${l.plan_name||'Not added'}`,
     '',
     'Included Options:',
-    l.included_options||'None added'
+    ...includedOptionsList(l.included_options).map(x=>`- ${x}`)
   ].join('\n');
   location.href=`mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 };
