@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="2026-10-02-crew-plan-link-prominent">
+<meta name="bowenbuilder-version" content="2026-10-02-remember-plan-links">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -2814,6 +2814,7 @@ button.teams-file-row:hover{border-color:#bdccdd}
     <label>Button Label
       <input id="crewPlanLinkLabel" type="text" placeholder="e.g. View Finch Plan on Bowen Homes Website">
     </label>
+    <div id="crewPlanLinkMemoryHint" class="muted" style="margin-top:8px">Saved plan links will auto-fill when the Plan Name matches.</div>
   </div>
 
   <label>Schedule Inspection Link<input id="permitUrl" type="url" placeholder="https://..."></label>
@@ -3320,7 +3321,8 @@ async function resetCrewQr(){
   await openCrewQrDialog();
 }
 
-let subdivisions=[],lots=[],items=[],punchouts=[],punchoutPhotos=[],profiles=[],selectedPunchouts=new Set(),currentSubdivision=null,currentLot=null;
+let subdivisions=[],lots=[],items=[],punchouts=[],punchoutPhotos=[],profiles=[],planCrewLinks=[],selectedPunchouts=new Set(),currentSubdivision=null,currentLot=null;
+let crewPlanAutoFilledValue='';
 let subdivisionViewMode='lots';
 let punchoutMarkupState={itemId:null,photoPath:null,baseImage:null,baseObjectUrl:'',ops:[],tool:'draw',drawing:null,bodyOverflow:''};
 let realtimeChannel=null;
@@ -3388,6 +3390,143 @@ function refreshLotTeamsDocField(kind){
 }
 function refreshAllLotTeamsDocFields(){
   ['deco','hlp','lgp'].forEach(refreshLotTeamsDocField);
+}
+
+function normalizeRememberedPlanName(value){
+  return String(value||'')
+    .trim()
+    .toLowerCase()
+    .replace(/&/g,' and ')
+    .replace(/[^a-z0-9]+/g,' ')
+    .replace(/\s+/g,' ')
+    .trim();
+}
+
+function rememberedPlanFamily(value){
+  const tokens=normalizeRememberedPlanName(value).split(' ').filter(Boolean);
+  if(!tokens.length)return '';
+
+  const descriptorWords=new Set([
+    'car','lh','rh','slab','front','rear','side','entry',
+    'basement','garage','elevation','crawl','crawlspace'
+  ]);
+
+  let stop=tokens.length;
+  for(let i=0;i<tokens.length;i++){
+    if(/^\d+$/.test(tokens[i]) || descriptorWords.has(tokens[i])){
+      stop=i;
+      break;
+    }
+  }
+
+  return tokens.slice(0,Math.max(1,stop)).join(' ');
+}
+
+function findRememberedCrewPlanLink(planName){
+  const key=normalizeRememberedPlanName(planName);
+  if(!key)return null;
+
+  const exact=planCrewLinks.find(row=>
+    normalizeRememberedPlanName(row.plan_name)===key
+  );
+  if(exact?.crew_plan_link)return exact;
+
+  const family=rememberedPlanFamily(planName);
+  if(!family)return null;
+
+  const familyMatches=planCrewLinks.filter(row=>
+    rememberedPlanFamily(row.plan_name)===family &&
+    String(row.crew_plan_link||'').trim()
+  );
+
+  const uniqueUrls=[...new Set(
+    familyMatches.map(row=>String(row.crew_plan_link||'').trim()).filter(Boolean)
+  )];
+
+  // Only fuzzy-match a plan family when every saved variation points to the
+  // same website URL. If there is ever a conflict, exact plan names still work.
+  if(uniqueUrls.length!==1)return null;
+
+  return familyMatches
+    .slice()
+    .sort((a,b)=>String(b.updated_at||'').localeCompare(String(a.updated_at||'')))[0]
+    || null;
+}
+
+function setCrewPlanMemoryHint(message,success=false){
+  const hint=$('crewPlanLinkMemoryHint');
+  if(!hint)return;
+  hint.textContent=message||'Saved plan links will auto-fill when the Plan Name matches.';
+  hint.style.color=success?'#18794e':'';
+}
+
+function autoFillRememberedCrewPlanLink({force=false}={}){
+  const planName=String($('planName')?.value||'').trim();
+  const linkInput=$('crewPlanLink');
+  if(!linkInput)return false;
+
+  const remembered=findRememberedCrewPlanLink(planName);
+  if(!remembered){
+    setCrewPlanMemoryHint(
+      planName
+        ? 'No saved website link for this plan yet. Add it once and BowenBuilder will remember it.'
+        : 'Saved plan links will auto-fill when the Plan Name matches.'
+    );
+    return false;
+  }
+
+  const current=String(linkInput.value||'').trim();
+  const canReplace=
+    force ||
+    !current ||
+    (!!crewPlanAutoFilledValue && current===crewPlanAutoFilledValue);
+
+  if(!canReplace){
+    setCrewPlanMemoryHint('A plan link is already entered for this lot.');
+    return false;
+  }
+
+  linkInput.value=remembered.crew_plan_link||'';
+  crewPlanAutoFilledValue=String(remembered.crew_plan_link||'').trim();
+
+  setCrewPlanMemoryHint(
+    `Auto-filled saved link for ${rememberedPlanFamily(remembered.plan_name)||remembered.plan_name}.`,
+    true
+  );
+  return true;
+}
+
+async function rememberCrewPlanLink(planName,url,label=''){
+  const cleanPlan=String(planName||'').trim();
+  const cleanUrl=String(url||'').trim();
+  if(!cleanPlan || !cleanUrl)return;
+
+  const row={
+    plan_name:cleanPlan,
+    crew_plan_link:cleanUrl,
+    crew_plan_link_label:String(label||'').trim()||null,
+    updated_at:new Date().toISOString(),
+    updated_by:currentAuthUserId||null
+  };
+
+  const {data,error}=await db
+    .from('plan_crew_links')
+    .upsert(row,{onConflict:'plan_key'})
+    .select('id,plan_name,plan_key,crew_plan_link,crew_plan_link_label,updated_at')
+    .single();
+
+  if(error){
+    console.warn('Could not remember Crew QR plan link:',error);
+    return;
+  }
+
+  if(data){
+    const idx=planCrewLinks.findIndex(x=>
+      normalizeRememberedPlanName(x.plan_name)===normalizeRememberedPlanName(data.plan_name)
+    );
+    if(idx>=0)planCrewLinks[idx]=data;
+    else planCrewLinks.push(data);
+  }
 }
 
 function openTeamsFileViewerShell(name){
@@ -4200,17 +4339,18 @@ async function refreshPreservingCalendar(){
 }
 
 async function load(){
- const [{data:s,error:se},{data:l,error:le},{data:i,error:ie},{data:p,error:pe},{data:pp,error:ppe},{data:pr,error:pre},{data:mp,error:mpe}]=await Promise.all([
+ const [{data:s,error:se},{data:l,error:le},{data:i,error:ie},{data:p,error:pe},{data:pp,error:ppe},{data:pr,error:pre},{data:mp,error:mpe},{data:pcl,error:pcle}]=await Promise.all([
   db.from('subdivisions').select('*').order('name'),
   db.from('lots').select('*').eq('active',true).order('lot_name'),
   db.from('schedule_items').select('*').order('starts_at'),
   db.from('punchout_items').select('*').order('created_at',{ascending:false}),
   db.from('punchout_photos').select('*').order('created_at'),
   db.from('profiles').select('id,full_name'),
-  db.from('subdivision_members').select('subdivision_id,can_edit,can_delete,can_punchout_add,can_punchout_edit,can_punchout_delete').eq('user_id',currentAuthUserId)
+  db.from('subdivision_members').select('subdivision_id,can_edit,can_delete,can_punchout_add,can_punchout_edit,can_punchout_delete').eq('user_id',currentAuthUserId),
+  db.from('plan_crew_links').select('id,plan_name,plan_key,crew_plan_link,crew_plan_link_label,updated_at').order('plan_name')
  ]);
- if(se||le||ie||pe||ppe||pre||mpe){alert((se||le||ie||pe||ppe||pre||mpe).message);return}
- subdivisions=s||[];lots=l||[];items=i||[];punchouts=p||[];punchoutPhotos=pp||[];profiles=pr||[];currentMembershipPermissions=mp||[];showSubs();
+ if(se||le||ie||pe||ppe||pre||mpe||pcle){alert((se||le||ie||pe||ppe||pre||mpe||pcle).message);return}
+ subdivisions=s||[];lots=l||[];items=i||[];punchouts=p||[];punchoutPhotos=pp||[];profiles=pr||[];currentMembershipPermissions=mp||[];planCrewLinks=pcl||[];showSubs();
 }
 function appOn(){ $('login').classList.add('hidden');$('app').classList.remove('hidden');}
 function showSubs(){
@@ -9551,6 +9691,8 @@ function openLotDialogLive(id=''){
   $('lotForm').reset();
   $('editLotId').value=id;
   pendingRenderingData='';
+  crewPlanAutoFilledValue='';
+  setCrewPlanMemoryHint('Saved plan links will auto-fill when the Plan Name matches.');
 
   const l=lots.find(x=>x.id===id);
   $('lotDialogTitle').textContent=l ? `Edit ${l.lot_name}` : 'Add Lot';
@@ -9577,6 +9719,7 @@ function openLotDialogLive(id=''){
   }
 
   refreshAllLotTeamsDocFields();
+  if(!l)autoFillRememberedCrewPlanLink();
   $('lotDialog').showModal();
 }
 
@@ -9595,6 +9738,10 @@ $('renderingFile').onchange=e=>{
 
 $('lotForm').onsubmit=async e=>{
   e.preventDefault();
+
+  // Catch plan names populated by imports or programmatic lot setup even if
+  // the user never typed in the Plan Name field.
+  if(!$('crewPlanLink').value.trim())autoFillRememberedCrewPlanLink();
 
   const editId=$('editLotId').value;
   const existingLot=editId?lots.find(x=>x.id===editId):null;
@@ -9656,6 +9803,16 @@ $('lotForm').onsubmit=async e=>{
     return;
   }
 
+  // Every successful plan + website link combination becomes reusable on
+  // future lots. Blank links never erase an existing remembered mapping.
+  if(payload.plan_name && payload.crew_plan_link){
+    await rememberCrewPlanLink(
+      payload.plan_name,
+      payload.crew_plan_link,
+      payload.crew_plan_link_label||''
+    );
+  }
+
   try{
     const patch={};
     if(plansUpload)patch.plans_file_path=await uploadLotDocument(lotId,'plans',plansUpload,existingLot?.plans_file_path||'');
@@ -9681,6 +9838,22 @@ $('lotForm').onsubmit=async e=>{
 
 $('addLot').onclick=()=>{if(requireEditPermission())openLotDialogLive()};
 $('editLot').onclick=()=>{if(requireEditPermission())openLotDialogLive(currentLot)};
+
+if($('planName')){
+  $('planName').addEventListener('input',()=>autoFillRememberedCrewPlanLink());
+  $('planName').addEventListener('change',()=>autoFillRememberedCrewPlanLink());
+}
+if($('crewPlanLink')){
+  $('crewPlanLink').addEventListener('input',()=>{
+    const current=String($('crewPlanLink').value||'').trim();
+    if(current!==crewPlanAutoFilledValue)crewPlanAutoFilledValue='';
+    if(!current){
+      setCrewPlanMemoryHint('Plan link cleared. Change or re-enter the Plan Name to use a saved link.');
+    }else if(!crewPlanAutoFilledValue){
+      setCrewPlanMemoryHint('Custom link entered. BowenBuilder will remember it when this lot is saved.');
+    }
+  });
+}
 $('lotX').onclick=()=>$('lotDialog').close();
 $('lotCancel').onclick=()=>$('lotDialog').close();
 $('emailLot').onclick=()=>{
