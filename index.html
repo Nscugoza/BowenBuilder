@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="2026-10-01-included-options-checkboxes">
+<meta name="bowenbuilder-version" content="2026-10-02-crew-plan-link-per-lot">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -2411,6 +2411,21 @@ button.teams-file-row:hover{border-color:#bdccdd}
   .lot-options-quick-grid{grid-template-columns:1fr}
 }
 
+
+.crew-plan-link-editor{
+  margin:10px 0;
+  border:1px solid #dbe3ee;
+  border-radius:16px;
+  padding:14px;
+  background:#f8fbff;
+}
+.crew-plan-link-title{
+  font-weight:850;
+  color:var(--navy);
+  font-size:15px;
+  margin-bottom:4px;
+}
+
 </style>
 </head>
 <body>
@@ -2741,6 +2756,18 @@ button.teams-file-row:hover{border-color:#bdccdd}
   <input id="plansUrl" type="hidden"><input id="hlpUrl" type="hidden"><input id="lgpUrl" type="hidden">
 <label>Plans File<input id="plansFile" type="file" accept="application/pdf,image/*"><span class="muted">Upload PDF/image for in-app viewing.</span></label>
 <label>Redlined Plan<input id="redlinedPlanFile" type="file" accept="application/pdf,image/*"><span class="muted">Upload PDF/image for in-app viewing.</span></label>
+
+  <div class="crew-plan-link-editor">
+    <div class="crew-plan-link-title">Crew QR Plan Link</div>
+    <div class="muted" style="margin-bottom:10px">Optional link shown only on this lot's Crew QR page. Use the link that matches this house plan.</div>
+    <label>Link URL
+      <input id="crewPlanLink" type="url" inputmode="url" placeholder="https://...">
+    </label>
+    <label>Button Label
+      <input id="crewPlanLinkLabel" type="text" placeholder="Defaults to the plan name">
+    </label>
+  </div>
+
   <label>Schedule Inspection Link<input id="permitUrl" type="url" placeholder="https://..."></label>
   <label>Color Rendering<input id="renderingFile" type="file" accept="image/*"></label>
   <div class="teams-doc-link-field">
@@ -3140,7 +3167,11 @@ async function showPublicCrewView(token){
   }
   const d=typeof data==='string'?JSON.parse(data):data;
   const lot=d.lot||{}, schedules=d.schedule||[], punch=d.punchout||[];
+  const planResourceLabel=String(lot.crew_plan_link_label||'').trim()
+    || (String(lot.plan_name||'').trim()?`${String(lot.plan_name).trim()} Plan`:'House Plan');
+
   const resources=[
+    crewExternalResource(planResourceLabel,lot.crew_plan_link),
     crewExternalResource('Deco Sheet',lot.deco_url),
     crewExternalResource('HLP',lot.hlp_url),
     crewExternalResource('LGP',lot.lgp_url)
@@ -5806,7 +5837,10 @@ function showLot(preserveScroll=false){
  });
  joinLotPresence(currentLot);
  $('lotsView').classList.add('hidden');$('lotView').classList.remove('hidden');$('heroTitle').textContent=l.lot_name;$('heroSub').textContent='Live BowenBuilder lot information and schedule.';updateHeroSiteMap(null);$('lotTitle').textContent=l.lot_name;$('lotSubtitle').textContent=[l.plan_name,l.county].filter(Boolean).join(' · ');
- const links=[['Schedule Inspection',l.permit_url]].filter(x=>safe(x[1]));
+ const links=[
+   ['Crew QR Plan Link',l.crew_plan_link],
+   ['Schedule Inspection',l.permit_url]
+ ].filter(x=>safe(x[1]));
  const storedDocs=[['Plans',l.plans_file_path],['Redlined Plan',l.redlined_plan_file_path],['HLP',l.hlp_file_path],['LGP',l.lgp_file_path]].filter(x=>x[1]);
  const teamsDocs=[['Deco Sheet',l.deco_url],['HLP',l.hlp_url],['LGP',l.lgp_url]].filter(x=>parseTeamsDocumentRef(x[1]));
  const externalLegacyDocs=[['Deco Sheet',l.deco_url],['HLP',l.hlp_url],['LGP',l.lgp_url]].filter(x=>x[1]&&!parseTeamsDocumentRef(x[1])&&safe(x[1]));
@@ -9465,6 +9499,8 @@ function openLotDialogLive(id=''){
     $('planName').value=l.plan_name||'';
     $('plansUrl').value=l.plans_url||'';
     $('county').value=l.county||'';
+    $('crewPlanLink').value=l.crew_plan_link||'';
+    $('crewPlanLinkLabel').value=l.crew_plan_link_label||'';
     $('permitUrl').value=l.permit_url||'';
     $('decoUrl').value=l.deco_url||'';
     setIncludedOptionsEditor(l.included_options||'');
@@ -9472,6 +9508,8 @@ function openLotDialogLive(id=''){
     $('lgpUrl').value=l.lgp_url||'';
   } else {
     $('county').value='Barrow County, GA';
+    $('crewPlanLink').value='';
+    $('crewPlanLinkLabel').value='';
     setIncludedOptionsEditor('');
   }
 
@@ -9508,6 +9546,8 @@ $('lotForm').onsubmit=async e=>{
     permit_number:$('permitNumber').value.trim()||null,
     plan_name:$('planName').value.trim()||null,
     plans_url:$('plansUrl').value.trim()||null,
+    crew_plan_link:$('crewPlanLink').value.trim()||null,
+    crew_plan_link_label:$('crewPlanLinkLabel').value.trim()||null,
     county:$('county').value.trim()||null,
     permit_url:$('permitUrl').value.trim()||null,
     deco_url:$('decoUrl').value.trim()||null,
