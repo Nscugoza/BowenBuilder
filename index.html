@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="2026-10-02-remember-plan-links">
+<meta name="bowenbuilder-version" content="2026-10-05-admin-activity-log">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -2474,6 +2474,20 @@ button.teams-file-row:hover{border-color:#bdccdd}
   color:#4478aa;
 }
 
+
+.admin-activity-toolbar{display:grid;grid-template-columns:minmax(180px,1fr) minmax(170px,.8fr) auto;gap:10px;align-items:end;margin-top:12px}
+.admin-activity-toolbar label{margin:0}
+.admin-activity-log-list{display:grid;gap:9px}
+.admin-activity-row{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:11px;align-items:start;border:1px solid #dbe3ee;border-radius:15px;padding:11px 12px;background:#fff}
+.admin-activity-avatar{width:42px;height:42px;border-radius:50%;display:grid;place-items:center;background:#eaf2fb;color:#174f86;font-weight:900;font-size:14px}
+.admin-activity-main{min-width:0}
+.admin-activity-name{font-weight:850;color:var(--navy)}
+.admin-activity-label{margin-top:2px;font-weight:700;color:#344054;line-height:1.35}
+.admin-activity-meta{margin-top:4px;color:var(--muted);font-size:12px;line-height:1.4}
+.admin-activity-time{font-size:12px;color:var(--muted);white-space:nowrap;text-align:right}
+.admin-activity-pill{display:inline-flex;align-items:center;border-radius:999px;padding:3px 7px;background:#f2f4f7;color:#475467;font-size:10px;font-weight:850;text-transform:uppercase;letter-spacing:.03em;margin-left:5px}
+@media(max-width:700px){.admin-activity-toolbar{grid-template-columns:1fr 1fr}.admin-activity-toolbar button{grid-column:1/-1}.admin-activity-row{grid-template-columns:38px minmax(0,1fr)}.admin-activity-avatar{width:36px;height:36px;font-size:12px}.admin-activity-time{grid-column:2;text-align:left;margin-top:-4px}}
+
 </style>
 </head>
 <body>
@@ -2715,6 +2729,7 @@ button.teams-file-row:hover{border-color:#bdccdd}
         <button id="adminPowerTab" class="admin-inner-tab" type="button">Power Companies</button>
         <button id="adminPermissionsTab" class="admin-inner-tab" type="button">User Permissions</button>
         <button id="adminOnlineTab" class="admin-inner-tab" type="button">Online Now</button>
+        <button id="adminActivityLogTab" class="admin-inner-tab" type="button">Activity Log</button>
       </div>
 
       <div id="adminContactsPanel">
@@ -2765,6 +2780,29 @@ button.teams-file-row:hover{border-color:#bdccdd}
           <button id="adminOnlineRefresh" class="secondary" type="button">↻ Refresh</button>
         </div>
         <div id="adminOnlineList" class="admin-online-list"></div>
+      </div>
+
+      <div id="adminActivityLogPanel" class="hidden">
+        <div class="card admin-note">
+          <strong>Activity Log</strong>
+          <div class="muted" style="margin-top:5px">Private administrator-only history of what signed-in BowenBuilder users are viewing and changing. Passwords, Microsoft tokens, email bodies, and file contents are not logged.</div>
+        </div>
+        <div class="admin-activity-toolbar">
+          <label>User<select id="adminActivityUser"><option value="">All users</option></select></label>
+          <label>Type<select id="adminActivityType">
+            <option value="">All activity</option>
+            <option value="navigation">Navigation</option>
+            <option value="schedule">Schedule</option>
+            <option value="lot">Lots</option>
+            <option value="checklist">Checklist</option>
+            <option value="punchout">Punchout</option>
+            <option value="communication">Email / Text</option>
+            <option value="admin">Admin</option>
+          </select></label>
+          <button id="adminActivityRefresh" class="secondary" type="button">↻ Refresh</button>
+        </div>
+        <div id="adminActivitySummary" class="muted" style="margin:10px 0"></div>
+        <div id="adminActivityLogList" class="admin-activity-log-list"></div>
       </div>
     </section>
 
@@ -3344,6 +3382,10 @@ let adminUsers=[];
 let adminMemberships=[];
 let currentMembershipPermissions=[];
 let activeAdminPanel='contacts';
+let adminActivityRows=[];
+let adminActivityLogTimer=null;
+let activitySessionId='';
+const activityLastLogged=new Map();
 
 let teamsFilesState={level:'teams',team:null,channel:null,driveId:'',folderId:'',folderName:'',folderStack:[]};
 let teamsFilesLoaded=false;
@@ -4353,6 +4395,75 @@ async function load(){
  subdivisions=s||[];lots=l||[];items=i||[];punchouts=p||[];punchoutPhotos=pp||[];profiles=pr||[];currentMembershipPermissions=mp||[];planCrewLinks=pcl||[];showSubs();
 }
 function appOn(){ $('login').classList.add('hidden');$('app').classList.remove('hidden');}
+
+function bowenActivitySessionId(){
+  if(activitySessionId)return activitySessionId;
+  try{
+    activitySessionId=sessionStorage.getItem('bowenbuilder_activity_session')||'';
+    if(!activitySessionId){
+      activitySessionId=globalThis.crypto?.randomUUID?globalThis.crypto.randomUUID():`${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      sessionStorage.setItem('bowenbuilder_activity_session',activitySessionId);
+    }
+  }catch(_){activitySessionId=activitySessionId||`${Date.now()}-${Math.random().toString(36).slice(2)}`;}
+  return activitySessionId;
+}
+function activityCategory(action){
+  const a=String(action||'');
+  if(a==='app_open'||a.startsWith('view_'))return 'navigation';
+  if(a.startsWith('schedule_')||a.startsWith('inspection_'))return 'schedule';
+  if(a.startsWith('lot_'))return 'lot';
+  if(a.startsWith('checklist_'))return 'checklist';
+  if(a.startsWith('punchout_'))return 'punchout';
+  if(a.startsWith('email_')||a.startsWith('text_'))return 'communication';
+  if(a.startsWith('admin_'))return 'admin';
+  return 'other';
+}
+function activityCategoryLabel(action){
+  return ({navigation:'Navigation',schedule:'Schedule',lot:'Lot',checklist:'Checklist',punchout:'Punchout',communication:'Email / Text',admin:'Admin',other:'Activity'})[activityCategory(action)]||'Activity';
+}
+function logBowenActivity(action,{label='',entityType='',entityId='',subdivisionId=null,lotId=null,screen='',metadata={},force=false}={}){
+  if(!currentAuthUserId||!action)return;
+  const resolvedLotId=lotId||currentLot||null;
+  const resolvedSubdivisionId=subdivisionId||(resolvedLotId?subdivisionForLot(resolvedLotId):null)||currentSubdivision||null;
+  const resolvedScreen=screen||currentPresenceLocation()||'BowenBuilder';
+  const key=[action,entityType,entityId,resolvedSubdivisionId||'',resolvedLotId||'',resolvedScreen].join('|');
+  const now=Date.now();
+  if(!force && now-Number(activityLastLogged.get(key)||0)<30000)return;
+  activityLastLogged.set(key,now);
+  db.rpc('bowenbuilder_log_activity',{
+    p_action:String(action),p_label:String(label||'').slice(0,240)||null,p_entity_type:String(entityType||'').slice(0,80)||null,p_entity_id:String(entityId||'').slice(0,160)||null,
+    p_subdivision_id:resolvedSubdivisionId||null,p_lot_id:resolvedLotId||null,p_screen:String(resolvedScreen||'').slice(0,80)||null,p_session_id:bowenActivitySessionId(),p_metadata:(metadata&&typeof metadata==='object')?metadata:{}
+  }).then(({error})=>{if(error)console.warn('BowenBuilder activity log failed:',error.message)}).catch(err=>console.warn('BowenBuilder activity log failed:',err));
+}
+function formatActivityDate(value){const d=new Date(value);if(Number.isNaN(d.getTime()))return'';return d.toDateString()===new Date().toDateString()?d.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'}):d.toLocaleString(undefined,{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});}
+function activityInitials(name){return String(name||'User').trim().split(/\s+/).slice(0,2).map(x=>x[0]||'').join('').toUpperCase()||'U';}
+async function loadAdminActivityLog(){
+  if(!isBowenBuilderAdmin())return;
+  const list=$('adminActivityLogList'); if(list)list.innerHTML='<div class="muted">Loading activity…</div>';
+  const selectedUser=String($('adminActivityUser')?.value||'').trim();
+  const {data,error}=await db.rpc('bowenbuilder_admin_activity_feed',{p_limit:500,p_user_id:selectedUser||null});
+  if(error){if(list)list.innerHTML=`<div class="notice">${esc(error.message)}</div>`;return;}
+  adminActivityRows=data||[];
+  const userSelect=$('adminActivityUser');
+  if(userSelect){
+    const current=userSelect.value; const users=new Map();
+    adminActivityRows.forEach(r=>{if(r.user_id)users.set(String(r.user_id),{id:String(r.user_id),name:r.full_name||r.email||'User'})});
+    (adminPresenceProfiles||[]).forEach(r=>{if(r.id)users.set(String(r.id),{id:String(r.id),name:r.full_name||r.email||'User'})});
+    userSelect.innerHTML='<option value="">All users</option>'+[...users.values()].sort((a,b)=>String(a.name).localeCompare(String(b.name))).map(u=>`<option value="${esc(u.id)}">${esc(u.name)}</option>`).join('');
+    if([...userSelect.options].some(o=>o.value===current))userSelect.value=current;
+  }
+  renderAdminActivityLog();
+}
+function renderAdminActivityLog(){
+  const list=$('adminActivityLogList'); const summary=$('adminActivitySummary'); if(!list)return;
+  const type=String($('adminActivityType')?.value||''); const rows=adminActivityRows.filter(r=>!type||activityCategory(r.action)===type);
+  if(summary)summary.textContent=rows.length?`Showing ${rows.length} recent activit${rows.length===1?'y':'ies'} · Auto-refreshes every 10 seconds`:'No activity matches this filter.';
+  if(!rows.length){list.innerHTML='<div class="card muted">No activity has been recorded for this filter yet.</div>';return;}
+  list.innerHTML=rows.map(r=>{const context=[r.lot_name||'',r.subdivision_name||'',r.screen||''].filter(Boolean);const unique=[...new Set(context)];return `<div class="admin-activity-row"><div class="admin-activity-avatar">${esc(activityInitials(r.full_name||r.email||'User'))}</div><div class="admin-activity-main"><div class="admin-activity-name">${esc(r.full_name||r.email||'User')}<span class="admin-activity-pill">${esc(activityCategoryLabel(r.action))}</span></div><div class="admin-activity-label">${esc(r.label||String(r.action||'Activity').replaceAll('_',' '))}</div>${unique.length?`<div class="admin-activity-meta">${unique.map(esc).join(' · ')}</div>`:''}</div><div class="admin-activity-time">${esc(formatActivityDate(r.created_at))}</div></div>`}).join('');
+}
+function startAdminActivityLogTimer(){if(adminActivityLogTimer)clearInterval(adminActivityLogTimer);adminActivityLogTimer=setInterval(()=>{if(isBowenBuilderAdmin()&&activeAdminPanel==='activity'&&!$('adminActivityLogPanel')?.classList.contains('hidden'))loadAdminActivityLog()},10000);}
+function stopAdminActivityLogTimer(){if(adminActivityLogTimer){clearInterval(adminActivityLogTimer);adminActivityLogTimer=null;}}
+
 function showSubs(){
  setTimeout(()=>updateAppPresenceLocation(),0);
  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.view==='subdivisions'));
@@ -4463,6 +4574,7 @@ async function quickSetAgendaInspectionStatus(id,status){
 
   const pos=items.findIndex(i=>String(i.id)===String(item.id));
   if(pos>=0)items[pos]=data;
+  logBowenActivity('schedule_completed',{label:`Marked ${item.name||'schedule item'} complete`,entityType:'schedule_item',entityId:item.id,subdivisionId:subdivisionForLot(item.lot_id),lotId:item.lot_id,force:true});
   renderSubdivisionAgenda();
 }
 
@@ -4485,6 +4597,7 @@ async function quickCompleteAgendaScheduleItem(id){
 
   const pos=items.findIndex(i=>String(i.id)===String(item.id));
   if(pos>=0)items[pos]=data;
+  logBowenActivity('inspection_status_changed',{label:`Marked ${item.name||'inspection'} ${normalized}`,entityType:'schedule_item',entityId:item.id,subdivisionId:subdivisionForLot(item.lot_id),lotId:item.lot_id,force:true,metadata:{inspection_status:normalized}});
   renderSubdivisionAgenda();
 }
 
@@ -4768,6 +4881,7 @@ function showLots(){
  leaveLotPresence();
  $('subdivisionsView').classList.add('hidden');$('lotView').classList.add('hidden');$('scheduleView').classList.add('hidden');$('adminView').classList.add('hidden');$('lotsView').classList.remove('hidden');
  const s=subdivisions.find(x=>x.id===currentSubdivision);
+ logBowenActivity('view_subdivision',{label:`Viewed ${s?.name||'subdivision'}`,entityType:'subdivision',entityId:currentSubdivision||'',subdivisionId:currentSubdivision||null});
  $('heroTitle').textContent=s?.name||'Lots';
  $('heroSub').textContent='Lots and schedules in this subdivision.';updateHeroSiteMap(s);
  $('subdivisionName').textContent=s?.name||'';
@@ -4827,6 +4941,7 @@ async function confirmDeleteLot(){
     return;
   }
 
+  logBowenActivity('lot_deleted',{label:`Deleted ${lot.lot_name||'lot'}`,entityType:'lot',entityId:lotId,subdivisionId:lot.subdivision_id,force:true});
   $('deleteLotDialog').close();
   pendingDeleteLotId=null;
   await load();
@@ -5543,6 +5658,7 @@ async function togglePunchoutComplete(id,triggerButton=null){
     item.completed=false;
     item.completed_at=null;
     item.completed_by=null;
+    logBowenActivity('punchout_reopened',{label:`Reopened punchout: ${item.description||'item'}`,entityType:'punchout_item',entityId:item.id,subdivisionId:subdivisionForLot(item.lot_id),lotId:item.lot_id,force:true});
     await renderPunchout(currentLot);
     return;
   }
@@ -5637,6 +5753,7 @@ async function togglePunchoutComplete(id,triggerButton=null){
       item.completed_at=completedAt;
       item.completed_by=completedBy;
       if(insertedPhoto)punchoutPhotos.push(insertedPhoto);
+      logBowenActivity('punchout_completed',{label:`Completed punchout: ${item.description||'item'}`,entityType:'punchout_item',entityId:item.id,subdivisionId:subdivisionForLot(item.lot_id),lotId:item.lot_id,force:true,metadata:{completion_photo:true}});
 
       await renderPunchout(currentLot);
     }catch(err){
@@ -5669,6 +5786,7 @@ async function deletePunchoutItem(id){
   const {error}=await db.from('punchout_items').delete().eq('id',id);
   if(error){alert(error.message);return}
 
+  logBowenActivity('punchout_deleted',{label:`Deleted punchout: ${item.description||'item'}`,entityType:'punchout_item',entityId:item.id,subdivisionId:subdivisionForLot(item.lot_id),lotId:item.lot_id,force:true});
   punchouts=punchouts.filter(p=>p.id!==id);
   punchoutPhotos=punchoutPhotos.filter(ph=>ph.punchout_item_id!==id);
   await renderPunchout(currentLot);
@@ -5761,6 +5879,7 @@ async function savePunchout(e){
 
   $('punchoutSave').disabled=false;
   $('punchoutSave').textContent='Save Punchout Item';
+  logBowenActivity('punchout_created',{label:`Added ${trade} punchout: ${description}`,entityType:'punchout_item',entityId:item.id,subdivisionId:subdivisionForLot(currentLot),lotId:currentLot,force:true,metadata:{trade_category:trade,photo_count:uploadedPaths.length}});
   $('punchoutDialog').close();
   scheduleRealtimeReload();
 }
@@ -5983,6 +6102,7 @@ async function quickSetOverviewInspectionStatus(id,status){
 
   const pos=items.findIndex(i=>String(i.id)===String(item.id));
   if(pos>=0)items[pos]=data;
+  logBowenActivity('schedule_completed',{label:`Marked ${item.name||'schedule item'} complete`,entityType:'schedule_item',entityId:item.id,subdivisionId:subdivisionForLot(item.lot_id),lotId:item.lot_id,force:true});
   showLot(true);
 }
 
@@ -6005,6 +6125,7 @@ async function quickCompleteOverviewScheduleItem(id){
 
   const pos=items.findIndex(i=>String(i.id)===String(item.id));
   if(pos>=0)items[pos]=data;
+  logBowenActivity('inspection_status_changed',{label:`Marked ${item.name||'inspection'} ${normalized}`,entityType:'schedule_item',entityId:item.id,subdivisionId:subdivisionForLot(item.lot_id),lotId:item.lot_id,force:true,metadata:{inspection_status:normalized}});
   showLot(true);
 }
 
@@ -6023,6 +6144,7 @@ function showLot(preserveScroll=false){
   if(lotViewEl) lotViewEl.classList.remove('hidden');
 
  const l=lots.find(x=>x.id===currentLot);if(!l)return;
+ logBowenActivity('view_lot',{label:`Opened ${l.lot_name||'lot'}`,entityType:'lot',entityId:l.id,subdivisionId:l.subdivision_id,lotId:l.id});
  configurePowerCompanyButton(l);
  requestAnimationFrame(()=>{
    const mainEl=document.querySelector('main');
@@ -6253,6 +6375,7 @@ function renderLotChecklist(){
     }
 
     lot.checklist_items=current;
+    logBowenActivity('checklist_status_changed',{label:`Checklist: ${current[index]?.name||'item'} → ${String(status||'').replaceAll('_',' ')}`,entityType:'checklist_item',entityId:String(index),subdivisionId:lot.subdivision_id,lotId:lot.id,force:true,metadata:{item_name:current[index]?.name||'',status:String(status||'')}});
     return true;
   }
 
@@ -7292,6 +7415,7 @@ async function saveAdminPowerCompany(subdivisionId,clear=false){
    if(e)e.value='';
  }
  if(status)status.textContent=clear?'Power company removed. Tax ID kept.':'Saved ✓';
+ logBowenActivity('admin_power_company_updated',{label:`${clear?'Cleared power company for':'Updated power company for'} ${sub?.name||'subdivision'}`,entityType:'subdivision',entityId:subdivisionId,subdivisionId:subdivisionId,screen:'Admin',force:true});
 
  if(currentLot){
    const lot=lots.find(l=>String(l.id)===String(currentLot));
@@ -7309,32 +7433,19 @@ async function showAdminView(){
   ['subdivisionsView','lotsView','lotView','scheduleView'].forEach(id=>$(id).classList.add('hidden'));
   $('adminView').classList.remove('hidden');
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.view==='admin'));
+  logBowenActivity('view_admin',{label:'Opened Admin',screen:'Admin'});
   $('heroTitle').textContent='Admin';
-  $('heroSub').textContent='Manage BowenBuilder contacts, power companies, and user permissions.';
+  $('heroSub').textContent='Manage BowenBuilder contacts, power companies, user permissions, and activity.';
   updateHeroSiteMap(null);
   showAdminPanel(activeAdminPanel);
 }
 function showAdminPanel(panel='contacts'){
  activeAdminPanel=panel;
- const contacts=panel==='contacts';
- const power=panel==='power';
- const permissions=panel==='permissions';
- const online=panel==='online';
- $('adminContactsPanel').classList.toggle('hidden',!contacts);
- $('adminPowerPanel').classList.toggle('hidden',!power);
- $('adminPermissionsPanel').classList.toggle('hidden',!permissions);
- $('adminOnlinePanel').classList.toggle('hidden',!online);
- $('adminContactsTab').classList.toggle('active',contacts);
- $('adminPowerTab').classList.toggle('active',power);
- $('adminPermissionsTab').classList.toggle('active',permissions);
- $('adminOnlineTab').classList.toggle('active',online);
- if(contacts)renderAdminContacts();
- else if(power)renderAdminPowerCompanies();
- else if(permissions)renderAdminUserPermissions();
- else{
-   syncAppPresenceState();
-   loadAdminPresenceProfiles().then(()=>renderAdminOnlineUsers());
- }
+ const contacts=panel==='contacts',power=panel==='power',permissions=panel==='permissions',online=panel==='online',activity=panel==='activity';
+ $('adminContactsPanel').classList.toggle('hidden',!contacts);$('adminPowerPanel').classList.toggle('hidden',!power);$('adminPermissionsPanel').classList.toggle('hidden',!permissions);$('adminOnlinePanel').classList.toggle('hidden',!online);$('adminActivityLogPanel').classList.toggle('hidden',!activity);
+ $('adminContactsTab').classList.toggle('active',contacts);$('adminPowerTab').classList.toggle('active',power);$('adminPermissionsTab').classList.toggle('active',permissions);$('adminOnlineTab').classList.toggle('active',online);$('adminActivityLogTab').classList.toggle('active',activity);
+ if(activity){loadAdminActivityLog();startAdminActivityLogTimer();}
+ else{stopAdminActivityLogTimer();if(contacts)renderAdminContacts();else if(power)renderAdminPowerCompanies();else if(permissions)renderAdminUserPermissions();else if(online){syncAppPresenceState();loadAdminPresenceProfiles().then(()=>renderAdminOnlineUsers());}}
  updateAppPresenceLocation();
 }
 
@@ -7543,6 +7654,7 @@ async function saveAdminScheduleContact(scheduleItem){
     return;
   }
   if(status){status.textContent='Saved ✓';status.style.color='#067647';}
+  logBowenActivity('admin_schedule_contact_updated',{label:`Updated Schedule Contacts for ${scheduleItem}`,entityType:'schedule_contact',entityId:scheduleItem,screen:'Admin',force:true});
   await loadScheduleContacts();
 }
 
@@ -9000,6 +9112,9 @@ function selectedDateMessage(planUrl='',includePlans=false,renderingUrl='',inclu
 }
 
 function launchCalendarComposer(href){
+  const raw=String(href||'');
+  if(raw.startsWith('mailto:'))logBowenActivity('email_draft_opened',{label:'Opened schedule email draft',lotId:currentLot||null,force:true});
+  else if(raw.startsWith('sms:'))logBowenActivity('text_draft_opened',{label:'Opened schedule text draft',lotId:currentLot||null,force:true});
   // A real anchor click is the most reliable way to preserve the iPhone tap
   // for mailto: and sms: custom URL schemes.
   const a=document.createElement('a');
@@ -9299,6 +9414,7 @@ async function showScheduleView(mode=scheduleViewMode,preserveScroll=false){
  if(!currentLot){alert('Open a lot first to view its calendar.');return}
  const activeLot=lots.find(l=>l.id===currentLot);
  if(!activeLot){alert('Open a lot first to view its calendar.');return}
+ if(!preserveScroll)logBowenActivity('view_calendar',{label:`Opened ${activeLot.lot_name||'lot'} calendar`,entityType:'lot',entityId:activeLot.id,subdivisionId:activeLot.subdivision_id,lotId:activeLot.id});
  currentSubdivision=activeLot.subdivision_id||currentSubdivision;
  leaveLotPresence();
  $('subdivisionsView').classList.add('hidden');
@@ -9373,6 +9489,7 @@ async function deleteScheduleItemLive(){
    return;
  }
 
+ logBowenActivity('schedule_deleted',{label:`Deleted ${item?.name||'schedule item'}`,entityType:'schedule_item',entityId:id,subdivisionId:subdivisionForLot(item?.lot_id),lotId:item?.lot_id||null,force:true});
  $('scheduleDialog').close();
  await cleanupCalendarMarksForDeletedItem(item);
 
@@ -9452,6 +9569,7 @@ async function saveSchedule(e){
      return;
    }
 
+   logBowenActivity(id?'schedule_updated':'schedule_created',{label:`${id?'Updated':'Added'} ${payload.name}`,entityType:'schedule_item',entityId:result.data?.id||id||'',subdivisionId:subdivisionForLot(payload.lot_id),lotId:payload.lot_id,force:true,metadata:{status:payload.status,start_date:startDate,end_date:endDate}});
    $('scheduleDialog').close();
    const returnToSchedule=scheduleContext==='schedule';
    const returnSubdivision=currentSubdivision;
@@ -9487,7 +9605,7 @@ document.addEventListener('visibilitychange',()=>{
 window.addEventListener('pagehide',()=>{updateMyLastSeen();});
 
 initPunchoutMarkupEditor();
-$('logout').onclick=async()=>{await updateMyLastSeen();if(lastSeenHeartbeatTimer)clearInterval(lastSeenHeartbeatTimer);if(adminPresenceRenderTimer)clearInterval(adminPresenceRenderTimer);if(realtimeChannel)await db.removeChannel(realtimeChannel);if(presenceChannel)await db.removeChannel(presenceChannel);if(appPresenceChannel)await db.removeChannel(appPresenceChannel);if(adminActivityChannel)await db.removeChannel(adminActivityChannel);await db.auth.signOut();location.reload()};
+$('logout').onclick=async()=>{logBowenActivity('app_logout',{label:'Signed out of BowenBuilder',screen:'App',force:true});await updateMyLastSeen();stopAdminActivityLogTimer();if(lastSeenHeartbeatTimer)clearInterval(lastSeenHeartbeatTimer);if(adminPresenceRenderTimer)clearInterval(adminPresenceRenderTimer);if(realtimeChannel)await db.removeChannel(realtimeChannel);if(presenceChannel)await db.removeChannel(presenceChannel);if(appPresenceChannel)await db.removeChannel(appPresenceChannel);if(adminActivityChannel)await db.removeChannel(adminActivityChannel);await db.auth.signOut();location.reload()};
 $('backToSubs').onclick=showSubs;
 $('subdivisionLotsTab').onclick=()=>showSubdivisionPanel('lots');
 $('subdivisionAgendaTab').onclick=()=>showSubdivisionPanel('agenda');
@@ -9803,6 +9921,8 @@ $('lotForm').onsubmit=async e=>{
     return;
   }
 
+  logBowenActivity(editId?'lot_updated':'lot_created',{label:`${editId?'Updated':'Created'} ${payload.lot_name}`,entityType:'lot',entityId:lotId,subdivisionId:payload.subdivision_id,lotId:lotId,force:true,metadata:{plan_name:payload.plan_name||''}});
+
   // Every successful plan + website link combination becomes reusable on
   // future lots. Blank links never erase an existing remembered mapping.
   if(payload.plan_name && payload.crew_plan_link){
@@ -9913,6 +10033,10 @@ $('adminContactsTab').onclick=()=>showAdminPanel('contacts');
 $('adminPowerTab').onclick=()=>showAdminPanel('power');
 $('adminPermissionsTab').onclick=()=>showAdminPanel('permissions');
 $('adminOnlineTab').onclick=()=>showAdminPanel('online');
+$('adminActivityLogTab').onclick=()=>showAdminPanel('activity');
+$('adminActivityRefresh').onclick=()=>loadAdminActivityLog();
+$('adminActivityUser').onchange=()=>loadAdminActivityLog();
+$('adminActivityType').onchange=()=>renderAdminActivityLog();
 $('adminOnlineRefresh').onclick=async()=>{syncAppPresenceState();await loadAdminPresenceProfiles();renderAdminOnlineUsers();};
 $('adminContactSearch').oninput=()=>renderAdminContacts();
 $('adminUserSearch').oninput=()=>renderAdminUserPermissions();
@@ -9961,6 +10085,7 @@ if(session){
     startAdminPresenceRenderTimer();
   }
   await load();
+  logBowenActivity('app_open',{label:'Opened BowenBuilder',screen:'App',force:true,metadata:{device:navigator.userAgent.includes('iPhone')?'iPhone':navigator.userAgent.includes('iPad')?'iPad':'Browser'}});
 }else{
   $('login').classList.remove('hidden');
   $('app').classList.add('hidden');
