@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="2026-10-05-admin-activity-log">
+<meta name="bowenbuilder-version" content="2026-10-06-activity-log-no-jump">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -4437,22 +4437,81 @@ function logBowenActivity(action,{label='',entityType='',entityId='',subdivision
 }
 function formatActivityDate(value){const d=new Date(value);if(Number.isNaN(d.getTime()))return'';return d.toDateString()===new Date().toDateString()?d.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'}):d.toLocaleString(undefined,{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});}
 function activityInitials(name){return String(name||'User').trim().split(/\s+/).slice(0,2).map(x=>x[0]||'').join('').toUpperCase()||'U';}
-async function loadAdminActivityLog(){
+async function loadAdminActivityLog({preservePosition=true,showLoading=false}={}){
   if(!isBowenBuilderAdmin())return;
-  const list=$('adminActivityLogList'); if(list)list.innerHTML='<div class="muted">Loading activity…</div>';
+
+  const list=$('adminActivityLogList');
+  const preservedWindowY=window.scrollY||window.pageYOffset||0;
+  const preservedListY=list?.scrollTop||0;
   const selectedUser=String($('adminActivityUser')?.value||'').trim();
-  const {data,error}=await db.rpc('bowenbuilder_admin_activity_feed',{p_limit:500,p_user_id:selectedUser||null});
-  if(error){if(list)list.innerHTML=`<div class="notice">${esc(error.message)}</div>`;return;}
+
+  // Keep the current feed visible during automatic refreshes. Replacing the
+  // full list with a one-line Loading state collapses the page height on iOS
+  // and can force Safari back toward the top.
+  if(showLoading && list && !list.children.length){
+    list.innerHTML='<div class="muted">Loading activity…</div>';
+  }
+
+  const {data,error}=await db.rpc('bowenbuilder_admin_activity_feed',{
+    p_limit:500,
+    p_user_id:selectedUser||null
+  });
+
+  if(error){
+    if(list && !list.children.length){
+      list.innerHTML=`<div class="notice">${esc(error.message)}</div>`;
+    }
+    return;
+  }
+
   adminActivityRows=data||[];
+
   const userSelect=$('adminActivityUser');
   if(userSelect){
-    const current=userSelect.value; const users=new Map();
-    adminActivityRows.forEach(r=>{if(r.user_id)users.set(String(r.user_id),{id:String(r.user_id),name:r.full_name||r.email||'User'})});
-    (adminPresenceProfiles||[]).forEach(r=>{if(r.id)users.set(String(r.id),{id:String(r.id),name:r.full_name||r.email||'User'})});
-    userSelect.innerHTML='<option value="">All users</option>'+[...users.values()].sort((a,b)=>String(a.name).localeCompare(String(b.name))).map(u=>`<option value="${esc(u.id)}">${esc(u.name)}</option>`).join('');
-    if([...userSelect.options].some(o=>o.value===current))userSelect.value=current;
+    const current=userSelect.value;
+    const users=new Map();
+
+    adminActivityRows.forEach(r=>{
+      if(r.user_id){
+        users.set(String(r.user_id),{
+          id:String(r.user_id),
+          name:r.full_name||r.email||'User'
+        });
+      }
+    });
+
+    (adminPresenceProfiles||[]).forEach(r=>{
+      if(r.id){
+        users.set(String(r.id),{
+          id:String(r.id),
+          name:r.full_name||r.email||'User'
+        });
+      }
+    });
+
+    userSelect.innerHTML='<option value="">All users</option>'+
+      [...users.values()]
+        .sort((a,b)=>String(a.name).localeCompare(String(b.name)))
+        .map(u=>`<option value="${esc(u.id)}">${esc(u.name)}</option>`)
+        .join('');
+
+    if([...userSelect.options].some(o=>o.value===current)){
+      userSelect.value=current;
+    }
   }
+
   renderAdminActivityLog();
+
+  if(preservePosition){
+    requestAnimationFrame(()=>{
+      if(list)list.scrollTop=preservedListY;
+      window.scrollTo({
+        top:preservedWindowY,
+        left:0,
+        behavior:'auto'
+      });
+    });
+  }
 }
 function renderAdminActivityLog(){
   const list=$('adminActivityLogList'); const summary=$('adminActivitySummary'); if(!list)return;
@@ -4461,7 +4520,18 @@ function renderAdminActivityLog(){
   if(!rows.length){list.innerHTML='<div class="card muted">No activity has been recorded for this filter yet.</div>';return;}
   list.innerHTML=rows.map(r=>{const context=[r.lot_name||'',r.subdivision_name||'',r.screen||''].filter(Boolean);const unique=[...new Set(context)];return `<div class="admin-activity-row"><div class="admin-activity-avatar">${esc(activityInitials(r.full_name||r.email||'User'))}</div><div class="admin-activity-main"><div class="admin-activity-name">${esc(r.full_name||r.email||'User')}<span class="admin-activity-pill">${esc(activityCategoryLabel(r.action))}</span></div><div class="admin-activity-label">${esc(r.label||String(r.action||'Activity').replaceAll('_',' '))}</div>${unique.length?`<div class="admin-activity-meta">${unique.map(esc).join(' · ')}</div>`:''}</div><div class="admin-activity-time">${esc(formatActivityDate(r.created_at))}</div></div>`}).join('');
 }
-function startAdminActivityLogTimer(){if(adminActivityLogTimer)clearInterval(adminActivityLogTimer);adminActivityLogTimer=setInterval(()=>{if(isBowenBuilderAdmin()&&activeAdminPanel==='activity'&&!$('adminActivityLogPanel')?.classList.contains('hidden'))loadAdminActivityLog()},10000);}
+function startAdminActivityLogTimer(){
+  if(adminActivityLogTimer)clearInterval(adminActivityLogTimer);
+  adminActivityLogTimer=setInterval(()=>{
+    if(
+      isBowenBuilderAdmin() &&
+      activeAdminPanel==='activity' &&
+      !$('adminActivityLogPanel')?.classList.contains('hidden')
+    ){
+      loadAdminActivityLog({preservePosition:true,showLoading:false});
+    }
+  },10000);
+}
 function stopAdminActivityLogTimer(){if(adminActivityLogTimer){clearInterval(adminActivityLogTimer);adminActivityLogTimer=null;}}
 
 function showSubs(){
@@ -4574,7 +4644,7 @@ async function quickSetAgendaInspectionStatus(id,status){
 
   const pos=items.findIndex(i=>String(i.id)===String(item.id));
   if(pos>=0)items[pos]=data;
-  logBowenActivity('schedule_completed',{label:`Marked ${item.name||'schedule item'} complete`,entityType:'schedule_item',entityId:item.id,subdivisionId:subdivisionForLot(item.lot_id),lotId:item.lot_id,force:true});
+  logBowenActivity('inspection_status_changed',{label:`Marked ${item.name||'inspection'} ${normalized}`,entityType:'schedule_item',entityId:item.id,subdivisionId:subdivisionForLot(item.lot_id),lotId:item.lot_id,force:true,metadata:{inspection_status:normalized}});
   renderSubdivisionAgenda();
 }
 
@@ -4597,7 +4667,7 @@ async function quickCompleteAgendaScheduleItem(id){
 
   const pos=items.findIndex(i=>String(i.id)===String(item.id));
   if(pos>=0)items[pos]=data;
-  logBowenActivity('inspection_status_changed',{label:`Marked ${item.name||'inspection'} ${normalized}`,entityType:'schedule_item',entityId:item.id,subdivisionId:subdivisionForLot(item.lot_id),lotId:item.lot_id,force:true,metadata:{inspection_status:normalized}});
+  logBowenActivity('schedule_completed',{label:`Marked ${item.name||'schedule item'} complete`,entityType:'schedule_item',entityId:item.id,subdivisionId:subdivisionForLot(item.lot_id),lotId:item.lot_id,force:true});
   renderSubdivisionAgenda();
 }
 
@@ -7444,7 +7514,7 @@ function showAdminPanel(panel='contacts'){
  const contacts=panel==='contacts',power=panel==='power',permissions=panel==='permissions',online=panel==='online',activity=panel==='activity';
  $('adminContactsPanel').classList.toggle('hidden',!contacts);$('adminPowerPanel').classList.toggle('hidden',!power);$('adminPermissionsPanel').classList.toggle('hidden',!permissions);$('adminOnlinePanel').classList.toggle('hidden',!online);$('adminActivityLogPanel').classList.toggle('hidden',!activity);
  $('adminContactsTab').classList.toggle('active',contacts);$('adminPowerTab').classList.toggle('active',power);$('adminPermissionsTab').classList.toggle('active',permissions);$('adminOnlineTab').classList.toggle('active',online);$('adminActivityLogTab').classList.toggle('active',activity);
- if(activity){loadAdminActivityLog();startAdminActivityLogTimer();}
+ if(activity){loadAdminActivityLog({preservePosition:true,showLoading:true});startAdminActivityLogTimer();}
  else{stopAdminActivityLogTimer();if(contacts)renderAdminContacts();else if(power)renderAdminPowerCompanies();else if(permissions)renderAdminUserPermissions();else if(online){syncAppPresenceState();loadAdminPresenceProfiles().then(()=>renderAdminOnlineUsers());}}
  updateAppPresenceLocation();
 }
@@ -10034,8 +10104,8 @@ $('adminPowerTab').onclick=()=>showAdminPanel('power');
 $('adminPermissionsTab').onclick=()=>showAdminPanel('permissions');
 $('adminOnlineTab').onclick=()=>showAdminPanel('online');
 $('adminActivityLogTab').onclick=()=>showAdminPanel('activity');
-$('adminActivityRefresh').onclick=()=>loadAdminActivityLog();
-$('adminActivityUser').onchange=()=>loadAdminActivityLog();
+$('adminActivityRefresh').onclick=()=>loadAdminActivityLog({preservePosition:true,showLoading:false});
+$('adminActivityUser').onchange=()=>loadAdminActivityLog({preservePosition:true,showLoading:false});
 $('adminActivityType').onchange=()=>renderAdminActivityLog();
 $('adminOnlineRefresh').onclick=async()=>{syncAppPresenceState();await loadAdminPresenceProfiles();renderAdminOnlineUsers();};
 $('adminContactSearch').oninput=()=>renderAdminContacts();
