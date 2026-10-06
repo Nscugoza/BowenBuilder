@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="1.0">
+<meta name="bowenbuilder-version" content="1.1">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -2488,6 +2488,67 @@ button.teams-file-row:hover{border-color:#bdccdd}
 .admin-activity-pill{display:inline-flex;align-items:center;border-radius:999px;padding:3px 7px;background:#f2f4f7;color:#475467;font-size:10px;font-weight:850;text-transform:uppercase;letter-spacing:.03em;margin-left:5px}
 @media(max-width:700px){.admin-activity-toolbar{grid-template-columns:1fr 1fr}.admin-activity-toolbar button{grid-column:1/-1}.admin-activity-row{grid-template-columns:38px minmax(0,1fr)}.admin-activity-avatar{width:36px;height:36px;font-size:12px}.admin-activity-time{grid-column:2;text-align:left;margin-top:-4px}}
 
+
+.bb-update-lock{
+  position:fixed;
+  inset:0;
+  z-index:1000000;
+  display:grid;
+  place-items:center;
+  padding:24px;
+  padding-top:max(24px,env(safe-area-inset-top));
+  padding-bottom:max(24px,env(safe-area-inset-bottom));
+  background:rgba(10,30,52,.72);
+  backdrop-filter:blur(9px);
+  -webkit-backdrop-filter:blur(9px);
+}
+.bb-update-lock.hidden{display:none}
+.bb-update-card{
+  width:min(430px,100%);
+  border-radius:24px;
+  padding:24px;
+  background:#fff;
+  box-shadow:0 24px 80px rgba(0,0,0,.28);
+  text-align:center;
+}
+.bb-update-icon{
+  width:64px;
+  height:64px;
+  margin:0 auto 14px;
+  border-radius:20px;
+  display:grid;
+  place-items:center;
+  background:#eaf3fc;
+  color:#174f86;
+  font-size:30px;
+  font-weight:900;
+}
+.bb-update-card h2{
+  margin:0;
+  color:#173b63;
+  font-size:23px;
+}
+.bb-update-card p{
+  margin:10px 0 0;
+  color:#5f6f82;
+  line-height:1.5;
+}
+.bb-update-version{
+  display:inline-block;
+  margin-top:12px;
+  padding:6px 10px;
+  border-radius:999px;
+  background:#f1f5f9;
+  color:#475569;
+  font-size:12px;
+  font-weight:800;
+}
+.bb-update-card .primary{
+  width:100%;
+  margin-top:18px;
+  min-height:48px;
+}
+
 </style>
 </head>
 <body>
@@ -3209,15 +3270,151 @@ button.teams-file-row:hover{border-color:#bdccdd}
   </div>
 </dialog>
 
+
+<div id="bbUpdateLock" class="bb-update-lock hidden" role="alertdialog" aria-modal="true" aria-labelledby="bbUpdateTitle">
+  <div class="bb-update-card">
+    <div class="bb-update-icon">↻</div>
+    <h2 id="bbUpdateTitle">BowenBuilder has been updated</h2>
+    <p>A newer version of the app is available. For your changes and schedules to stay in sync, please reload BowenBuilder and sign in again.</p>
+    <div id="bbUpdateVersion" class="bb-update-version">New version available</div>
+    <button id="bbUpdateReload" class="primary" type="button">Reload &amp; Sign In</button>
+  </div>
+</div>
+
 <script>
 (async()=>{
 const $=id=>document.getElementById(id);
-const BOWENBUILDER_VERSION='1.0';
+const BOWENBUILDER_VERSION='1.1';
 const SB_URL='https://oztefiymckpyxiewgxtc.supabase.co';
 const SB_KEY='sb_publishable__ItoYGeHKEGTBFiE7JM74w_1F-qERVe';
 const db=window.supabase.createClient(SB_URL,SB_KEY);
 
 const crewTokenFromUrl=()=>new URLSearchParams(location.search).get('crew')||'';
+
+let bowenBuilderVersionWatchTimer=null;
+let bowenBuilderVersionCheckPromise=null;
+let bowenBuilderUpdateLocked=false;
+
+function bowenBuilderVersionCheckUrl(){
+  const url=new URL(location.href);
+  url.hash='';
+  url.search='';
+  url.searchParams.set('__bb_version_check',String(Date.now()));
+  return url.href;
+}
+
+async function latestDeployedBowenBuilderVersion(){
+  if(!/^https?:$/i.test(location.protocol))return '';
+
+  const response=await fetch(bowenBuilderVersionCheckUrl(),{
+    method:'GET',
+    cache:'no-store',
+    credentials:'same-origin',
+    headers:{
+      'Cache-Control':'no-cache',
+      'Pragma':'no-cache'
+    }
+  });
+
+  if(!response.ok)return '';
+
+  const html=await response.text();
+  const doc=new DOMParser().parseFromString(html,'text/html');
+  return String(
+    doc.querySelector('meta[name="bowenbuilder-version"]')?.content||''
+  ).trim();
+}
+
+async function forceBowenBuilderVersionUpdate(latestVersion){
+  if(bowenBuilderUpdateLocked)return;
+  bowenBuilderUpdateLocked=true;
+
+  if(bowenBuilderVersionWatchTimer){
+    clearInterval(bowenBuilderVersionWatchTimer);
+    bowenBuilderVersionWatchTimer=null;
+  }
+
+  // Record the forced update before ending the old authenticated session.
+  try{
+    logBowenActivity('app_update_detected',{
+      label:`BowenBuilder ${BOWENBUILDER_VERSION} replaced by ${latestVersion}`,
+      screen:'App',
+      force:true,
+      metadata:{
+        old_version:BOWENBUILDER_VERSION,
+        new_version:latestVersion
+      }
+    });
+  }catch(_){}
+
+  const versionLabel=$('bbUpdateVersion');
+  if(versionLabel){
+    versionLabel.textContent=`BowenBuilder ${BOWENBUILDER_VERSION} → ${latestVersion}`;
+  }
+
+  $('bbUpdateLock')?.classList.remove('hidden');
+
+  // The old build is now locked. Signing out here guarantees the user must
+  // authenticate again after loading the newly deployed version.
+  try{
+    await db.auth.signOut();
+  }catch(_){}
+  currentAuthUserId='';
+}
+
+async function checkForBowenBuilderUpdate(){
+  // Crew QR pages are public/read-only and do not have a login to refresh.
+  if(crewTokenFromUrl() || bowenBuilderUpdateLocked || !currentAuthUserId)return false;
+
+  if(bowenBuilderVersionCheckPromise)return bowenBuilderVersionCheckPromise;
+
+  bowenBuilderVersionCheckPromise=(async()=>{
+    try{
+      const latest=await latestDeployedBowenBuilderVersion();
+      if(
+        latest &&
+        latest!==BOWENBUILDER_VERSION
+      ){
+        await forceBowenBuilderVersionUpdate(latest);
+        return true;
+      }
+    }catch(err){
+      // A temporary offline/network problem should never lock somebody out.
+      console.warn('BowenBuilder version check skipped:',err);
+    }finally{
+      bowenBuilderVersionCheckPromise=null;
+    }
+    return false;
+  })();
+
+  return bowenBuilderVersionCheckPromise;
+}
+
+function startBowenBuilderVersionWatch(){
+  if(crewTokenFromUrl())return;
+
+  if(bowenBuilderVersionWatchTimer){
+    clearInterval(bowenBuilderVersionWatchTimer);
+  }
+
+  // Check immediately, then every 30 seconds while this build remains open.
+  void checkForBowenBuilderUpdate();
+  bowenBuilderVersionWatchTimer=setInterval(()=>{
+    if(document.visibilityState==='visible'){
+      void checkForBowenBuilderUpdate();
+    }
+  },30000);
+}
+
+function reloadLatestBowenBuilder(){
+  const url=new URL(location.href);
+  url.hash='';
+  url.search='';
+  url.searchParams.set('__bb_reload',String(Date.now()));
+  location.replace(url.href);
+}
+
+
 function crewDateLabel(value){
   if(!value)return '';
   const key=String(value).slice(0,10);
@@ -4177,7 +4374,10 @@ function startLastSeenHeartbeat(){
 document.addEventListener('visibilitychange',()=>{
   if(document.visibilityState==='visible')updateMyLastSeen();
 });
-window.addEventListener('focus',()=>updateMyLastSeen());
+window.addEventListener('focus',()=>{
+  updateMyLastSeen();
+  void checkForBowenBuilderUpdate();
+});
 window.addEventListener('pagehide',()=>{ updateMyLastSeen(); });
 
 async function startAdminActivityRealtime(){
@@ -9754,9 +9954,14 @@ async function saveSchedule(e){
 $('msLogin').onclick=signIn;
 $('loginForm').onsubmit=e=>{e.preventDefault();signIn()};
 
+if($('bbUpdateReload')){
+  $('bbUpdateReload').onclick=reloadLatestBowenBuilder;
+}
+
 document.addEventListener('visibilitychange',()=>{
   if(document.visibilityState==='visible'){
     ensureBowenBuilderSession({showAlert:false}).catch(()=>{});
+    void checkForBowenBuilderUpdate();
     updateMyLastSeen();
     updateAppPresenceLocation();
   }else{
@@ -9766,7 +9971,7 @@ document.addEventListener('visibilitychange',()=>{
 window.addEventListener('pagehide',()=>{updateMyLastSeen();});
 
 initPunchoutMarkupEditor();
-$('logout').onclick=async()=>{logBowenActivity('app_logout',{label:'Signed out of BowenBuilder',screen:'App',force:true});await updateMyLastSeen();stopAdminActivityLogTimer();if(lastSeenHeartbeatTimer)clearInterval(lastSeenHeartbeatTimer);if(adminPresenceRenderTimer)clearInterval(adminPresenceRenderTimer);if(realtimeChannel)await db.removeChannel(realtimeChannel);if(presenceChannel)await db.removeChannel(presenceChannel);if(appPresenceChannel)await db.removeChannel(appPresenceChannel);if(adminActivityChannel)await db.removeChannel(adminActivityChannel);await db.auth.signOut();location.reload()};
+$('logout').onclick=async()=>{logBowenActivity('app_logout',{label:'Signed out of BowenBuilder',screen:'App',force:true});if(bowenBuilderVersionWatchTimer)clearInterval(bowenBuilderVersionWatchTimer);await updateMyLastSeen();stopAdminActivityLogTimer();if(lastSeenHeartbeatTimer)clearInterval(lastSeenHeartbeatTimer);if(adminPresenceRenderTimer)clearInterval(adminPresenceRenderTimer);if(realtimeChannel)await db.removeChannel(realtimeChannel);if(presenceChannel)await db.removeChannel(presenceChannel);if(appPresenceChannel)await db.removeChannel(appPresenceChannel);if(adminActivityChannel)await db.removeChannel(adminActivityChannel);await db.auth.signOut();location.reload()};
 $('backToSubs').onclick=showSubs;
 $('subdivisionLotsTab').onclick=()=>showSubdivisionPanel('lots');
 $('subdivisionAgendaTab').onclick=()=>showSubdivisionPanel('agenda');
@@ -10240,6 +10445,7 @@ if(session){
   startRealtimeUpdates();
   await startAppPresence();
   startLastSeenHeartbeat();
+  startBowenBuilderVersionWatch();
   if(isBowenBuilderAdmin()){
     await loadAdminPresenceProfiles();
     await startAdminActivityRealtime();
@@ -10738,7 +10944,7 @@ try{
 </script>
 
 <div id="bbBuildVersion" style="text-align:center;color:#8a96a8;font-size:10px;padding:10px 8px 18px">
-  BowenBuilder 1.0</div>
+  BowenBuilder 1.1</div>
 
 
 
