@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="2026-10-06-activity-log-no-jump">
+<meta name="bowenbuilder-version" content="2026-10-06-activity-log-all-buttons-tabs">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -2797,6 +2797,7 @@ button.teams-file-row:hover{border-color:#bdccdd}
             <option value="checklist">Checklist</option>
             <option value="punchout">Punchout</option>
             <option value="communication">Email / Text</option>
+            <option value="interaction">Tabs / Buttons</option>
             <option value="admin">Admin</option>
           </select></label>
           <button id="adminActivityRefresh" class="secondary" type="button">↻ Refresh</button>
@@ -4415,11 +4416,12 @@ function activityCategory(action){
   if(a.startsWith('checklist_'))return 'checklist';
   if(a.startsWith('punchout_'))return 'punchout';
   if(a.startsWith('email_')||a.startsWith('text_'))return 'communication';
+  if(a==='ui_click')return 'interaction';
   if(a.startsWith('admin_'))return 'admin';
   return 'other';
 }
 function activityCategoryLabel(action){
-  return ({navigation:'Navigation',schedule:'Schedule',lot:'Lot',checklist:'Checklist',punchout:'Punchout',communication:'Email / Text',admin:'Admin',other:'Activity'})[activityCategory(action)]||'Activity';
+  return ({navigation:'Navigation',schedule:'Schedule',lot:'Lot',checklist:'Checklist',punchout:'Punchout',communication:'Email / Text',interaction:'Tabs / Buttons',admin:'Admin',other:'Activity'})[activityCategory(action)]||'Activity';
 }
 function logBowenActivity(action,{label='',entityType='',entityId='',subdivisionId=null,lotId=null,screen='',metadata={},force=false}={}){
   if(!currentAuthUserId||!action)return;
@@ -4435,6 +4437,94 @@ function logBowenActivity(action,{label='',entityType='',entityId='',subdivision
     p_subdivision_id:resolvedSubdivisionId||null,p_lot_id:resolvedLotId||null,p_screen:String(resolvedScreen||'').slice(0,80)||null,p_session_id:bowenActivitySessionId(),p_metadata:(metadata&&typeof metadata==='object')?metadata:{}
   }).then(({error})=>{if(error)console.warn('BowenBuilder activity log failed:',error.message)}).catch(err=>console.warn('BowenBuilder activity log failed:',err));
 }
+
+function cleanActivityControlLabel(value){
+  return String(value||'')
+    .replace(/\s+/g,' ')
+    .replace(/[↗▣☎✓✕×]+/g,' ')
+    .replace(/\s+/g,' ')
+    .trim()
+    .slice(0,180);
+}
+
+function activityControlLabel(el){
+  if(!el)return 'Control';
+
+  const aria=cleanActivityControlLabel(el.getAttribute?.('aria-label')||'');
+  if(aria)return aria;
+
+  const title=cleanActivityControlLabel(el.getAttribute?.('title')||'');
+  if(title)return title;
+
+  const textLabel=cleanActivityControlLabel(el.innerText||el.textContent||'');
+  if(textLabel)return textLabel;
+
+  const value=cleanActivityControlLabel(el.value||'');
+  if(value)return value;
+
+  const id=cleanActivityControlLabel(el.id||'');
+  if(id)return id.replace(/([a-z])([A-Z])/g,'$1 $2');
+
+  return 'Control';
+}
+
+function activityControlKind(el){
+  if(!el)return 'control';
+
+  if(
+    el.classList?.contains('tab') ||
+    el.classList?.contains('lot-tab') ||
+    el.classList?.contains('admin-inner-tab') ||
+    el.classList?.contains('subdivision-inner-tab') ||
+    el.getAttribute?.('role')==='tab'
+  )return 'tab';
+
+  if(el.tagName==='A')return 'link';
+  if(el.tagName==='BUTTON')return 'button';
+  return 'control';
+}
+
+function activityControlMetadata(el){
+  const meta={control_kind:activityControlKind(el)};
+
+  // Only stable control identifiers are logged. We intentionally do not log
+  // input values, URLs/query strings, message bodies, tokens, or file data.
+  if(el.id)meta.control_id=String(el.id).slice(0,100);
+  if(el.dataset?.view)meta.view=String(el.dataset.view).slice(0,80);
+  if(el.dataset?.lottab)meta.lot_tab=String(el.dataset.lottab).slice(0,80);
+  if(el.dataset?.action)meta.action=String(el.dataset.action).slice(0,80);
+  if(el.dataset?.mode)meta.mode=String(el.dataset.mode).slice(0,80);
+
+  return meta;
+}
+
+// Track every signed-in user click on buttons, tabs, and links.
+// Capture phase means the click is recorded even if a control later stops
+// propagation in its own handler.
+document.addEventListener('click',e=>{
+  if(!currentAuthUserId)return;
+
+  const control=e.target?.closest?.(
+    'button,a,[role="button"],[role="tab"],.tab,.lot-tab,.admin-inner-tab,.subdivision-inner-tab'
+  );
+  if(!control)return;
+
+  if(control.disabled || control.getAttribute?.('aria-disabled')==='true')return;
+
+  const label=activityControlLabel(control);
+
+  logBowenActivity('ui_click',{
+    label:`Clicked ${label}`,
+    entityType:'ui_control',
+    entityId:control.id||control.dataset?.view||control.dataset?.lottab||label,
+    subdivisionId:currentSubdivision||null,
+    lotId:currentLot||null,
+    screen:currentPresenceLocation()||'BowenBuilder',
+    metadata:activityControlMetadata(control),
+    force:true
+  });
+},true);
+
 function formatActivityDate(value){const d=new Date(value);if(Number.isNaN(d.getTime()))return'';return d.toDateString()===new Date().toDateString()?d.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'}):d.toLocaleString(undefined,{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});}
 function activityInitials(name){return String(name||'User').trim().split(/\s+/).slice(0,2).map(x=>x[0]||'').join('').toUpperCase()||'U';}
 async function loadAdminActivityLog({preservePosition=true,showLoading=false}={}){
