@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="1.2">
+<meta name="bowenbuilder-version" content="1.3">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -2696,6 +2696,189 @@ button.teams-file-row:hover{border-color:#bdccdd}
   }
 }
 
+
+.guest-access-create{margin-top:12px}
+.guest-access-create-title{
+  font-weight:900;
+  color:var(--navy);
+  font-size:17px;
+  margin-bottom:12px;
+}
+.guest-access-subtitle{
+  font-size:12px;
+  font-weight:850;
+  color:#475467;
+  margin:8px 0;
+  text-transform:uppercase;
+  letter-spacing:.04em;
+}
+.guest-access-subdivision-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+  gap:8px;
+}
+.guest-access-subdivision-check{
+  display:flex;
+  align-items:center;
+  gap:9px;
+  margin:0;
+  padding:10px 11px;
+  border:1px solid #dbe3ee;
+  border-radius:12px;
+  background:#fff;
+  font-size:13px;
+  font-weight:750;
+  color:#344054;
+}
+.guest-access-subdivision-check input{
+  width:19px;
+  height:19px;
+  margin:0;
+}
+.guest-access-created{
+  margin-top:14px;
+  border:1px solid #9fd3b7;
+  background:#f2fbf6;
+  border-radius:16px;
+  padding:14px;
+}
+.guest-access-created-url{
+  margin-top:10px;
+  padding:10px 11px;
+  border-radius:10px;
+  background:#fff;
+  border:1px solid #cfe1d7;
+  font-size:12px;
+  color:#315942;
+  overflow-wrap:anywhere;
+}
+.guest-access-created-actions{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  margin-top:10px;
+}
+.guest-access-list{
+  display:grid;
+  gap:10px;
+}
+.guest-access-row{
+  border:1px solid #dbe3ee;
+  border-radius:15px;
+  background:#fff;
+  padding:13px;
+}
+.guest-access-row-head{
+  display:flex;
+  justify-content:space-between;
+  gap:12px;
+  align-items:flex-start;
+}
+.guest-access-row-name{
+  font-weight:900;
+  color:var(--navy);
+}
+.guest-access-row-email{
+  margin-top:2px;
+  color:#667085;
+  font-size:12px;
+}
+.guest-access-status{
+  display:inline-flex;
+  border-radius:999px;
+  padding:5px 9px;
+  font-size:10px;
+  font-weight:900;
+  text-transform:uppercase;
+  letter-spacing:.04em;
+}
+.guest-access-status.active{background:#eaf8ef;color:#28734c}
+.guest-access-status.expired{background:#f2f4f7;color:#667085}
+.guest-access-status.revoked{background:#fdecea;color:#a1271d}
+.guest-access-row-meta{
+  margin-top:9px;
+  display:grid;
+  gap:4px;
+  color:#667085;
+  font-size:12px;
+  line-height:1.4;
+}
+.guest-access-row-actions{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  margin-top:11px;
+}
+.guest-portal-hero{
+  border-radius:20px;
+  padding:18px;
+  background:linear-gradient(135deg,#123f70,#1e5e98);
+  color:#fff;
+  margin-bottom:12px;
+}
+.guest-portal-hero h1{margin:0;font-size:24px}
+.guest-portal-hero p{margin:6px 0 0;color:rgba(255,255,255,.82);line-height:1.4}
+.guest-portal-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(210px,1fr));
+  gap:10px;
+}
+.guest-portal-folder{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  width:100%;
+  text-align:left;
+  border:1px solid #d7e2ee;
+  background:#fff;
+  color:#173f6c;
+  border-radius:15px;
+  padding:13px;
+  cursor:pointer;
+}
+.guest-portal-folder-icon{
+  width:44px;
+  height:40px;
+  border-radius:10px;
+  display:grid;
+  place-items:center;
+  background:#eaf2fb;
+  font-size:22px;
+  flex:0 0 auto;
+}
+.guest-portal-folder-copy{min-width:0;flex:1}
+.guest-portal-folder-copy strong{display:block}
+.guest-portal-folder-copy small{display:block;margin-top:3px;color:#667085;line-height:1.3}
+.guest-portal-file{
+  display:grid;
+  grid-template-columns:42px minmax(0,1fr) auto;
+  gap:10px;
+  align-items:center;
+  border:1px solid #dbe3ee;
+  border-radius:13px;
+  padding:10px;
+  background:#fff;
+  margin-top:8px;
+}
+.guest-portal-file-icon{
+  width:38px;height:38px;border-radius:10px;
+  display:grid;place-items:center;
+  background:#eef4fb;color:#244f7e;
+  font-size:11px;font-weight:900;
+}
+.guest-portal-file-name{
+  font-weight:800;color:#173f6c;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.guest-portal-file-meta{font-size:11px;color:#667085;margin-top:3px}
+.guest-portal-file-actions{display:flex;gap:6px;flex-wrap:wrap}
+.guest-portal-back{margin-bottom:10px}
+@media(max-width:640px){
+  .guest-portal-file{grid-template-columns:38px minmax(0,1fr)}
+  .guest-portal-file-actions{grid-column:2}
+  .guest-portal-file-actions a{flex:1 1 auto;text-align:center}
+}
+
 </style>
 </head>
 <body>
@@ -2704,6 +2887,16 @@ button.teams-file-row:hover{border-color:#bdccdd}
   <div class="crew-shell">
     <div class="crew-brand"><div class="brand-mark">BB</div><div><strong>BowenBuilder</strong><div class="muted">Bowen & Bowen Homebuilders</div></div></div>
     <div id="crewPublicContent"><div class="crew-card">Loading job information…</div></div>
+  </div>
+</section>
+
+<section id="guestFilesView" class="crew-public hidden">
+  <div class="crew-shell">
+    <div class="crew-brand">
+      <div class="brand-mark">BB</div>
+      <div><strong>BowenBuilder Guest Files</strong><div class="muted">Bowen &amp; Bowen Homebuilders</div></div>
+    </div>
+    <div id="guestFilesContent"><div class="crew-card">Loading guest file access…</div></div>
   </div>
 </section>
 
@@ -2959,6 +3152,7 @@ button.teams-file-row:hover{border-color:#bdccdd}
         <button id="adminPowerTab" class="admin-inner-tab" type="button">Power Companies</button>
         <button id="adminPermissionsTab" class="admin-inner-tab" type="button">User Permissions</button>
         <button id="adminOnlineTab" class="admin-inner-tab" type="button">Online Now</button>
+        <button id="adminGuestFilesTab" class="admin-inner-tab" type="button">Guest File Access</button>
         <button id="adminActivityLogTab" class="admin-inner-tab" type="button">Activity Log</button>
       </div>
 
@@ -3010,6 +3204,61 @@ button.teams-file-row:hover{border-color:#bdccdd}
           <button id="adminOnlineRefresh" class="secondary" type="button">↻ Refresh</button>
         </div>
         <div id="adminOnlineList" class="admin-online-list"></div>
+      </div>
+
+
+      <div id="adminGuestFilesPanel" class="hidden">
+        <div class="card admin-note">
+          <strong>Guest File Access</strong>
+          <div class="muted" style="margin-top:5px">Give outside subcontractors or vendors view/download access to selected subdivision file spaces without a Bowen Microsoft account. Guest links can expire or be revoked at any time.</div>
+        </div>
+
+        <div class="guest-access-create card">
+          <div class="guest-access-create-title">Create Guest Access</div>
+          <div class="two">
+            <label>Guest Name
+              <input id="guestAccessName" type="text" placeholder="e.g. ABC Plumbing">
+            </label>
+            <label>Email Address
+              <input id="guestAccessEmail" type="email" placeholder="contractor@gmail.com">
+            </label>
+          </div>
+          <label>Access Expires
+            <input id="guestAccessExpires" type="date">
+          </label>
+          <div>
+            <div class="guest-access-subtitle">Subdivision Access</div>
+            <div id="guestAccessSubdivisionChoices" class="guest-access-subdivision-grid"></div>
+          </div>
+          <div id="guestAccessCreateNotice" class="notice hidden"></div>
+          <div class="actions" style="margin-top:12px">
+            <button id="guestAccessCreate" class="primary" type="button">Create Guest Link</button>
+          </div>
+        </div>
+
+        <div id="guestAccessCreated" class="guest-access-created hidden">
+          <div>
+            <strong>Guest link created</strong>
+            <div class="muted">Send this link to the guest. They do not need a BowenBuilder account.</div>
+          </div>
+          <div id="guestAccessCreatedUrl" class="guest-access-created-url"></div>
+          <div class="guest-access-created-actions">
+            <button id="guestAccessCreatedEmail" class="primary" type="button">Email Invite</button>
+            <button id="guestAccessCreatedCopy" class="secondary" type="button">Copy Link</button>
+            <button id="guestAccessCreatedOpen" class="secondary" type="button">Open Portal</button>
+          </div>
+        </div>
+
+        <div class="admin-section">
+          <div class="admin-section-head">
+            <div>
+              <strong>Existing Guest Access</strong>
+              <div class="muted">Active, expired, and revoked guest links.</div>
+            </div>
+            <button id="guestAccessRefresh" class="secondary" type="button">↻ Refresh</button>
+          </div>
+          <div id="guestAccessList" class="guest-access-list"></div>
+        </div>
       </div>
 
       <div id="adminActivityLogPanel" class="hidden">
@@ -3454,12 +3703,187 @@ button.teams-file-row:hover{border-color:#bdccdd}
 <script>
 (async()=>{
 const $=id=>document.getElementById(id);
-const BOWENBUILDER_VERSION='1.2';
+const BOWENBUILDER_VERSION='1.3';
 const SB_URL='https://oztefiymckpyxiewgxtc.supabase.co';
 const SB_KEY='sb_publishable__ItoYGeHKEGTBFiE7JM74w_1F-qERVe';
 const db=window.supabase.createClient(SB_URL,SB_KEY);
 
 const crewTokenFromUrl=()=>new URLSearchParams(location.search).get('crew')||'';
+
+const guestTokenFromUrl=()=>new URLSearchParams(location.search).get('guest')||'';
+let guestPortalToken='';
+let guestPortalData=null;
+let guestPortalSubdivisionId=null;
+let guestPortalLotId=null;
+
+function guestFileFunctionUrl(fileId,{download=false}={}){
+  const url=new URL(`${SB_URL}/functions/v1/guest-file`);
+  url.searchParams.set('token',guestPortalToken);
+  url.searchParams.set('file',String(fileId||''));
+  if(download)url.searchParams.set('download','1');
+  return url.href;
+}
+
+function guestPortalFileSize(bytes){
+  const n=Number(bytes||0);
+  if(!Number.isFinite(n)||n<=0)return '';
+  if(n<1024)return `${n} B`;
+  if(n<1024*1024)return `${(n/1024).toFixed(n<10240?1:0)} KB`;
+  return `${(n/(1024*1024)).toFixed(n<10*1024*1024?1:0)} MB`;
+}
+
+function guestPortalDate(value){
+  const d=new Date(value);
+  if(Number.isNaN(d.getTime()))return '';
+  return d.toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'});
+}
+
+function guestPortalFileIcon(file){
+  const mime=String(file?.mime_type||'').toLowerCase();
+  const name=String(file?.file_name||'').toLowerCase();
+  if(mime.startsWith('image/'))return 'IMG';
+  if(mime.includes('pdf')||name.endsWith('.pdf'))return 'PDF';
+  if(/\.(xlsx?|csv)$/i.test(name))return 'XL';
+  if(/\.(docx?|rtf)$/i.test(name))return 'DOC';
+  return 'FILE';
+}
+
+function renderGuestFilePortal(){
+  const root=$('guestFilesContent');
+  if(!root||!guestPortalData)return;
+
+  const guest=guestPortalData.guest||{};
+  const subs=Array.isArray(guestPortalData.subdivisions)?guestPortalData.subdivisions:[];
+  const guestLots=Array.isArray(guestPortalData.lots)?guestPortalData.lots:[];
+  const guestFiles=Array.isArray(guestPortalData.files)?guestPortalData.files:[];
+
+  const heading=`<div class="guest-portal-hero">
+    <h1>Guest File Access</h1>
+    <p>${guest.name?`Access for ${esc(guest.name)} · `:''}${esc(guest.email||'')}${guest.expires_at?`<br>Access expires ${esc(guestPortalDate(guest.expires_at))}`:''}</p>
+  </div>`;
+
+  if(!guestPortalSubdivisionId){
+    root.innerHTML=heading+`
+      <div class="crew-card">
+        <h2>Subdivisions</h2>
+        <div class="muted" style="margin-bottom:12px">Choose a subdivision to view its lot folders.</div>
+        <div class="guest-portal-grid">
+          ${subs.map(sub=>{
+            const lotCount=guestLots.filter(l=>String(l.subdivision_id)===String(sub.id)).length;
+            return `<button class="guest-portal-folder" type="button" data-guest-sub="${esc(sub.id)}">
+              <span class="guest-portal-folder-icon">📁</span>
+              <span class="guest-portal-folder-copy"><strong>${esc(sub.name)}</strong><small>${lotCount} lot${lotCount===1?'':'s'}</small></span>
+            </button>`;
+          }).join('')||'<div class="muted">No subdivision access is assigned to this guest link.</div>'}
+        </div>
+      </div>`;
+    root.querySelectorAll('[data-guest-sub]').forEach(btn=>{
+      btn.onclick=()=>{
+        guestPortalSubdivisionId=btn.dataset.guestSub;
+        guestPortalLotId=null;
+        renderGuestFilePortal();
+      };
+    });
+    return;
+  }
+
+  const sub=subs.find(s=>String(s.id)===String(guestPortalSubdivisionId));
+
+  if(!guestPortalLotId){
+    const lotRows=guestLots
+      .filter(l=>String(l.subdivision_id)===String(guestPortalSubdivisionId))
+      .slice()
+      .sort((a,b)=>String(a.lot_name||'').localeCompare(String(b.lot_name||''),undefined,{numeric:true}));
+
+    root.innerHTML=heading+`
+      <div class="crew-card">
+        <button class="secondary guest-portal-back" type="button" data-guest-back="subdivisions">← Subdivisions</button>
+        <h2>${esc(sub?.name||'Subdivision')}</h2>
+        <div class="muted" style="margin-bottom:12px">Choose a lot folder.</div>
+        <div class="guest-portal-grid">
+          ${lotRows.map(lot=>{
+            const fileCount=guestFiles.filter(f=>String(f.lot_id)===String(lot.id)).length;
+            return `<button class="guest-portal-folder" type="button" data-guest-lot="${esc(lot.id)}">
+              <span class="guest-portal-folder-icon">📁</span>
+              <span class="guest-portal-folder-copy">
+                <strong>${esc(lot.lot_name||'Lot')}</strong>
+                <small>${esc(lot.address||lot.plan_name||'Lot files')} · ${fileCount} file${fileCount===1?'':'s'}</small>
+              </span>
+            </button>`;
+          }).join('')||'<div class="muted">No lots are available.</div>'}
+        </div>
+      </div>`;
+
+    root.querySelector('[data-guest-back="subdivisions"]')?.addEventListener('click',()=>{
+      guestPortalSubdivisionId=null;
+      guestPortalLotId=null;
+      renderGuestFilePortal();
+    });
+
+    root.querySelectorAll('[data-guest-lot]').forEach(btn=>{
+      btn.onclick=()=>{
+        guestPortalLotId=btn.dataset.guestLot;
+        renderGuestFilePortal();
+      };
+    });
+    return;
+  }
+
+  const lot=guestLots.find(l=>String(l.id)===String(guestPortalLotId));
+  const files=guestFiles.filter(f=>String(f.lot_id)===String(guestPortalLotId));
+
+  root.innerHTML=heading+`
+    <div class="crew-card">
+      <button class="secondary guest-portal-back" type="button" data-guest-back="lots">← Lot Folders</button>
+      <h2>${esc(lot?.lot_name||'Lot Files')}</h2>
+      <div class="muted">${esc(lot?.address||lot?.plan_name||sub?.name||'')}</div>
+      <div style="margin-top:12px">
+        ${files.length?files.map(file=>`
+          <div class="guest-portal-file">
+            <div class="guest-portal-file-icon">${esc(guestPortalFileIcon(file))}</div>
+            <div>
+              <div class="guest-portal-file-name">${esc(file.file_name||'File')}</div>
+              <div class="guest-portal-file-meta">${esc([guestPortalFileSize(file.size_bytes),guestPortalDate(file.created_at)].filter(Boolean).join(' · '))}</div>
+            </div>
+            <div class="guest-portal-file-actions">
+              <a class="secondary" href="${esc(guestFileFunctionUrl(file.id))}" target="_blank" rel="noopener">Open</a>
+              <a class="secondary" href="${esc(guestFileFunctionUrl(file.id,{download:true}))}" target="_blank" rel="noopener">Download</a>
+            </div>
+          </div>`).join('')
+          :'<div class="muted">No files have been uploaded to this lot folder yet.</div>'}
+      </div>
+    </div>`;
+
+  root.querySelector('[data-guest-back="lots"]')?.addEventListener('click',()=>{
+    guestPortalLotId=null;
+    renderGuestFilePortal();
+  });
+}
+
+async function showGuestFilePortal(token){
+  $('login').classList.add('hidden');
+  $('app').classList.add('hidden');
+  $('crewPublicView').classList.add('hidden');
+  $('guestFilesView').classList.remove('hidden');
+
+  guestPortalToken=String(token||'').trim();
+  guestPortalSubdivisionId=null;
+  guestPortalLotId=null;
+
+  const root=$('guestFilesContent');
+  root.innerHTML='<div class="crew-card">Loading guest file access…</div>';
+
+  const {data,error}=await db.rpc('bowenbuilder_guest_file_portal',{p_token:guestPortalToken});
+  if(error||!data){
+    root.innerHTML=`<div class="crew-card"><h2>Guest link unavailable</h2><p class="muted">${esc(error?.message||'This guest file link is invalid, expired, or has been revoked.')}</p></div>`;
+    return;
+  }
+
+  guestPortalData=typeof data==='string'?JSON.parse(data):data;
+  renderGuestFilePortal();
+}
+
+
 
 let bowenBuilderVersionWatchTimer=null;
 let bowenBuilderVersionCheckPromise=null;
@@ -3534,7 +3958,7 @@ async function forceBowenBuilderVersionUpdate(latestVersion){
 
 async function checkForBowenBuilderUpdate(){
   // Crew QR pages are public/read-only and do not have a login to refresh.
-  if(crewTokenFromUrl() || bowenBuilderUpdateLocked || !currentAuthUserId)return false;
+  if(crewTokenFromUrl() || guestTokenFromUrl() || bowenBuilderUpdateLocked || !currentAuthUserId)return false;
 
   if(bowenBuilderVersionCheckPromise)return bowenBuilderVersionCheckPromise;
 
@@ -3561,7 +3985,7 @@ async function checkForBowenBuilderUpdate(){
 }
 
 function startBowenBuilderVersionWatch(){
-  if(crewTokenFromUrl())return;
+  if(crewTokenFromUrl() || guestTokenFromUrl())return;
 
   if(bowenBuilderVersionWatchTimer){
     clearInterval(bowenBuilderVersionWatchTimer);
@@ -3755,6 +4179,10 @@ let adminMemberships=[];
 let currentMembershipPermissions=[];
 let activeAdminPanel='contacts';
 let adminActivityRows=[];
+let adminGuestInvites=[];
+let adminGuestInviteSubdivisions=[];
+let adminGuestFileActivity=[];
+let latestCreatedGuestLink={url:'',email:'',name:'',expiresAt:''};
 let adminActivityLogTimer=null;
 let activitySessionId='';
 const activityLastLogged=new Map();
@@ -8368,17 +8796,349 @@ async function showAdminView(){
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.view==='admin'));
   logBowenActivity('view_admin',{label:'Opened Admin',screen:'Admin'});
   $('heroTitle').textContent='Admin';
-  $('heroSub').textContent='Manage BowenBuilder contacts, power companies, user permissions, and activity.';
+  $('heroSub').textContent='Manage BowenBuilder contacts, permissions, guest file access, and activity.';
   updateHeroSiteMap(null);
   showAdminPanel(activeAdminPanel);
 }
+
+function guestAccessDefaultExpiration(){
+  const d=new Date();
+  d.setDate(d.getDate()+30);
+  const y=d.getFullYear();
+  const m=String(d.getMonth()+1).padStart(2,'0');
+  const day=String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
+}
+
+function guestAccessToken(){
+  const bytes=new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  let binary='';
+  bytes.forEach(b=>binary+=String.fromCharCode(b));
+  return btoa(binary).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+}
+
+function guestAccessPortalUrl(token){
+  const url=new URL(location.href);
+  url.hash='';
+  url.search='';
+  url.searchParams.set('guest',String(token||''));
+  return url.href;
+}
+
+function guestAccessStatus(invite){
+  if(invite?.revoked_at)return 'revoked';
+  const expires=new Date(invite?.expires_at||0);
+  if(Number.isNaN(expires.getTime()) || expires<=new Date())return 'expired';
+  return 'active';
+}
+
+function guestAccessStatusLabel(status){
+  return status==='active'?'Active':status==='revoked'?'Revoked':'Expired';
+}
+
+function guestAccessSubNames(inviteId){
+  const ids=adminGuestInviteSubdivisions
+    .filter(row=>String(row.invite_id)===String(inviteId))
+    .map(row=>String(row.subdivision_id));
+  return subdivisions
+    .filter(s=>ids.includes(String(s.id)))
+    .map(s=>s.name);
+}
+
+function guestAccessLatestActivity(inviteId){
+  return adminGuestFileActivity.find(row=>String(row.invite_id)===String(inviteId))||null;
+}
+
+function renderGuestAccessSubdivisionChoices(){
+  const root=$('guestAccessSubdivisionChoices');
+  if(!root)return;
+  root.innerHTML=subdivisions
+    .filter(s=>s.active!==false)
+    .map(s=>`<label class="guest-access-subdivision-check">
+      <input type="checkbox" data-guest-access-subdivision="${esc(s.id)}">
+      <span>${esc(s.name)}</span>
+    </label>`)
+    .join('');
+}
+
+function guestAccessSetNotice(message='',error=false){
+  const box=$('guestAccessCreateNotice');
+  if(!box)return;
+  box.textContent=message||'';
+  box.classList.toggle('hidden',!message);
+  box.style.color=error?'#b42318':'';
+}
+
+function showLatestCreatedGuestLink({url,email,name,expiresAt}){
+  latestCreatedGuestLink={url,email,name,expiresAt};
+  $('guestAccessCreatedUrl').textContent=url;
+  $('guestAccessCreated').classList.remove('hidden');
+}
+
+function guestInviteEmailHref({url,email,name,expiresAt}){
+  const guestName=String(name||'').trim();
+  const subject='BowenBuilder Guest File Access';
+  const expiration=expiresAt?new Date(expiresAt).toLocaleDateString():'';
+  const body=[
+    guestName?`Hi ${guestName},`:'Hello,',
+    '',
+    'You have been given guest access to project files from Bowen & Bowen Homebuilders.',
+    '',
+    'Open your secure BowenBuilder guest file portal here:',
+    url,
+    '',
+    expiration?`This access expires ${expiration}.`:'',
+    'No BowenBuilder or Microsoft account is required.'
+  ].filter(Boolean).join('\n');
+  return `mailto:${encodeURIComponent(email||'')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
+
+async function loadAdminGuestAccess(){
+  if(!isBowenBuilderAdmin())return;
+
+  const list=$('guestAccessList');
+  if(list)list.innerHTML='<div class="muted">Loading guest access…</div>';
+
+  const [{data:invites,error:inviteError},{data:accessRows,error:accessError},{data:activity,error:activityError}]=await Promise.all([
+    db.from('guest_file_invites')
+      .select('id,guest_name,email,token_value,expires_at,revoked_at,created_at,updated_at')
+      .order('created_at',{ascending:false}),
+    db.from('guest_file_invite_subdivisions')
+      .select('invite_id,subdivision_id'),
+    db.from('guest_file_activity')
+      .select('id,invite_id,file_id,action,created_at')
+      .order('created_at',{ascending:false})
+      .limit(1000)
+  ]);
+
+  if(inviteError||accessError||activityError){
+    if(list)list.innerHTML=`<div class="notice">${esc((inviteError||accessError||activityError).message)}</div>`;
+    return;
+  }
+
+  adminGuestInvites=invites||[];
+  adminGuestInviteSubdivisions=accessRows||[];
+  adminGuestFileActivity=activity||[];
+
+  renderGuestAccessSubdivisionChoices();
+  renderAdminGuestAccessList();
+
+  if(!$('guestAccessExpires').value){
+    $('guestAccessExpires').value=guestAccessDefaultExpiration();
+  }
+}
+
+function renderAdminGuestAccessList(){
+  const list=$('guestAccessList');
+  if(!list)return;
+
+  if(!adminGuestInvites.length){
+    list.innerHTML='<div class="card muted">No guest access links have been created yet.</div>';
+    return;
+  }
+
+  list.innerHTML=adminGuestInvites.map(invite=>{
+    const status=guestAccessStatus(invite);
+    const subs=guestAccessSubNames(invite.id);
+    const latest=guestAccessLatestActivity(invite.id);
+    const url=invite.token_value?guestAccessPortalUrl(invite.token_value):'';
+    const expires=invite.expires_at?new Date(invite.expires_at).toLocaleDateString():'';
+    const lastActivity=latest
+      ? `${String(latest.action||'activity').replaceAll('_',' ')} · ${new Date(latest.created_at).toLocaleString()}`
+      :'No guest activity yet';
+
+    return `<div class="guest-access-row">
+      <div class="guest-access-row-head">
+        <div>
+          <div class="guest-access-row-name">${esc(invite.guest_name||invite.email||'Guest')}</div>
+          <div class="guest-access-row-email">${esc(invite.email||'')}</div>
+        </div>
+        <span class="guest-access-status ${esc(status)}">${esc(guestAccessStatusLabel(status))}</span>
+      </div>
+      <div class="guest-access-row-meta">
+        <div><strong>Subdivisions:</strong> ${esc(subs.join(', ')||'None')}</div>
+        <div><strong>Expires:</strong> ${esc(expires||'Not set')}</div>
+        <div><strong>Last activity:</strong> ${esc(lastActivity)}</div>
+      </div>
+      <div class="guest-access-row-actions">
+        ${status==='active'&&url?`<button class="secondary" type="button" data-guest-email="${esc(invite.id)}">Email Invite</button>`:''}
+        ${status==='active'&&url?`<button class="secondary" type="button" data-guest-copy="${esc(invite.id)}">Copy Link</button>`:''}
+        ${status==='active'&&url?`<button class="secondary" type="button" data-guest-open="${esc(invite.id)}">Open Portal</button>`:''}
+        ${status==='active'?`<button class="secondary" type="button" data-guest-revoke="${esc(invite.id)}" style="color:#b42318">Revoke</button>`:''}
+      </div>
+    </div>`;
+  }).join('');
+
+  list.querySelectorAll('[data-guest-email]').forEach(btn=>{
+    btn.onclick=()=>{
+      const invite=adminGuestInvites.find(x=>String(x.id)===String(btn.dataset.guestEmail));
+      if(!invite?.token_value)return;
+      location.href=guestInviteEmailHref({
+        url:guestAccessPortalUrl(invite.token_value),
+        email:invite.email,
+        name:invite.guest_name,
+        expiresAt:invite.expires_at
+      });
+    };
+  });
+
+  list.querySelectorAll('[data-guest-copy]').forEach(btn=>{
+    btn.onclick=async()=>{
+      const invite=adminGuestInvites.find(x=>String(x.id)===String(btn.dataset.guestCopy));
+      if(!invite?.token_value)return;
+      const url=guestAccessPortalUrl(invite.token_value);
+      try{
+        await navigator.clipboard.writeText(url);
+        alert('Guest link copied.');
+      }catch{
+        prompt('Copy this guest link:',url);
+      }
+    };
+  });
+
+  list.querySelectorAll('[data-guest-open]').forEach(btn=>{
+    btn.onclick=()=>{
+      const invite=adminGuestInvites.find(x=>String(x.id)===String(btn.dataset.guestOpen));
+      if(!invite?.token_value)return;
+      window.open(guestAccessPortalUrl(invite.token_value),'_blank','noopener');
+    };
+  });
+
+  list.querySelectorAll('[data-guest-revoke]').forEach(btn=>{
+    btn.onclick=()=>revokeGuestAccess(btn.dataset.guestRevoke);
+  });
+}
+
+async function createGuestAccess(){
+  if(!isBowenBuilderAdmin())return;
+
+  const name=String($('guestAccessName').value||'').trim();
+  const email=String($('guestAccessEmail').value||'').trim();
+  const expiresDate=String($('guestAccessExpires').value||'').trim();
+  const subdivisionIds=[...document.querySelectorAll('[data-guest-access-subdivision]:checked')]
+    .map(x=>x.dataset.guestAccessSubdivision)
+    .filter(Boolean);
+
+  if(!email){
+    guestAccessSetNotice('Enter the guest email address.',true);
+    return;
+  }
+  if(!expiresDate){
+    guestAccessSetNotice('Choose an expiration date.',true);
+    return;
+  }
+  if(!subdivisionIds.length){
+    guestAccessSetNotice('Choose at least one subdivision.',true);
+    return;
+  }
+
+  const expiresAt=new Date(`${expiresDate}T23:59:59`);
+  if(Number.isNaN(expiresAt.getTime())||expiresAt<=new Date()){
+    guestAccessSetNotice('Expiration must be in the future.',true);
+    return;
+  }
+
+  const button=$('guestAccessCreate');
+  const original=button.textContent;
+  button.disabled=true;
+  button.textContent='Creating…';
+  guestAccessSetNotice('');
+
+  try{
+    const token=guestAccessToken();
+    const {data,error}=await db.rpc('bowenbuilder_admin_create_guest_file_invite',{
+      p_email:email,
+      p_guest_name:name||null,
+      p_expires_at:expiresAt.toISOString(),
+      p_token:token,
+      p_subdivision_ids:subdivisionIds
+    });
+
+    if(error)throw error;
+
+    const url=guestAccessPortalUrl(token);
+    showLatestCreatedGuestLink({
+      url,
+      email,
+      name,
+      expiresAt:expiresAt.toISOString()
+    });
+
+    logBowenActivity('admin_guest_file_access_created',{
+      label:`Created guest file access for ${name||email}`,
+      entityType:'guest_file_invite',
+      entityId:String(data||''),
+      screen:'Admin',
+      force:true,
+      metadata:{subdivision_count:subdivisionIds.length}
+    });
+
+    $('guestAccessName').value='';
+    $('guestAccessEmail').value='';
+    $('guestAccessExpires').value=guestAccessDefaultExpiration();
+    document.querySelectorAll('[data-guest-access-subdivision]').forEach(x=>x.checked=false);
+
+    await loadAdminGuestAccess();
+  }catch(err){
+    guestAccessSetNotice(err?.message||'Could not create guest access.',true);
+  }finally{
+    button.disabled=false;
+    button.textContent=original;
+  }
+}
+
+async function revokeGuestAccess(inviteId){
+  const invite=adminGuestInvites.find(x=>String(x.id)===String(inviteId));
+  if(!invite)return;
+
+  if(!confirm(`Revoke guest file access for ${invite.guest_name||invite.email}? Their link will stop working immediately.`))return;
+
+  const {error}=await db.rpc('bowenbuilder_admin_revoke_guest_file_invite',{p_invite_id:invite.id});
+  if(error){
+    alert(error.message);
+    return;
+  }
+
+  logBowenActivity('admin_guest_file_access_revoked',{
+    label:`Revoked guest file access for ${invite.guest_name||invite.email}`,
+    entityType:'guest_file_invite',
+    entityId:invite.id,
+    screen:'Admin',
+    force:true
+  });
+
+  await loadAdminGuestAccess();
+}
+
 function showAdminPanel(panel='contacts'){
  activeAdminPanel=panel;
- const contacts=panel==='contacts',power=panel==='power',permissions=panel==='permissions',online=panel==='online',activity=panel==='activity';
- $('adminContactsPanel').classList.toggle('hidden',!contacts);$('adminPowerPanel').classList.toggle('hidden',!power);$('adminPermissionsPanel').classList.toggle('hidden',!permissions);$('adminOnlinePanel').classList.toggle('hidden',!online);$('adminActivityLogPanel').classList.toggle('hidden',!activity);
- $('adminContactsTab').classList.toggle('active',contacts);$('adminPowerTab').classList.toggle('active',power);$('adminPermissionsTab').classList.toggle('active',permissions);$('adminOnlineTab').classList.toggle('active',online);$('adminActivityLogTab').classList.toggle('active',activity);
- if(activity){loadAdminActivityLog({preservePosition:true,showLoading:true});startAdminActivityLogTimer();}
- else{stopAdminActivityLogTimer();if(contacts)renderAdminContacts();else if(power)renderAdminPowerCompanies();else if(permissions)renderAdminUserPermissions();else if(online){syncAppPresenceState();loadAdminPresenceProfiles().then(()=>renderAdminOnlineUsers());}}
+ const contacts=panel==='contacts',power=panel==='power',permissions=panel==='permissions',online=panel==='online',guestFiles=panel==='guest_files',activity=panel==='activity';
+ $('adminContactsPanel').classList.toggle('hidden',!contacts);
+ $('adminPowerPanel').classList.toggle('hidden',!power);
+ $('adminPermissionsPanel').classList.toggle('hidden',!permissions);
+ $('adminOnlinePanel').classList.toggle('hidden',!online);
+ $('adminGuestFilesPanel').classList.toggle('hidden',!guestFiles);
+ $('adminActivityLogPanel').classList.toggle('hidden',!activity);
+
+ $('adminContactsTab').classList.toggle('active',contacts);
+ $('adminPowerTab').classList.toggle('active',power);
+ $('adminPermissionsTab').classList.toggle('active',permissions);
+ $('adminOnlineTab').classList.toggle('active',online);
+ $('adminGuestFilesTab').classList.toggle('active',guestFiles);
+ $('adminActivityLogTab').classList.toggle('active',activity);
+
+ if(activity){
+   loadAdminActivityLog({preservePosition:true,showLoading:true});
+   startAdminActivityLogTimer();
+ }else{
+   stopAdminActivityLogTimer();
+   if(contacts)renderAdminContacts();
+   else if(power)renderAdminPowerCompanies();
+   else if(permissions)renderAdminUserPermissions();
+   else if(online){syncAppPresenceState();loadAdminPresenceProfiles().then(()=>renderAdminOnlineUsers());}
+   else if(guestFiles)loadAdminGuestAccess();
+ }
  updateAppPresenceLocation();
 }
 
@@ -10987,7 +11747,27 @@ $('adminContactsTab').onclick=()=>showAdminPanel('contacts');
 $('adminPowerTab').onclick=()=>showAdminPanel('power');
 $('adminPermissionsTab').onclick=()=>showAdminPanel('permissions');
 $('adminOnlineTab').onclick=()=>showAdminPanel('online');
+$('adminGuestFilesTab').onclick=()=>showAdminPanel('guest_files');
 $('adminActivityLogTab').onclick=()=>showAdminPanel('activity');
+
+$('guestAccessCreate').onclick=createGuestAccess;
+$('guestAccessRefresh').onclick=loadAdminGuestAccess;
+$('guestAccessCreatedEmail').onclick=()=>{
+  if(!latestCreatedGuestLink.url)return;
+  location.href=guestInviteEmailHref(latestCreatedGuestLink);
+};
+$('guestAccessCreatedCopy').onclick=async()=>{
+  if(!latestCreatedGuestLink.url)return;
+  try{
+    await navigator.clipboard.writeText(latestCreatedGuestLink.url);
+    alert('Guest link copied.');
+  }catch{
+    prompt('Copy this guest link:',latestCreatedGuestLink.url);
+  }
+};
+$('guestAccessCreatedOpen').onclick=()=>{
+  if(latestCreatedGuestLink.url)window.open(latestCreatedGuestLink.url,'_blank','noopener');
+};
 $('adminActivityRefresh').onclick=()=>loadAdminActivityLog({preservePosition:true,showLoading:false});
 $('adminActivityUser').onchange=()=>loadAdminActivityLog({preservePosition:true,showLoading:false});
 $('adminActivityType').onchange=()=>renderAdminActivityLog();
@@ -11023,6 +11803,12 @@ $('crewQrPrint').onclick=()=>{
 const crewToken=crewTokenFromUrl();
 if(crewToken){
   await showPublicCrewView(crewToken);
+  return;
+}
+
+const guestToken=guestTokenFromUrl();
+if(guestToken){
+  await showGuestFilePortal(guestToken);
   return;
 }
 
@@ -11532,7 +12318,7 @@ try{
 </script>
 
 <div id="bbBuildVersion" style="text-align:center;color:#8a96a8;font-size:10px;padding:10px 8px 18px">
-  BowenBuilder 1.2</div>
+  BowenBuilder 1.3</div>
 
 
 
