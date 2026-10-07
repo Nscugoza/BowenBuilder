@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="1.1">
+<meta name="bowenbuilder-version" content="1.2">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -2549,6 +2549,153 @@ button.teams-file-row:hover{border-color:#bdccdd}
   min-height:48px;
 }
 
+
+.subdivision-files-shell{
+  display:grid;
+  gap:14px;
+}
+.subdivision-files-head{
+  display:flex;
+  align-items:flex-end;
+  justify-content:space-between;
+  gap:12px;
+  flex-wrap:wrap;
+}
+.subdivision-files-head-actions{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+}
+.subdivision-file-folder-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+  gap:12px;
+}
+.subdivision-file-folder{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  width:100%;
+  min-height:88px;
+  padding:14px;
+  border:1px solid #d8e4f0;
+  border-radius:16px;
+  background:#fff;
+  color:#173f6c;
+  text-align:left;
+  cursor:pointer;
+  box-shadow:0 5px 16px rgba(22,50,82,.04);
+}
+.subdivision-file-folder:hover{
+  border-color:#9db4cd;
+  transform:translateY(-1px);
+}
+.subdivision-file-folder-icon{
+  width:46px;
+  height:40px;
+  flex:0 0 auto;
+  display:grid;
+  place-items:center;
+  border-radius:10px;
+  background:#eaf2fb;
+  color:#174f86;
+  font-size:24px;
+}
+.subdivision-file-folder-copy{
+  min-width:0;
+  flex:1;
+}
+.subdivision-file-folder-name{
+  font-weight:900;
+  font-size:16px;
+  line-height:1.2;
+}
+.subdivision-file-folder-meta{
+  margin-top:4px;
+  color:var(--muted);
+  font-size:12px;
+  line-height:1.35;
+}
+.subdivision-file-count{
+  flex:0 0 auto;
+  border-radius:999px;
+  background:#f2f4f7;
+  color:#475467;
+  font-size:11px;
+  font-weight:850;
+  padding:5px 8px;
+}
+.subdivision-file-list{
+  display:grid;
+  gap:9px;
+}
+.subdivision-file-row{
+  display:grid;
+  grid-template-columns:44px minmax(0,1fr) auto;
+  gap:11px;
+  align-items:center;
+  padding:11px 12px;
+  border:1px solid #dbe3ee;
+  border-radius:14px;
+  background:#fff;
+}
+.subdivision-file-icon{
+  width:40px;
+  height:40px;
+  display:grid;
+  place-items:center;
+  border-radius:11px;
+  background:#eef4fb;
+  color:#244f7e;
+  font-size:18px;
+  font-weight:900;
+}
+.subdivision-file-copy{
+  min-width:0;
+}
+.subdivision-file-name{
+  font-weight:850;
+  color:#173f6c;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.subdivision-file-meta{
+  margin-top:3px;
+  color:var(--muted);
+  font-size:12px;
+}
+.subdivision-file-actions{
+  display:flex;
+  gap:7px;
+  flex-wrap:wrap;
+  justify-content:flex-end;
+}
+.subdivision-file-empty{
+  border:1px dashed #cbd8e6;
+  border-radius:16px;
+  padding:28px 18px;
+  text-align:center;
+  color:var(--muted);
+  background:#fbfcfe;
+}
+@media(max-width:700px){
+  .subdivision-file-folder-grid{
+    grid-template-columns:1fr;
+  }
+  .subdivision-file-row{
+    grid-template-columns:40px minmax(0,1fr);
+    align-items:start;
+  }
+  .subdivision-file-actions{
+    grid-column:2;
+    justify-content:flex-start;
+  }
+  .subdivision-file-actions button{
+    flex:1 1 auto;
+  }
+}
+
 </style>
 </head>
 <body>
@@ -2594,6 +2741,7 @@ button.teams-file-row:hover{border-color:#bdccdd}
 
       <div class="subdivision-inner-tabs" role="tablist" aria-label="Subdivision views">
         <button id="subdivisionLotsTab" class="subdivision-inner-tab active" type="button">Lots</button>
+        <button id="subdivisionFilesTab" class="subdivision-inner-tab" type="button">Files</button>
         <button id="subdivisionAgendaTab" class="subdivision-inner-tab" type="button">Today & Tomorrow</button>
         <button id="subdivisionPunchoutTab" class="subdivision-inner-tab" type="button">Outstanding Punchout</button>
         <button id="subdivisionInspectionTab" class="subdivision-inner-tab" type="button">Schedule Inspection</button>
@@ -2602,6 +2750,27 @@ button.teams-file-row:hover{border-color:#bdccdd}
       <div id="subdivisionLotsPanel">
         <div class="toolbar"><div><strong id="subdivisionName"></strong><div class="muted">Lots in this subdivision</div></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button id="aiImportLot" class="secondary" type="button">⬇ Import Lot from Teams</button><button id="addLot" class="primary" type="button">+ Add Lot</button></div></div>
         <div id="lotsGrid" class="grid"></div>
+      </div>
+
+
+      <div id="subdivisionFilesPanel" class="hidden">
+        <div class="subdivision-files-shell">
+          <div class="subdivision-files-head">
+            <div>
+              <strong id="subdivisionFilesName">Subdivision Files</strong>
+              <div id="subdivisionFilesBreadcrumb" class="muted">Choose a lot folder.</div>
+            </div>
+            <div class="subdivision-files-head-actions">
+              <button id="subdivisionFilesBack" class="secondary hidden" type="button">← Lot Folders</button>
+              <button id="subdivisionFilesUpload" class="primary hidden" type="button">+ Upload Files</button>
+              <input id="subdivisionFilesInput" type="file" multiple hidden>
+            </div>
+          </div>
+
+          <div id="subdivisionFilesNotice" class="notice hidden" style="margin:12px 0"></div>
+          <div id="subdivisionFileFolders" class="subdivision-file-folder-grid"></div>
+          <div id="subdivisionFileList" class="subdivision-file-list hidden"></div>
+        </div>
       </div>
 
       <div id="subdivisionAgendaPanel" class="hidden">
@@ -2859,6 +3028,7 @@ button.teams-file-row:hover{border-color:#bdccdd}
             <option value="punchout">Punchout</option>
             <option value="communication">Email / Text</option>
             <option value="interaction">Tabs / Buttons</option>
+            <option value="files">Files</option>
             <option value="admin">Admin</option>
           </select></label>
           <button id="adminActivityRefresh" class="secondary" type="button">↻ Refresh</button>
@@ -3284,7 +3454,7 @@ button.teams-file-row:hover{border-color:#bdccdd}
 <script>
 (async()=>{
 const $=id=>document.getElementById(id);
-const BOWENBUILDER_VERSION='1.1';
+const BOWENBUILDER_VERSION='1.2';
 const SB_URL='https://oztefiymckpyxiewgxtc.supabase.co';
 const SB_KEY='sb_publishable__ItoYGeHKEGTBFiE7JM74w_1F-qERVe';
 const db=window.supabase.createClient(SB_URL,SB_KEY);
@@ -3561,6 +3731,9 @@ async function resetCrewQr(){
 let subdivisions=[],lots=[],items=[],punchouts=[],punchoutPhotos=[],profiles=[],planCrewLinks=[],selectedPunchouts=new Set(),currentSubdivision=null,currentLot=null;
 let crewPlanAutoFilledValue='';
 let subdivisionViewMode='lots';
+let subdivisionFiles=[];
+let subdivisionFilesLotId=null;
+let subdivisionFilesLoading=false;
 let punchoutMarkupState={itemId:null,photoPath:null,baseImage:null,baseObjectUrl:'',ops:[],tool:'draw',drawing:null,bodyOverflow:''};
 let realtimeChannel=null;
 let presenceChannel=null;
@@ -4618,11 +4791,12 @@ function activityCategory(action){
   if(a.startsWith('punchout_'))return 'punchout';
   if(a.startsWith('email_')||a.startsWith('text_'))return 'communication';
   if(a==='ui_click')return 'interaction';
+  if(a.startsWith('subdivision_file_'))return 'files';
   if(a.startsWith('admin_'))return 'admin';
   return 'other';
 }
 function activityCategoryLabel(action){
-  return ({navigation:'Navigation',schedule:'Schedule',lot:'Lot',checklist:'Checklist',punchout:'Punchout',communication:'Email / Text',interaction:'Tabs / Buttons',admin:'Admin',other:'Activity'})[activityCategory(action)]||'Activity';
+  return ({navigation:'Navigation',schedule:'Schedule',lot:'Lot',checklist:'Checklist',punchout:'Punchout',communication:'Email / Text',interaction:'Tabs / Buttons',files:'Files',admin:'Admin',other:'Activity'})[activityCategory(action)]||'Activity';
 }
 function logBowenActivity(action,{label='',entityType='',entityId='',subdivisionId=null,lotId=null,screen='',metadata={},force=false}={}){
   if(!currentAuthUserId||!action)return;
@@ -5213,25 +5387,422 @@ function toggleSubdivisionInspectionMenu(forceOpen=null){
  btn.setAttribute('aria-expanded',willOpen?'true':'false');
 }
 
+
+function subdivisionFileSafeName(name){
+  return String(name||'file')
+    .replace(/[\/\\:*?"<>|]+/g,'-')
+    .replace(/\s+/g,' ')
+    .trim()
+    .slice(0,180)
+    || 'file';
+}
+
+function subdivisionFileSize(bytes){
+  const n=Number(bytes||0);
+  if(!Number.isFinite(n) || n<=0)return '';
+  if(n<1024)return `${n} B`;
+  if(n<1024*1024)return `${(n/1024).toFixed(n<10*1024?1:0)} KB`;
+  return `${(n/(1024*1024)).toFixed(n<10*1024*1024?1:0)} MB`;
+}
+
+function subdivisionFileIcon(file){
+  const mime=String(file?.mime_type||'').toLowerCase();
+  const name=String(file?.file_name||'').toLowerCase();
+  if(mime.startsWith('image/'))return '▧';
+  if(mime.includes('pdf') || name.endsWith('.pdf'))return 'PDF';
+  if(mime.includes('spreadsheet') || /\.(xlsx?|csv)$/i.test(name))return 'XL';
+  if(mime.includes('word') || /\.(docx?|rtf)$/i.test(name))return 'DOC';
+  return 'FILE';
+}
+
+function subdivisionFilesNotice(message='',kind=''){
+  const box=$('subdivisionFilesNotice');
+  if(!box)return;
+  box.textContent=message||'';
+  box.classList.toggle('hidden',!message);
+  box.style.color=kind==='error'?'#b42318':'';
+}
+
+async function loadSubdivisionFiles(){
+  if(!currentSubdivision || subdivisionFilesLoading)return;
+  subdivisionFilesLoading=true;
+  subdivisionFilesNotice('');
+
+  try{
+    const {data,error}=await db
+      .from('subdivision_files')
+      .select('id,subdivision_id,lot_id,file_name,storage_path,mime_type,size_bytes,uploaded_by,created_at,updated_at')
+      .eq('subdivision_id',currentSubdivision)
+      .order('created_at',{ascending:false});
+
+    if(error)throw error;
+    subdivisionFiles=data||[];
+    renderSubdivisionFiles();
+  }catch(err){
+    subdivisionFilesNotice(err?.message||'Could not load subdivision files.','error');
+  }finally{
+    subdivisionFilesLoading=false;
+  }
+}
+
+function renderSubdivisionFiles(){
+  const folders=$('subdivisionFileFolders');
+  const list=$('subdivisionFileList');
+  const back=$('subdivisionFilesBack');
+  const upload=$('subdivisionFilesUpload');
+  const breadcrumb=$('subdivisionFilesBreadcrumb');
+  const sub=subdivisions.find(s=>String(s.id)===String(currentSubdivision));
+
+  if(!folders||!list)return;
+
+  if(!subdivisionFilesLotId){
+    folders.classList.remove('hidden');
+    list.classList.add('hidden');
+    back?.classList.add('hidden');
+    upload?.classList.add('hidden');
+    if(breadcrumb)breadcrumb.textContent='Lot folders · access follows subdivision permissions';
+
+    const lotRows=lots
+      .filter(l=>String(l.subdivision_id)===String(currentSubdivision))
+      .slice()
+      .sort((a,b)=>String(a.lot_name||'').localeCompare(String(b.lot_name||''),undefined,{numeric:true}));
+
+    if(!lotRows.length){
+      folders.innerHTML='<div class="subdivision-file-empty">No lots are available in this subdivision yet.</div>';
+      return;
+    }
+
+    folders.innerHTML=lotRows.map(l=>{
+      const count=subdivisionFiles.filter(f=>String(f.lot_id)===String(l.id)).length;
+      return `<button class="subdivision-file-folder" type="button" data-subdivision-file-lot="${esc(l.id)}">
+        <span class="subdivision-file-folder-icon">📁</span>
+        <span class="subdivision-file-folder-copy">
+          <span class="subdivision-file-folder-name">${esc(l.lot_name||'Lot')}</span>
+          <span class="subdivision-file-folder-meta">${esc(l.address||l.plan_name||'Lot files')}</span>
+        </span>
+        <span class="subdivision-file-count">${count}</span>
+      </button>`;
+    }).join('');
+
+    folders.querySelectorAll('[data-subdivision-file-lot]').forEach(btn=>{
+      btn.onclick=()=>{
+        subdivisionFilesLotId=btn.dataset.subdivisionFileLot||null;
+        const lot=lots.find(l=>String(l.id)===String(subdivisionFilesLotId));
+        logBowenActivity('view_subdivision_file_folder',{
+          label:`Opened ${lot?.lot_name||'lot'} file folder`,
+          entityType:'lot',
+          entityId:subdivisionFilesLotId||'',
+          subdivisionId:currentSubdivision,
+          lotId:subdivisionFilesLotId,
+          force:true
+        });
+        renderSubdivisionFiles();
+      };
+    });
+    return;
+  }
+
+  folders.classList.add('hidden');
+  list.classList.remove('hidden');
+  back?.classList.remove('hidden');
+
+  const lot=lots.find(l=>String(l.id)===String(subdivisionFilesLotId));
+  if(breadcrumb){
+    breadcrumb.textContent=`${sub?.name||'Subdivision'} / ${lot?.lot_name||'Lot'}`;
+  }
+
+  const canManage=canEditSubdivision(currentSubdivision);
+  upload?.classList.toggle('hidden',!canManage);
+
+  const files=subdivisionFiles.filter(f=>String(f.lot_id)===String(subdivisionFilesLotId));
+
+  if(!files.length){
+    list.innerHTML=`<div class="subdivision-file-empty">
+      <strong>No files in ${esc(lot?.lot_name||'this lot')} yet.</strong>
+      <div style="margin-top:5px">${canManage?'Use Upload Files to add plans, reports, photos, PDFs, or other job documents.':'Files uploaded for this lot will appear here.'}</div>
+    </div>`;
+    return;
+  }
+
+  list.innerHTML=files.map(file=>{
+    const date=file.created_at
+      ? new Date(file.created_at).toLocaleString(undefined,{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'})
+      : '';
+    const meta=[subdivisionFileSize(file.size_bytes),date].filter(Boolean).join(' · ');
+    return `<div class="subdivision-file-row" data-subdivision-file-row="${esc(file.id)}">
+      <div class="subdivision-file-icon">${esc(subdivisionFileIcon(file))}</div>
+      <div class="subdivision-file-copy">
+        <div class="subdivision-file-name">${esc(file.file_name||'File')}</div>
+        <div class="subdivision-file-meta">${esc(meta||'BowenBuilder file')}</div>
+      </div>
+      <div class="subdivision-file-actions">
+        <button class="secondary" type="button" data-open-subdivision-file="${esc(file.id)}">Open</button>
+        <button class="secondary" type="button" data-share-subdivision-file="${esc(file.id)}">Share</button>
+        ${canManage?`<button class="secondary" type="button" data-delete-subdivision-file="${esc(file.id)}" style="color:#b42318">Delete</button>`:''}
+      </div>
+    </div>`;
+  }).join('');
+
+  list.querySelectorAll('[data-open-subdivision-file]').forEach(btn=>{
+    btn.onclick=()=>openSubdivisionFile(btn.dataset.openSubdivisionFile);
+  });
+  list.querySelectorAll('[data-share-subdivision-file]').forEach(btn=>{
+    btn.onclick=()=>shareSubdivisionFile(btn.dataset.shareSubdivisionFile);
+  });
+  list.querySelectorAll('[data-delete-subdivision-file]').forEach(btn=>{
+    btn.onclick=()=>deleteSubdivisionFile(btn.dataset.deleteSubdivisionFile);
+  });
+}
+
+async function signedSubdivisionFileUrl(file,expiresIn=3600){
+  if(!file?.storage_path)return '';
+  const {data,error}=await db.storage
+    .from('bowenbuilder-files')
+    .createSignedUrl(file.storage_path,expiresIn);
+  if(error)throw error;
+  return data?.signedUrl||'';
+}
+
+async function openSubdivisionFile(fileId){
+  const file=subdivisionFiles.find(f=>String(f.id)===String(fileId));
+  if(!file)return;
+
+  try{
+    const url=await signedSubdivisionFileUrl(file,3600);
+    if(!url)throw new Error('Could not create a secure file link.');
+
+    logBowenActivity('subdivision_file_opened',{
+      label:`Opened ${file.file_name||'file'}`,
+      entityType:'subdivision_file',
+      entityId:file.id,
+      subdivisionId:file.subdivision_id,
+      lotId:file.lot_id,
+      force:true
+    });
+
+    window.open(url,'_blank','noopener');
+  }catch(err){
+    alert(err?.message||'Could not open this file.');
+  }
+}
+
+async function shareSubdivisionFile(fileId){
+  const file=subdivisionFiles.find(f=>String(f.id)===String(fileId));
+  if(!file)return;
+
+  try{
+    const url=await signedSubdivisionFileUrl(file,3600);
+
+    let shared=false;
+    if(navigator.share && url){
+      try{
+        const response=await fetch(url);
+        if(response.ok){
+          const blob=await response.blob();
+          const nativeFile=new File(
+            [blob],
+            file.file_name||'BowenBuilder File',
+            {type:file.mime_type||blob.type||'application/octet-stream'}
+          );
+
+          if(!navigator.canShare || navigator.canShare({files:[nativeFile]})){
+            await navigator.share({
+              title:file.file_name||'BowenBuilder File',
+              files:[nativeFile]
+            });
+            shared=true;
+          }
+        }
+      }catch(err){
+        if(err?.name==='AbortError')return;
+      }
+    }
+
+    if(!shared){
+      if(navigator.clipboard?.writeText){
+        await navigator.clipboard.writeText(url);
+        alert('Secure file link copied. The link expires in 1 hour.');
+      }else{
+        window.open(url,'_blank','noopener');
+      }
+    }
+
+    logBowenActivity('subdivision_file_shared',{
+      label:`Shared ${file.file_name||'file'}`,
+      entityType:'subdivision_file',
+      entityId:file.id,
+      subdivisionId:file.subdivision_id,
+      lotId:file.lot_id,
+      force:true
+    });
+  }catch(err){
+    alert(err?.message||'Could not share this file.');
+  }
+}
+
+async function uploadSubdivisionFiles(fileList){
+  if(!currentSubdivision || !subdivisionFilesLotId)return;
+  if(!requireEditPermission(currentSubdivision))return;
+
+  const files=[...(fileList||[])];
+  if(!files.length)return;
+
+  const lot=lots.find(l=>String(l.id)===String(subdivisionFilesLotId));
+  if(!lot)return;
+
+  const uploadBtn=$('subdivisionFilesUpload');
+  const originalText=uploadBtn?.textContent||'+ Upload Files';
+  if(uploadBtn){
+    uploadBtn.disabled=true;
+    uploadBtn.textContent='Uploading…';
+  }
+
+  subdivisionFilesNotice(`Uploading ${files.length} file${files.length===1?'':'s'}…`);
+
+  try{
+    for(const file of files){
+      if(file.size>50*1024*1024){
+        throw new Error(`${file.name} is larger than the 50 MB file limit.`);
+      }
+
+      const id=globalThis.crypto?.randomUUID
+        ? globalThis.crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+      const safeName=subdivisionFileSafeName(file.name);
+      const path=`${currentSubdivision}/${subdivisionFilesLotId}/${id}/${safeName}`;
+
+      const {error:uploadError}=await db.storage
+        .from('bowenbuilder-files')
+        .upload(path,file,{
+          contentType:file.type||'application/octet-stream',
+          upsert:false
+        });
+
+      if(uploadError)throw uploadError;
+
+      const {data:row,error:rowError}=await db
+        .from('subdivision_files')
+        .insert({
+          id,
+          subdivision_id:currentSubdivision,
+          lot_id:subdivisionFilesLotId,
+          file_name:file.name,
+          storage_path:path,
+          mime_type:file.type||null,
+          size_bytes:file.size||null,
+          uploaded_by:currentAuthUserId||null
+        })
+        .select('id,subdivision_id,lot_id,file_name,storage_path,mime_type,size_bytes,uploaded_by,created_at,updated_at')
+        .single();
+
+      if(rowError){
+        await db.storage.from('bowenbuilder-files').remove([path]);
+        throw rowError;
+      }
+
+      if(row)subdivisionFiles.unshift(row);
+
+      logBowenActivity('subdivision_file_uploaded',{
+        label:`Uploaded ${file.name} to ${lot.lot_name||'lot'}`,
+        entityType:'subdivision_file',
+        entityId:id,
+        subdivisionId:currentSubdivision,
+        lotId:subdivisionFilesLotId,
+        force:true,
+        metadata:{size_bytes:file.size||0,mime_type:file.type||''}
+      });
+    }
+
+    subdivisionFilesNotice(`${files.length} file${files.length===1?'':'s'} uploaded.`);
+    renderSubdivisionFiles();
+  }catch(err){
+    subdivisionFilesNotice(err?.message||'File upload failed.','error');
+  }finally{
+    if(uploadBtn){
+      uploadBtn.disabled=false;
+      uploadBtn.textContent=originalText;
+    }
+    if($('subdivisionFilesInput'))$('subdivisionFilesInput').value='';
+  }
+}
+
+async function deleteSubdivisionFile(fileId){
+  const file=subdivisionFiles.find(f=>String(f.id)===String(fileId));
+  if(!file)return;
+  if(!requireEditPermission(file.subdivision_id))return;
+
+  if(!confirm(`Delete "${file.file_name}" from this lot folder?`))return;
+
+  try{
+    const {error:storageError}=await db.storage
+      .from('bowenbuilder-files')
+      .remove([file.storage_path]);
+
+    if(storageError)throw storageError;
+
+    const {error:rowError}=await db
+      .from('subdivision_files')
+      .delete()
+      .eq('id',file.id);
+
+    if(rowError)throw rowError;
+
+    subdivisionFiles=subdivisionFiles.filter(f=>String(f.id)!==String(file.id));
+
+    logBowenActivity('subdivision_file_deleted',{
+      label:`Deleted ${file.file_name||'file'}`,
+      entityType:'subdivision_file',
+      entityId:file.id,
+      subdivisionId:file.subdivision_id,
+      lotId:file.lot_id,
+      force:true
+    });
+
+    renderSubdivisionFiles();
+  }catch(err){
+    alert(err?.message||'Could not delete this file.');
+  }
+}
+
 function showSubdivisionPanel(mode='lots'){
- subdivisionViewMode=['agenda','punchout','inspection'].includes(mode)?mode:'lots';
+ subdivisionViewMode=['files','agenda','punchout','inspection'].includes(mode)?mode:'lots';
 
  const lotsMode=subdivisionViewMode==='lots';
+ const filesMode=subdivisionViewMode==='files';
  const agendaMode=subdivisionViewMode==='agenda';
  const punchoutMode=subdivisionViewMode==='punchout';
  const inspectionMode=subdivisionViewMode==='inspection';
 
  $('subdivisionLotsPanel').classList.toggle('hidden',!lotsMode);
+ $('subdivisionFilesPanel').classList.toggle('hidden',!filesMode);
  $('subdivisionAgendaPanel').classList.toggle('hidden',!agendaMode);
  $('subdivisionPunchoutPanel').classList.toggle('hidden',!punchoutMode);
  $('subdivisionInspectionPanel').classList.toggle('hidden',!inspectionMode);
 
  $('subdivisionLotsTab').classList.toggle('active',lotsMode);
+ $('subdivisionFilesTab').classList.toggle('active',filesMode);
  $('subdivisionAgendaTab').classList.toggle('active',agendaMode);
  $('subdivisionPunchoutTab').classList.toggle('active',punchoutMode);
  $('subdivisionInspectionTab').classList.toggle('active',inspectionMode);
 
  toggleSubdivisionInspectionMenu(false);
+
+ if(filesMode){
+   const sub=subdivisions.find(s=>String(s.id)===String(currentSubdivision));
+   $('subdivisionFilesName').textContent=`${sub?.name||'Subdivision'} Files`;
+   logBowenActivity('view_subdivision_files',{
+     label:`Opened Files${sub?.name?' · '+sub.name:''}`,
+     entityType:'subdivision',
+     entityId:currentSubdivision||'',
+     subdivisionId:currentSubdivision||null,
+     force:true
+   });
+   loadSubdivisionFiles();
+ }else{
+   subdivisionFilesLotId=null;
+ }
+
  if(agendaMode)renderSubdivisionAgenda();
  if(punchoutMode)renderSubdivisionPunchout();
  if(inspectionMode)renderSubdivisionInspectionMenu();
@@ -5247,6 +5818,7 @@ function showLots(){
  $('heroSub').textContent='Lots and schedules in this subdivision.';updateHeroSiteMap(s);
  $('subdivisionName').textContent=s?.name||'';
  $('subdivisionAgendaName').textContent=s?.name||'';
+ if($('subdivisionFilesName'))$('subdivisionFilesName').textContent=`${s?.name||'Subdivision'} Files`;
  if($('subdivisionPunchoutName'))$('subdivisionPunchoutName').textContent=s?.name||'';
  if($('subdivisionInspectionName'))$('subdivisionInspectionName').textContent=s?.name||'';
 
@@ -9974,9 +10546,25 @@ initPunchoutMarkupEditor();
 $('logout').onclick=async()=>{logBowenActivity('app_logout',{label:'Signed out of BowenBuilder',screen:'App',force:true});if(bowenBuilderVersionWatchTimer)clearInterval(bowenBuilderVersionWatchTimer);await updateMyLastSeen();stopAdminActivityLogTimer();if(lastSeenHeartbeatTimer)clearInterval(lastSeenHeartbeatTimer);if(adminPresenceRenderTimer)clearInterval(adminPresenceRenderTimer);if(realtimeChannel)await db.removeChannel(realtimeChannel);if(presenceChannel)await db.removeChannel(presenceChannel);if(appPresenceChannel)await db.removeChannel(appPresenceChannel);if(adminActivityChannel)await db.removeChannel(adminActivityChannel);await db.auth.signOut();location.reload()};
 $('backToSubs').onclick=showSubs;
 $('subdivisionLotsTab').onclick=()=>showSubdivisionPanel('lots');
+$('subdivisionFilesTab').onclick=()=>showSubdivisionPanel('files');
 $('subdivisionAgendaTab').onclick=()=>showSubdivisionPanel('agenda');
 $('subdivisionPunchoutTab').onclick=()=>showSubdivisionPanel('punchout');
 $('subdivisionInspectionTab').onclick=()=>showSubdivisionPanel('inspection');
+
+$('subdivisionFilesBack').onclick=()=>{
+  subdivisionFilesLotId=null;
+  renderSubdivisionFiles();
+};
+
+$('subdivisionFilesUpload').onclick=()=>{
+  if(!subdivisionFilesLotId)return;
+  if(!requireEditPermission(currentSubdivision))return;
+  $('subdivisionFilesInput').click();
+};
+
+$('subdivisionFilesInput').onchange=e=>{
+  uploadSubdivisionFiles(e.target.files);
+};
 $('subdivisionInspectionDropdownButton').onclick=e=>{e.stopPropagation();toggleSubdivisionInspectionMenu()};
 document.addEventListener('click',e=>{
  const wrap=e.target.closest?.('.subdivision-inspection-dropdown-wrap');
@@ -10944,7 +11532,7 @@ try{
 </script>
 
 <div id="bbBuildVersion" style="text-align:center;color:#8a96a8;font-size:10px;padding:10px 8px 18px">
-  BowenBuilder 1.1</div>
+  BowenBuilder 1.2</div>
 
 
 
