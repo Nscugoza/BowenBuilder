@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="1.8">
+<meta name="bowenbuilder-version" content="1.9">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -2964,6 +2964,30 @@ button.teams-file-row:hover{border-color:#bdccdd}
   }
 }
 
+
+.subdivision-file-root-card{
+  position:relative;
+  min-width:0;
+}
+.subdivision-file-root-card .subdivision-file-folder{
+  height:100%;
+}
+.subdivision-file-root-delete{
+  position:absolute;
+  top:7px;
+  right:7px;
+  z-index:2;
+  border:0;
+  border-radius:9px;
+  padding:5px 7px;
+  background:rgba(255,255,255,.94);
+  color:#b42318;
+  font-size:11px;
+  font-weight:850;
+  box-shadow:0 2px 8px rgba(0,0,0,.08);
+  cursor:pointer;
+}
+
 </style>
 </head>
 <body>
@@ -3823,7 +3847,7 @@ button.teams-file-row:hover{border-color:#bdccdd}
 <script>
 (async()=>{
 const $=id=>document.getElementById(id);
-const BOWENBUILDER_VERSION='1.8';
+const BOWENBUILDER_VERSION='1.9';
 const SB_URL='https://oztefiymckpyxiewgxtc.supabase.co';
 const SB_KEY='sb_publishable__ItoYGeHKEGTBFiE7JM74w_1F-qERVe';
 const db=window.supabase.createClient(SB_URL,SB_KEY);
@@ -3888,17 +3912,27 @@ function renderGuestFilePortal(){
     root.innerHTML=heading+`
       <div class="crew-card">
         <h2>Subdivisions</h2>
-        <div class="muted" style="margin-bottom:12px">Choose a subdivision to view its lot folders.</div>
+        <div class="muted" style="margin-bottom:12px">Choose a subdivision to view its file folders.</div>
         <div class="guest-portal-grid">
           ${subs.map(sub=>{
             const lotCount=guestLots.filter(l=>String(l.subdivision_id)===String(sub.id)).length;
+            const sharedCount=guestFolders.filter(f=>
+              String(f.subdivision_id)===String(sub.id) &&
+              !f.lot_id &&
+              !f.parent_folder_id
+            ).length;
+            const detail=[
+              `${lotCount} lot${lotCount===1?'':'s'}`,
+              sharedCount?`${sharedCount} shared folder${sharedCount===1?'':'s'}`:''
+            ].filter(Boolean).join(' · ');
             return `<button class="guest-portal-folder" type="button" data-guest-sub="${esc(sub.id)}">
               <span class="guest-portal-folder-icon">📁</span>
-              <span class="guest-portal-folder-copy"><strong>${esc(sub.name)}</strong><small>${lotCount} lot${lotCount===1?'':'s'}</small></span>
+              <span class="guest-portal-folder-copy"><strong>${esc(sub.name)}</strong><small>${esc(detail)}</small></span>
             </button>`;
           }).join('')||'<div class="muted">No subdivision access is assigned to this guest link.</div>'}
         </div>
       </div>`;
+
     root.querySelectorAll('[data-guest-sub]').forEach(btn=>{
       btn.onclick=()=>{
         guestPortalSubdivisionId=btn.dataset.guestSub;
@@ -3912,18 +3946,45 @@ function renderGuestFilePortal(){
 
   const sub=subs.find(s=>String(s.id)===String(guestPortalSubdivisionId));
 
-  if(!guestPortalLotId){
+  // Subdivision main Files screen: shared folders + automatic lot folders.
+  if(!guestPortalLotId && !guestPortalFolderId){
     const lotRows=guestLots
       .filter(l=>String(l.subdivision_id)===String(guestPortalSubdivisionId))
       .slice()
       .sort((a,b)=>String(a.lot_name||'').localeCompare(String(b.lot_name||''),undefined,{numeric:true}));
 
+    const sharedFolders=guestFolders
+      .filter(f=>
+        String(f.subdivision_id)===String(guestPortalSubdivisionId) &&
+        !f.lot_id &&
+        !f.parent_folder_id
+      )
+      .slice()
+      .sort((a,b)=>String(a.name||'').localeCompare(String(b.name||'')));
+
     root.innerHTML=heading+`
       <div class="crew-card">
         <button class="secondary guest-portal-back" type="button" data-guest-back="subdivisions">← Subdivisions</button>
         <h2>${esc(sub?.name||'Subdivision')}</h2>
-        <div class="muted" style="margin-bottom:12px">Choose a lot folder.</div>
+        <div class="muted" style="margin-bottom:12px">Choose a subdivision folder or lot folder.</div>
         <div class="guest-portal-grid">
+          ${sharedFolders.map(folder=>{
+            const directFiles=guestFiles.filter(f=>
+              !f.lot_id && String(f.folder_id||'')===String(folder.id)
+            ).length;
+            const directFolders=guestFolders.filter(f=>
+              !f.lot_id && String(f.parent_folder_id||'')===String(folder.id)
+            ).length;
+            const count=directFiles+directFolders;
+            return `<button class="guest-portal-folder" type="button" data-guest-shared-folder="${esc(folder.id)}">
+              <span class="guest-portal-folder-icon">📁</span>
+              <span class="guest-portal-folder-copy">
+                <strong>${esc(folder.name)}</strong>
+                <small>Subdivision folder · ${count} item${count===1?'':'s'}</small>
+              </span>
+            </button>`;
+          }).join('')}
+
           ${lotRows.map(lot=>{
             const fileCount=guestFiles.filter(f=>String(f.lot_id)===String(lot.id)).length;
             return `<button class="guest-portal-folder" type="button" data-guest-lot="${esc(lot.id)}">
@@ -3933,7 +3994,9 @@ function renderGuestFilePortal(){
                 <small>${esc(lot.address||lot.plan_name||'Lot files')} · ${fileCount} file${fileCount===1?'':'s'}</small>
               </span>
             </button>`;
-          }).join('')||'<div class="muted">No lots are available.</div>'}
+          }).join('')}
+
+          ${(!sharedFolders.length&&!lotRows.length)?'<div class="muted">No file folders are available.</div>':''}
         </div>
       </div>`;
 
@@ -3942,6 +4005,14 @@ function renderGuestFilePortal(){
       guestPortalLotId=null;
       guestPortalFolderId=null;
       renderGuestFilePortal();
+    });
+
+    root.querySelectorAll('[data-guest-shared-folder]').forEach(btn=>{
+      btn.onclick=()=>{
+        guestPortalLotId=null;
+        guestPortalFolderId=btn.dataset.guestSharedFolder;
+        renderGuestFilePortal();
+      };
     });
 
     root.querySelectorAll('[data-guest-lot]').forEach(btn=>{
@@ -3954,22 +4025,27 @@ function renderGuestFilePortal(){
     return;
   }
 
-  const lot=guestLots.find(l=>String(l.id)===String(guestPortalLotId));
+  const lot=guestPortalLotId
+    ? guestLots.find(l=>String(l.id)===String(guestPortalLotId))
+    : null;
+
   const currentFolder=guestPortalFolderId
     ? guestFolders.find(f=>String(f.id)===String(guestPortalFolderId))
     : null;
 
   const parentKey=String(guestPortalFolderId||'');
+  const scopeLot=String(guestPortalLotId||'');
+
   const folders=guestFolders
     .filter(f=>
-      String(f.lot_id)===String(guestPortalLotId) &&
+      String(f.lot_id||'')===scopeLot &&
       String(f.parent_folder_id||'')===parentKey
     )
     .slice()
     .sort((a,b)=>String(a.name||'').localeCompare(String(b.name||'')));
 
   const files=guestFiles.filter(f=>
-    String(f.lot_id)===String(guestPortalLotId) &&
+    String(f.lot_id||'')===scopeLot &&
     String(f.folder_id||'')===parentKey
   );
 
@@ -3986,14 +4062,17 @@ function renderGuestFilePortal(){
     }
   }
 
+  const title=lot?.lot_name || folderPath[0]?.name || 'Subdivision Files';
+  const detail=[
+    lot?.address||lot?.plan_name||sub?.name||'',
+    ...(lot?folderPath.map(f=>f.name):folderPath.slice(1).map(f=>f.name))
+  ].filter(Boolean).join(' / ');
+
   root.innerHTML=heading+`
     <div class="crew-card">
-      <button class="secondary guest-portal-back" type="button" data-guest-back="${guestPortalFolderId?'folder':'lots'}">${guestPortalFolderId?'← Up One Folder':'← Lot Folders'}</button>
-      <h2>${esc(lot?.lot_name||'Lot Files')}</h2>
-      <div class="muted">${esc([
-        lot?.address||lot?.plan_name||sub?.name||'',
-        ...folderPath.map(f=>f.name)
-      ].filter(Boolean).join(' / '))}</div>
+      <button class="secondary guest-portal-back" type="button" data-guest-back="${guestPortalFolderId?'folder':'lots'}">${guestPortalFolderId?'← Up One Folder':'← Main Files'}</button>
+      <h2>${esc(title)}</h2>
+      <div class="muted">${esc(detail)}</div>
 
       <div style="margin-top:12px">
         ${folders.map(folder=>`
@@ -4032,6 +4111,9 @@ function renderGuestFilePortal(){
 
   root.querySelector('[data-guest-back="folder"]')?.addEventListener('click',()=>{
     guestPortalFolderId=currentFolder?.parent_folder_id||null;
+
+    // Leaving a subdivision-level root folder returns to the subdivision
+    // main Files screen. Lot folders remain in their lot root.
     renderGuestFilePortal();
   });
 
@@ -6101,7 +6183,7 @@ function subdivisionFolderChildCount(folderId){
 }
 
 async function createSubdivisionFileFolder(){
-  if(!currentSubdivision || !subdivisionFilesLotId)return;
+  if(!currentSubdivision)return;
   if(!requireEditPermission(currentSubdivision))return;
 
   const name=prompt('Folder name:','');
@@ -6116,7 +6198,7 @@ async function createSubdivisionFileFolder(){
       .from('subdivision_file_folders')
       .insert({
         subdivision_id:currentSubdivision,
-        lot_id:subdivisionFilesLotId,
+        lot_id:subdivisionFilesLotId||null,
         parent_folder_id:subdivisionFilesFolderId||null,
         name:clean,
         created_by:currentAuthUserId||null
@@ -6128,21 +6210,33 @@ async function createSubdivisionFileFolder(){
     if(data)subdivisionFileFolders.push(data);
 
     const lot=lots.find(l=>String(l.id)===String(subdivisionFilesLotId));
+    const parent=currentSubdivisionFileFolder();
+    const locationLabel=lot?.lot_name
+      || parent?.name
+      || subdivisions.find(s=>String(s.id)===String(currentSubdivision))?.name
+      || 'subdivision';
+
     logBowenActivity('subdivision_file_folder_created',{
-      label:`Created folder ${clean} in ${lot?.lot_name||'lot'}`,
+      label:`Created folder ${clean} in ${locationLabel}`,
       entityType:'subdivision_file_folder',
       entityId:data?.id||'',
       subdivisionId:currentSubdivision,
-      lotId:subdivisionFilesLotId,
+      lotId:subdivisionFilesLotId||null,
       force:true,
-      metadata:{parent_folder_id:subdivisionFilesFolderId||null}
+      metadata:{
+        parent_folder_id:subdivisionFilesFolderId||null,
+        subdivision_root:!subdivisionFilesLotId
+      }
     });
 
     subdivisionFilesNotice(`Folder "${clean}" created.`);
     renderSubdivisionFiles();
   }catch(err){
     const msg=String(err?.message||'Could not create folder.');
-    alert(msg.includes('duplicate')?'A folder with that name already exists here.':msg);
+    alert(msg.toLowerCase().includes('duplicate') || msg.toLowerCase().includes('unique')
+      ? 'A folder with that name already exists here.'
+      : msg
+    );
   }
 }
 
@@ -6195,7 +6289,7 @@ async function deleteSubdivisionFileFolder(folderId){
 }
 
 function renderSubdivisionFiles(){
-  const lotFolders=$('subdivisionFileFolders');
+  const rootGrid=$('subdivisionFileFolders');
   const list=$('subdivisionFileList');
   const back=$('subdivisionFilesBack');
   const createFolder=$('subdivisionFilesCreateFolder');
@@ -6203,31 +6297,56 @@ function renderSubdivisionFiles(){
   const upload=$('subdivisionFilesUpload');
   const breadcrumb=$('subdivisionFilesBreadcrumb');
   const sub=subdivisions.find(s=>String(s.id)===String(currentSubdivision));
+  const canManage=canEditSubdivision(currentSubdivision);
 
-  if(!lotFolders||!list)return;
+  if(!rootGrid||!list)return;
 
-  // Top level: automatic lot folders.
-  if(!subdivisionFilesLotId){
-    subdivisionFilesFolderId=null;
-    lotFolders.classList.remove('hidden');
+  const atSubdivisionRoot=!subdivisionFilesLotId && !subdivisionFilesFolderId;
+
+  // Main Files screen: custom subdivision folders + automatic lot folders.
+  if(atSubdivisionRoot){
+    rootGrid.classList.remove('hidden');
     list.classList.add('hidden');
+
     back?.classList.add('hidden');
-    createFolder?.classList.add('hidden');
+    createFolder?.classList.toggle('hidden',!canManage);
     teamsImport?.classList.add('hidden');
     upload?.classList.add('hidden');
-    if(breadcrumb)breadcrumb.textContent='Lot folders · access follows subdivision permissions';
+
+    if(breadcrumb){
+      breadcrumb.textContent='Subdivision folders and lot folders · access follows subdivision permissions';
+    }
+
+    const sharedFolders=subdivisionFileFolders
+      .filter(f=>
+        !f.lot_id &&
+        !f.parent_folder_id &&
+        String(f.subdivision_id)===String(currentSubdivision)
+      )
+      .slice()
+      .sort((a,b)=>String(a.name||'').localeCompare(String(b.name||'')));
 
     const lotRows=lots
       .filter(l=>String(l.subdivision_id)===String(currentSubdivision))
       .slice()
       .sort((a,b)=>String(a.lot_name||'').localeCompare(String(b.lot_name||''),undefined,{numeric:true}));
 
-    if(!lotRows.length){
-      lotFolders.innerHTML='<div class="subdivision-file-empty">No lots are available in this subdivision yet.</div>';
-      return;
-    }
+    const sharedHtml=sharedFolders.map(folder=>{
+      const count=subdivisionFolderChildCount(folder.id);
+      return `<div class="subdivision-file-root-card">
+        <button class="subdivision-file-folder" type="button" data-open-root-subdivision-folder="${esc(folder.id)}">
+          <span class="subdivision-file-folder-icon">📁</span>
+          <span class="subdivision-file-folder-copy">
+            <span class="subdivision-file-folder-name">${esc(folder.name)}</span>
+            <span class="subdivision-file-folder-meta">Subdivision folder · ${count} item${count===1?'':'s'}</span>
+          </span>
+          <span class="subdivision-file-count">${count}</span>
+        </button>
+        ${canManage?`<button class="subdivision-file-root-delete" type="button" data-delete-root-subdivision-folder="${esc(folder.id)}">Delete</button>`:''}
+      </div>`;
+    }).join('');
 
-    lotFolders.innerHTML=lotRows.map(l=>{
+    const lotsHtml=lotRows.map(l=>{
       const fileCount=subdivisionFiles.filter(f=>String(f.lot_id)===String(l.id)).length;
       const folderCount=subdivisionFileFolders.filter(f=>String(f.lot_id)===String(l.id)).length;
       const total=fileCount+folderCount;
@@ -6241,7 +6360,37 @@ function renderSubdivisionFiles(){
       </button>`;
     }).join('');
 
-    lotFolders.querySelectorAll('[data-subdivision-file-lot]').forEach(btn=>{
+    rootGrid.innerHTML=sharedHtml+lotsHtml || '<div class="subdivision-file-empty">No folders are available yet.</div>';
+
+    rootGrid.querySelectorAll('[data-open-root-subdivision-folder]').forEach(btn=>{
+      btn.onclick=()=>{
+        const folder=subdivisionFileFolders.find(
+          f=>String(f.id)===String(btn.dataset.openRootSubdivisionFolder)
+        );
+        if(!folder)return;
+        subdivisionFilesLotId=null;
+        subdivisionFilesFolderId=folder.id;
+        logBowenActivity('view_subdivision_file_folder',{
+          label:`Opened subdivision folder ${folder.name}`,
+          entityType:'subdivision_file_folder',
+          entityId:folder.id,
+          subdivisionId:currentSubdivision,
+          lotId:null,
+          force:true
+        });
+        renderSubdivisionFiles();
+      };
+    });
+
+    rootGrid.querySelectorAll('[data-delete-root-subdivision-folder]').forEach(btn=>{
+      btn.onclick=e=>{
+        e.preventDefault();
+        e.stopPropagation();
+        deleteSubdivisionFileFolder(btn.dataset.deleteRootSubdivisionFolder);
+      };
+    });
+
+    rootGrid.querySelectorAll('[data-subdivision-file-lot]').forEach(btn=>{
       btn.onclick=()=>{
         subdivisionFilesLotId=btn.dataset.subdivisionFileLot||null;
         subdivisionFilesFolderId=null;
@@ -6257,44 +6406,54 @@ function renderSubdivisionFiles(){
         renderSubdivisionFiles();
       };
     });
+
     return;
   }
 
-  // Inside a lot folder (root or nested).
-  lotFolders.classList.add('hidden');
+  // Inside either a lot folder or a custom subdivision folder.
+  rootGrid.classList.add('hidden');
   list.classList.remove('hidden');
   back?.classList.remove('hidden');
 
   const lot=lots.find(l=>String(l.id)===String(subdivisionFilesLotId));
   const folderPath=subdivisionFileFolderPath(subdivisionFilesFolderId);
+  const currentFolder=currentSubdivisionFileFolder();
+
   if(breadcrumb){
     breadcrumb.textContent=[
       sub?.name||'Subdivision',
-      lot?.lot_name||'Lot',
+      lot?.lot_name||null,
       ...folderPath.map(f=>f.name)
-    ].join(' / ');
+    ].filter(Boolean).join(' / ');
   }
 
   if(back){
-    back.textContent=subdivisionFilesFolderId?'← Up One Folder':'← Lot Folders';
+    if(subdivisionFilesFolderId){
+      back.textContent=currentFolder?.parent_folder_id
+        ? '← Up One Folder'
+        : (subdivisionFilesLotId?'← Lot Folder':'← Main Files');
+    }else{
+      back.textContent='← Lot Folders';
+    }
   }
 
-  const canManage=canEditSubdivision(currentSubdivision);
   createFolder?.classList.toggle('hidden',!canManage);
   teamsImport?.classList.toggle('hidden',!canManage);
   upload?.classList.toggle('hidden',!canManage);
 
   const currentParent=String(subdivisionFilesFolderId||'');
+  const scopeLot=String(subdivisionFilesLotId||'');
+
   const childFolders=subdivisionFileFolders
     .filter(f=>
-      String(f.lot_id)===String(subdivisionFilesLotId) &&
+      String(f.lot_id||'')===scopeLot &&
       String(f.parent_folder_id||'')===currentParent
     )
     .slice()
     .sort((a,b)=>String(a.name||'').localeCompare(String(b.name||'')));
 
   const files=subdivisionFiles.filter(f=>
-    String(f.lot_id)===String(subdivisionFilesLotId) &&
+    String(f.lot_id||'')===scopeLot &&
     String(f.folder_id||'')===currentParent
   );
 
@@ -6354,7 +6513,7 @@ function renderSubdivisionFiles(){
         entityType:'subdivision_file_folder',
         entityId:folder.id,
         subdivisionId:folder.subdivision_id,
-        lotId:folder.lot_id,
+        lotId:folder.lot_id||null,
         force:true
       });
       renderSubdivisionFiles();
@@ -6364,7 +6523,6 @@ function renderSubdivisionFiles(){
   list.querySelectorAll('[data-delete-subdivision-folder]').forEach(btn=>{
     btn.onclick=()=>deleteSubdivisionFileFolder(btn.dataset.deleteSubdivisionFolder);
   });
-
   list.querySelectorAll('[data-open-subdivision-file]').forEach(btn=>{
     btn.onclick=()=>openSubdivisionFile(btn.dataset.openSubdivisionFile);
   });
@@ -6464,15 +6622,16 @@ async function shareSubdivisionFile(fileId){
 
 
 async function importOneTeamsFileToSubdivisionSpace(selection){
-  if(!currentSubdivision || !subdivisionFilesLotId){
-    throw new Error('Open a lot Files folder before importing from Teams.');
+  if(!currentSubdivision || (!subdivisionFilesLotId && !subdivisionFilesFolderId)){
+    throw new Error('Open a BowenBuilder Files folder before importing from Teams.');
   }
   if(!canEditSubdivision(currentSubdivision)){
     throw new Error('You do not have permission to add files to this subdivision.');
   }
 
   const lot=lots.find(l=>String(l.id)===String(subdivisionFilesLotId));
-  if(!lot)throw new Error('The selected BowenBuilder lot could not be found.');
+  const currentFolder=currentSubdivisionFileFolder();
+  const destinationLabel=lot?.lot_name||currentFolder?.name||'subdivision folder';
 
   const driveId=String(selection?.driveId||'').trim();
   const itemId=String(selection?.itemId||'').trim();
@@ -6486,8 +6645,6 @@ async function importOneTeamsFileToSubdivisionSpace(selection){
     throw new Error(`${cleanName} is larger than the 50 MB BowenBuilder file limit.`);
   }
 
-  // Refresh metadata before importing so the final filename, size and MIME
-  // type match the current Microsoft Teams file.
   const meta=await microsoftGraphJson(
     `/drives/${encodeURIComponent(driveId)}/items/${encodeURIComponent(itemId)}?$select=id,name,size,file,webUrl`
   );
@@ -6529,7 +6686,8 @@ async function importOneTeamsFileToSubdivisionSpace(selection){
     : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
   const safeName=subdivisionFileSafeName(finalName);
-  const path=`${currentSubdivision}/${subdivisionFilesLotId}/${subdivisionFilesFolderId||'root'}/${id}/${safeName}`;
+  const storageScope=subdivisionFilesLotId||'shared';
+  const path=`${currentSubdivision}/${storageScope}/${subdivisionFilesFolderId||'root'}/${id}/${safeName}`;
   const mimeType=String(meta?.file?.mimeType||selection?.mimeType||blob.type||'application/octet-stream');
 
   const {error:uploadError}=await db.storage
@@ -6546,7 +6704,7 @@ async function importOneTeamsFileToSubdivisionSpace(selection){
     .insert({
       id,
       subdivision_id:currentSubdivision,
-      lot_id:subdivisionFilesLotId,
+      lot_id:subdivisionFilesLotId||null,
       folder_id:subdivisionFilesFolderId||null,
       file_name:finalName,
       storage_path:path,
@@ -6565,17 +6723,18 @@ async function importOneTeamsFileToSubdivisionSpace(selection){
   if(row)subdivisionFiles.unshift(row);
 
   logBowenActivity('subdivision_file_imported_from_teams',{
-    label:`Imported ${finalName} from Teams to ${lot.lot_name||'lot'}`,
+    label:`Imported ${finalName} from Teams to ${destinationLabel}`,
     entityType:'subdivision_file',
     entityId:id,
     subdivisionId:currentSubdivision,
-    lotId:subdivisionFilesLotId,
+    lotId:subdivisionFilesLotId||null,
     force:true,
     metadata:{
       source:'microsoft_teams',
       size_bytes:blob.size||size||0,
       mime_type:mimeType,
-      folder_id:subdivisionFilesFolderId||null
+      folder_id:subdivisionFilesFolderId||null,
+      subdivision_root:!subdivisionFilesLotId
     }
   });
 
@@ -6669,20 +6828,22 @@ async function importTeamsFileToSubdivisionSpace(itemId,name,webUrl=''){
 }
 
 function openSubdivisionTeamsFilePicker(){
-  if(!currentSubdivision || !subdivisionFilesLotId)return;
+  if(!currentSubdivision || (!subdivisionFilesLotId && !subdivisionFilesFolderId))return;
   if(!requireEditPermission(currentSubdivision))return;
   openLotTeamsDocumentPicker('subdivision_file_import');
 }
 
 async function uploadSubdivisionFiles(fileList){
-  if(!currentSubdivision || !subdivisionFilesLotId)return;
+  if(!currentSubdivision)return;
+  if(!subdivisionFilesLotId && !subdivisionFilesFolderId)return;
   if(!requireEditPermission(currentSubdivision))return;
 
   const files=[...(fileList||[])];
   if(!files.length)return;
 
   const lot=lots.find(l=>String(l.id)===String(subdivisionFilesLotId));
-  if(!lot)return;
+  const currentFolder=currentSubdivisionFileFolder();
+  const destinationLabel=lot?.lot_name||currentFolder?.name||'subdivision folder';
 
   const uploadBtn=$('subdivisionFilesUpload');
   const originalText=uploadBtn?.textContent||'+ Upload Files';
@@ -6704,7 +6865,8 @@ async function uploadSubdivisionFiles(fileList){
         : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
       const safeName=subdivisionFileSafeName(file.name);
-      const path=`${currentSubdivision}/${subdivisionFilesLotId}/${subdivisionFilesFolderId||'root'}/${id}/${safeName}`;
+      const storageScope=subdivisionFilesLotId||'shared';
+      const path=`${currentSubdivision}/${storageScope}/${subdivisionFilesFolderId||'root'}/${id}/${safeName}`;
 
       const {error:uploadError}=await db.storage
         .from('bowenbuilder-files')
@@ -6720,7 +6882,7 @@ async function uploadSubdivisionFiles(fileList){
         .insert({
           id,
           subdivision_id:currentSubdivision,
-          lot_id:subdivisionFilesLotId,
+          lot_id:subdivisionFilesLotId||null,
           folder_id:subdivisionFilesFolderId||null,
           file_name:file.name,
           storage_path:path,
@@ -6739,13 +6901,18 @@ async function uploadSubdivisionFiles(fileList){
       if(row)subdivisionFiles.unshift(row);
 
       logBowenActivity('subdivision_file_uploaded',{
-        label:`Uploaded ${file.name} to ${lot.lot_name||'lot'}`,
+        label:`Uploaded ${file.name} to ${destinationLabel}`,
         entityType:'subdivision_file',
         entityId:id,
         subdivisionId:currentSubdivision,
-        lotId:subdivisionFilesLotId,
+        lotId:subdivisionFilesLotId||null,
         force:true,
-        metadata:{size_bytes:file.size||0,mime_type:file.type||'',folder_id:subdivisionFilesFolderId||null}
+        metadata:{
+          size_bytes:file.size||0,
+          mime_type:file.type||'',
+          folder_id:subdivisionFilesFolderId||null,
+          subdivision_root:!subdivisionFilesLotId
+        }
       });
     }
 
@@ -12226,6 +12393,12 @@ $('subdivisionFilesBack').onclick=()=>{
   if(subdivisionFilesFolderId){
     const current=currentSubdivisionFileFolder();
     subdivisionFilesFolderId=current?.parent_folder_id||null;
+
+    // A subdivision-level root folder has no lot context, so when its parent
+    // becomes null we are back on the main Files screen.
+    if(!subdivisionFilesLotId && !subdivisionFilesFolderId){
+      subdivisionFilesLotId=null;
+    }
   }else{
     subdivisionFilesLotId=null;
     subdivisionFilesFolderId=null;
@@ -13271,7 +13444,7 @@ try{
 </script>
 
 <div id="bbBuildVersion" style="text-align:center;color:#8a96a8;font-size:10px;padding:10px 8px 18px">
-  BowenBuilder 1.8</div>
+  BowenBuilder 1.9</div>
 
 
 
