@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="1.3">
+<meta name="bowenbuilder-version" content="1.4">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -2879,6 +2879,57 @@ button.teams-file-row:hover{border-color:#bdccdd}
   .guest-portal-file-actions a{flex:1 1 auto;text-align:center}
 }
 
+
+.guest-access-expiration{
+  display:grid;
+  grid-template-columns:minmax(180px,1fr) minmax(220px,1fr);
+  gap:10px;
+  align-items:end;
+}
+.guest-access-never-check{
+  display:flex;
+  align-items:flex-start;
+  gap:10px;
+  margin:0;
+  padding:11px 12px;
+  border:1px solid #dbe3ee;
+  border-radius:12px;
+  background:#fff;
+  cursor:pointer;
+}
+.guest-access-never-check input{
+  width:20px;
+  height:20px;
+  margin:1px 0 0;
+  flex:0 0 auto;
+}
+.guest-access-never-check span{
+  display:block;
+  min-width:0;
+}
+.guest-access-never-check strong{
+  display:block;
+  color:#344054;
+  font-size:13px;
+}
+.guest-access-never-check small{
+  display:block;
+  color:#667085;
+  margin-top:3px;
+  line-height:1.3;
+}
+.guest-access-never-check:has(input:checked){
+  border-color:#8bc5a4;
+  background:#f3fbf6;
+}
+#guestAccessExpires:disabled{
+  opacity:.55;
+  background:#f2f4f7;
+}
+@media(max-width:640px){
+  .guest-access-expiration{grid-template-columns:1fr}
+}
+
 </style>
 </head>
 <body>
@@ -3223,9 +3274,15 @@ button.teams-file-row:hover{border-color:#bdccdd}
               <input id="guestAccessEmail" type="email" placeholder="contractor@gmail.com">
             </label>
           </div>
-          <label>Access Expires
-            <input id="guestAccessExpires" type="date">
-          </label>
+          <div class="guest-access-expiration">
+            <label id="guestAccessExpiresLabel">Access Expires
+              <input id="guestAccessExpires" type="date">
+            </label>
+            <label class="guest-access-never-check">
+              <input id="guestAccessNeverExpires" type="checkbox">
+              <span><strong>Link never expires</strong><small>Access stays active until you manually revoke it.</small></span>
+            </label>
+          </div>
           <div>
             <div class="guest-access-subtitle">Subdivision Access</div>
             <div id="guestAccessSubdivisionChoices" class="guest-access-subdivision-grid"></div>
@@ -3703,7 +3760,7 @@ button.teams-file-row:hover{border-color:#bdccdd}
 <script>
 (async()=>{
 const $=id=>document.getElementById(id);
-const BOWENBUILDER_VERSION='1.3';
+const BOWENBUILDER_VERSION='1.4';
 const SB_URL='https://oztefiymckpyxiewgxtc.supabase.co';
 const SB_KEY='sb_publishable__ItoYGeHKEGTBFiE7JM74w_1F-qERVe';
 const db=window.supabase.createClient(SB_URL,SB_KEY);
@@ -3759,7 +3816,7 @@ function renderGuestFilePortal(){
 
   const heading=`<div class="guest-portal-hero">
     <h1>Guest File Access</h1>
-    <p>${guest.name?`Access for ${esc(guest.name)} · `:''}${esc(guest.email||'')}${guest.expires_at?`<br>Access expires ${esc(guestPortalDate(guest.expires_at))}`:''}</p>
+    <p>${guest.name?`Access for ${esc(guest.name)} · `:''}${esc(guest.email||'')}<br>${guest.expires_at?`Access expires ${esc(guestPortalDate(guest.expires_at))}`:'This access does not expire unless revoked.'}</p>
   </div>`;
 
   if(!guestPortalSubdivisionId){
@@ -4182,7 +4239,7 @@ let adminActivityRows=[];
 let adminGuestInvites=[];
 let adminGuestInviteSubdivisions=[];
 let adminGuestFileActivity=[];
-let latestCreatedGuestLink={url:'',email:'',name:'',expiresAt:''};
+let latestCreatedGuestLink={url:'',email:'',name:'',expiresAt:'',neverExpires:false};
 let adminActivityLogTimer=null;
 let activitySessionId='';
 const activityLastLogged=new Map();
@@ -8801,6 +8858,23 @@ async function showAdminView(){
   showAdminPanel(activeAdminPanel);
 }
 
+
+function syncGuestAccessExpirationMode(){
+  const never=!!$('guestAccessNeverExpires')?.checked;
+  const expires=$('guestAccessExpires');
+  const label=$('guestAccessExpiresLabel');
+
+  if(expires){
+    expires.disabled=never;
+    if(never)expires.value='';
+    else if(!expires.value)expires.value=guestAccessDefaultExpiration();
+  }
+
+  if(label){
+    label.style.opacity=never?'.6':'1';
+  }
+}
+
 function guestAccessDefaultExpiration(){
   const d=new Date();
   d.setDate(d.getDate()+30);
@@ -8828,7 +8902,8 @@ function guestAccessPortalUrl(token){
 
 function guestAccessStatus(invite){
   if(invite?.revoked_at)return 'revoked';
-  const expires=new Date(invite?.expires_at||0);
+  if(!invite?.expires_at)return 'active';
+  const expires=new Date(invite.expires_at);
   if(Number.isNaN(expires.getTime()) || expires<=new Date())return 'expired';
   return 'active';
 }
@@ -8870,16 +8945,19 @@ function guestAccessSetNotice(message='',error=false){
   box.style.color=error?'#b42318':'';
 }
 
-function showLatestCreatedGuestLink({url,email,name,expiresAt}){
-  latestCreatedGuestLink={url,email,name,expiresAt};
+function showLatestCreatedGuestLink({url,email,name,expiresAt,neverExpires=false}){
+  latestCreatedGuestLink={url,email,name,expiresAt,neverExpires};
   $('guestAccessCreatedUrl').textContent=url;
   $('guestAccessCreated').classList.remove('hidden');
 }
 
-function guestInviteEmailHref({url,email,name,expiresAt}){
+function guestInviteEmailHref({url,email,name,expiresAt,neverExpires=false}){
   const guestName=String(name||'').trim();
   const subject='BowenBuilder Guest File Access';
   const expiration=expiresAt?new Date(expiresAt).toLocaleDateString():'';
+  const accessLine=neverExpires || !expiresAt
+    ? 'This access does not expire unless Bowen & Bowen revokes the link.'
+    : `This access expires ${expiration}.`;
   const body=[
     guestName?`Hi ${guestName},`:'Hello,',
     '',
@@ -8888,7 +8966,7 @@ function guestInviteEmailHref({url,email,name,expiresAt}){
     'Open your secure BowenBuilder guest file portal here:',
     url,
     '',
-    expiration?`This access expires ${expiration}.`:'',
+    accessLine,
     'No BowenBuilder or Microsoft account is required.'
   ].filter(Boolean).join('\n');
   return `mailto:${encodeURIComponent(email||'')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
@@ -8924,9 +9002,10 @@ async function loadAdminGuestAccess(){
   renderGuestAccessSubdivisionChoices();
   renderAdminGuestAccessList();
 
-  if(!$('guestAccessExpires').value){
+  if(!$('guestAccessNeverExpires')?.checked && !$('guestAccessExpires').value){
     $('guestAccessExpires').value=guestAccessDefaultExpiration();
   }
+  syncGuestAccessExpirationMode();
 }
 
 function renderAdminGuestAccessList(){
@@ -8943,7 +9022,7 @@ function renderAdminGuestAccessList(){
     const subs=guestAccessSubNames(invite.id);
     const latest=guestAccessLatestActivity(invite.id);
     const url=invite.token_value?guestAccessPortalUrl(invite.token_value):'';
-    const expires=invite.expires_at?new Date(invite.expires_at).toLocaleDateString():'';
+    const expires=invite.expires_at?new Date(invite.expires_at).toLocaleDateString():'Never';
     const lastActivity=latest
       ? `${String(latest.action||'activity').replaceAll('_',' ')} · ${new Date(latest.created_at).toLocaleString()}`
       :'No guest activity yet';
@@ -8958,7 +9037,7 @@ function renderAdminGuestAccessList(){
       </div>
       <div class="guest-access-row-meta">
         <div><strong>Subdivisions:</strong> ${esc(subs.join(', ')||'None')}</div>
-        <div><strong>Expires:</strong> ${esc(expires||'Not set')}</div>
+        <div><strong>Expires:</strong> ${esc(expires)}</div>
         <div><strong>Last activity:</strong> ${esc(lastActivity)}</div>
       </div>
       <div class="guest-access-row-actions">
@@ -8978,7 +9057,8 @@ function renderAdminGuestAccessList(){
         url:guestAccessPortalUrl(invite.token_value),
         email:invite.email,
         name:invite.guest_name,
-        expiresAt:invite.expires_at
+        expiresAt:invite.expires_at,
+        neverExpires:!invite.expires_at
       });
     };
   });
@@ -9015,6 +9095,7 @@ async function createGuestAccess(){
 
   const name=String($('guestAccessName').value||'').trim();
   const email=String($('guestAccessEmail').value||'').trim();
+  const neverExpires=!!$('guestAccessNeverExpires')?.checked;
   const expiresDate=String($('guestAccessExpires').value||'').trim();
   const subdivisionIds=[...document.querySelectorAll('[data-guest-access-subdivision]:checked')]
     .map(x=>x.dataset.guestAccessSubdivision)
@@ -9024,8 +9105,8 @@ async function createGuestAccess(){
     guestAccessSetNotice('Enter the guest email address.',true);
     return;
   }
-  if(!expiresDate){
-    guestAccessSetNotice('Choose an expiration date.',true);
+  if(!neverExpires && !expiresDate){
+    guestAccessSetNotice('Choose an expiration date or select Link never expires.',true);
     return;
   }
   if(!subdivisionIds.length){
@@ -9033,8 +9114,8 @@ async function createGuestAccess(){
     return;
   }
 
-  const expiresAt=new Date(`${expiresDate}T23:59:59`);
-  if(Number.isNaN(expiresAt.getTime())||expiresAt<=new Date()){
+  const expiresAt=neverExpires?null:new Date(`${expiresDate}T23:59:59`);
+  if(!neverExpires && (Number.isNaN(expiresAt.getTime())||expiresAt<=new Date())){
     guestAccessSetNotice('Expiration must be in the future.',true);
     return;
   }
@@ -9050,7 +9131,7 @@ async function createGuestAccess(){
     const {data,error}=await db.rpc('bowenbuilder_admin_create_guest_file_invite',{
       p_email:email,
       p_guest_name:name||null,
-      p_expires_at:expiresAt.toISOString(),
+      p_expires_at:neverExpires?null:expiresAt.toISOString(),
       p_token:token,
       p_subdivision_ids:subdivisionIds
     });
@@ -9062,7 +9143,8 @@ async function createGuestAccess(){
       url,
       email,
       name,
-      expiresAt:expiresAt.toISOString()
+      expiresAt:neverExpires?null:expiresAt.toISOString(),
+      neverExpires
     });
 
     logBowenActivity('admin_guest_file_access_created',{
@@ -9071,12 +9153,14 @@ async function createGuestAccess(){
       entityId:String(data||''),
       screen:'Admin',
       force:true,
-      metadata:{subdivision_count:subdivisionIds.length}
+      metadata:{subdivision_count:subdivisionIds.length,never_expires:neverExpires}
     });
 
     $('guestAccessName').value='';
     $('guestAccessEmail').value='';
+    if($('guestAccessNeverExpires'))$('guestAccessNeverExpires').checked=false;
     $('guestAccessExpires').value=guestAccessDefaultExpiration();
+    syncGuestAccessExpirationMode();
     document.querySelectorAll('[data-guest-access-subdivision]').forEach(x=>x.checked=false);
 
     await loadAdminGuestAccess();
@@ -11751,6 +11835,7 @@ $('adminGuestFilesTab').onclick=()=>showAdminPanel('guest_files');
 $('adminActivityLogTab').onclick=()=>showAdminPanel('activity');
 
 $('guestAccessCreate').onclick=createGuestAccess;
+$('guestAccessNeverExpires').onchange=syncGuestAccessExpirationMode;
 $('guestAccessRefresh').onclick=loadAdminGuestAccess;
 $('guestAccessCreatedEmail').onclick=()=>{
   if(!latestCreatedGuestLink.url)return;
@@ -12318,7 +12403,7 @@ try{
 </script>
 
 <div id="bbBuildVersion" style="text-align:center;color:#8a96a8;font-size:10px;padding:10px 8px 18px">
-  BowenBuilder 1.3</div>
+  BowenBuilder 1.4</div>
 
 
 
