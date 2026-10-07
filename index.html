@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="1.5">
+<meta name="bowenbuilder-version" content="1.7">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -3006,6 +3006,8 @@ button.teams-file-row:hover{border-color:#bdccdd}
             </div>
             <div class="subdivision-files-head-actions">
               <button id="subdivisionFilesBack" class="secondary hidden" type="button">← Lot Folders</button>
+              <button id="subdivisionFilesCreateFolder" class="secondary hidden" type="button">+ New Folder</button>
+              <button id="subdivisionFilesTeams" class="secondary hidden" type="button">Import from Teams</button>
               <button id="subdivisionFilesUpload" class="primary hidden" type="button">+ Upload Files</button>
               <input id="subdivisionFilesInput" type="file" multiple hidden>
             </div>
@@ -3787,7 +3789,7 @@ button.teams-file-row:hover{border-color:#bdccdd}
 <script>
 (async()=>{
 const $=id=>document.getElementById(id);
-const BOWENBUILDER_VERSION='1.5';
+const BOWENBUILDER_VERSION='1.7';
 const SB_URL='https://oztefiymckpyxiewgxtc.supabase.co';
 const SB_KEY='sb_publishable__ItoYGeHKEGTBFiE7JM74w_1F-qERVe';
 const db=window.supabase.createClient(SB_URL,SB_KEY);
@@ -3799,6 +3801,7 @@ let guestPortalToken='';
 let guestPortalData=null;
 let guestPortalSubdivisionId=null;
 let guestPortalLotId=null;
+let guestPortalFolderId=null;
 
 function guestFileFunctionUrl(fileId,{download=false}={}){
   const url=new URL(`${SB_URL}/functions/v1/guest-file`);
@@ -3840,6 +3843,7 @@ function renderGuestFilePortal(){
   const subs=Array.isArray(guestPortalData.subdivisions)?guestPortalData.subdivisions:[];
   const guestLots=Array.isArray(guestPortalData.lots)?guestPortalData.lots:[];
   const guestFiles=Array.isArray(guestPortalData.files)?guestPortalData.files:[];
+  const guestFolders=Array.isArray(guestPortalData.folders)?guestPortalData.folders:[];
 
   const heading=`<div class="guest-portal-hero">
     <h1>Guest File Access</h1>
@@ -3865,6 +3869,7 @@ function renderGuestFilePortal(){
       btn.onclick=()=>{
         guestPortalSubdivisionId=btn.dataset.guestSub;
         guestPortalLotId=null;
+        guestPortalFolderId=null;
         renderGuestFilePortal();
       };
     });
@@ -3901,12 +3906,14 @@ function renderGuestFilePortal(){
     root.querySelector('[data-guest-back="subdivisions"]')?.addEventListener('click',()=>{
       guestPortalSubdivisionId=null;
       guestPortalLotId=null;
+      guestPortalFolderId=null;
       renderGuestFilePortal();
     });
 
     root.querySelectorAll('[data-guest-lot]').forEach(btn=>{
       btn.onclick=()=>{
         guestPortalLotId=btn.dataset.guestLot;
+        guestPortalFolderId=null;
         renderGuestFilePortal();
       };
     });
@@ -3914,15 +3921,58 @@ function renderGuestFilePortal(){
   }
 
   const lot=guestLots.find(l=>String(l.id)===String(guestPortalLotId));
-  const files=guestFiles.filter(f=>String(f.lot_id)===String(guestPortalLotId));
+  const currentFolder=guestPortalFolderId
+    ? guestFolders.find(f=>String(f.id)===String(guestPortalFolderId))
+    : null;
+
+  const parentKey=String(guestPortalFolderId||'');
+  const folders=guestFolders
+    .filter(f=>
+      String(f.lot_id)===String(guestPortalLotId) &&
+      String(f.parent_folder_id||'')===parentKey
+    )
+    .slice()
+    .sort((a,b)=>String(a.name||'').localeCompare(String(b.name||'')));
+
+  const files=guestFiles.filter(f=>
+    String(f.lot_id)===String(guestPortalLotId) &&
+    String(f.folder_id||'')===parentKey
+  );
+
+  const folderPath=[];
+  if(guestPortalFolderId){
+    const seen=new Set();
+    let cursor=currentFolder;
+    while(cursor && !seen.has(String(cursor.id))){
+      seen.add(String(cursor.id));
+      folderPath.unshift(cursor);
+      cursor=cursor.parent_folder_id
+        ? guestFolders.find(f=>String(f.id)===String(cursor.parent_folder_id))
+        : null;
+    }
+  }
 
   root.innerHTML=heading+`
     <div class="crew-card">
-      <button class="secondary guest-portal-back" type="button" data-guest-back="lots">← Lot Folders</button>
+      <button class="secondary guest-portal-back" type="button" data-guest-back="${guestPortalFolderId?'folder':'lots'}">${guestPortalFolderId?'← Up One Folder':'← Lot Folders'}</button>
       <h2>${esc(lot?.lot_name||'Lot Files')}</h2>
-      <div class="muted">${esc(lot?.address||lot?.plan_name||sub?.name||'')}</div>
+      <div class="muted">${esc([
+        lot?.address||lot?.plan_name||sub?.name||'',
+        ...folderPath.map(f=>f.name)
+      ].filter(Boolean).join(' / '))}</div>
+
       <div style="margin-top:12px">
-        ${files.length?files.map(file=>`
+        ${folders.map(folder=>`
+          <button class="guest-portal-folder" type="button" data-guest-folder="${esc(folder.id)}" style="margin-bottom:8px">
+            <span class="guest-portal-folder-icon">📁</span>
+            <span class="guest-portal-folder-copy">
+              <strong>${esc(folder.name)}</strong>
+              <small>Open folder</small>
+            </span>
+          </button>
+        `).join('')}
+
+        ${files.map(file=>`
           <div class="guest-portal-file">
             <div class="guest-portal-file-icon">${esc(guestPortalFileIcon(file))}</div>
             <div>
@@ -3933,13 +3983,27 @@ function renderGuestFilePortal(){
               <a class="secondary" href="${esc(guestFileFunctionUrl(file.id))}" target="_blank" rel="noopener">Open</a>
               <a class="secondary" href="${esc(guestFileFunctionUrl(file.id,{download:true}))}" target="_blank" rel="noopener">Download</a>
             </div>
-          </div>`).join('')
-          :'<div class="muted">No files have been uploaded to this lot folder yet.</div>'}
+          </div>`).join('')}
+
+        ${(!folders.length&&!files.length)?'<div class="muted">This folder is empty.</div>':''}
       </div>
     </div>`;
 
+  root.querySelectorAll('[data-guest-folder]').forEach(btn=>{
+    btn.onclick=()=>{
+      guestPortalFolderId=btn.dataset.guestFolder;
+      renderGuestFilePortal();
+    };
+  });
+
+  root.querySelector('[data-guest-back="folder"]')?.addEventListener('click',()=>{
+    guestPortalFolderId=currentFolder?.parent_folder_id||null;
+    renderGuestFilePortal();
+  });
+
   root.querySelector('[data-guest-back="lots"]')?.addEventListener('click',()=>{
     guestPortalLotId=null;
+    guestPortalFolderId=null;
     renderGuestFilePortal();
   });
 }
@@ -3953,6 +4017,7 @@ async function showGuestFilePortal(token){
   guestPortalToken=String(token||'').trim();
   guestPortalSubdivisionId=null;
   guestPortalLotId=null;
+  guestPortalFolderId=null;
 
   const root=$('guestFilesContent');
   root.innerHTML='<div class="crew-card">Loading guest file access…</div>';
@@ -4240,7 +4305,9 @@ let subdivisions=[],lots=[],items=[],punchouts=[],punchoutPhotos=[],profiles=[],
 let crewPlanAutoFilledValue='';
 let subdivisionViewMode='lots';
 let subdivisionFiles=[];
+let subdivisionFileFolders=[];
 let subdivisionFilesLotId=null;
+let subdivisionFilesFolderId=null;
 let subdivisionFilesLoading=false;
 let punchoutMarkupState={itemId:null,photoPath:null,baseImage:null,baseObjectUrl:'',ops:[],tool:'draw',drawing:null,bodyOverflow:''};
 let realtimeChannel=null;
@@ -5942,14 +6009,20 @@ async function loadSubdivisionFiles(){
   subdivisionFilesNotice('');
 
   try{
-    const {data,error}=await db
-      .from('subdivision_files')
-      .select('id,subdivision_id,lot_id,file_name,storage_path,mime_type,size_bytes,uploaded_by,created_at,updated_at')
-      .eq('subdivision_id',currentSubdivision)
-      .order('created_at',{ascending:false});
+    const [{data:files,error:fileError},{data:folders,error:folderError}]=await Promise.all([
+      db.from('subdivision_files')
+        .select('id,subdivision_id,lot_id,folder_id,file_name,storage_path,mime_type,size_bytes,uploaded_by,created_at,updated_at')
+        .eq('subdivision_id',currentSubdivision)
+        .order('created_at',{ascending:false}),
+      db.from('subdivision_file_folders')
+        .select('id,subdivision_id,lot_id,parent_folder_id,name,created_by,created_at,updated_at')
+        .eq('subdivision_id',currentSubdivision)
+        .order('name')
+    ]);
 
-    if(error)throw error;
-    subdivisionFiles=data||[];
+    if(fileError||folderError)throw (fileError||folderError);
+    subdivisionFiles=files||[];
+    subdivisionFileFolders=folders||[];
     renderSubdivisionFiles();
   }catch(err){
     subdivisionFilesNotice(err?.message||'Could not load subdivision files.','error');
@@ -5958,20 +6031,153 @@ async function loadSubdivisionFiles(){
   }
 }
 
+
+function currentSubdivisionFileFolder(){
+  return subdivisionFileFolders.find(
+    f=>String(f.id)===String(subdivisionFilesFolderId)
+  )||null;
+}
+
+function subdivisionFileFolderPath(folderId){
+  const result=[];
+  const seen=new Set();
+  let current=subdivisionFileFolders.find(f=>String(f.id)===String(folderId));
+
+  while(current && !seen.has(String(current.id))){
+    seen.add(String(current.id));
+    result.unshift(current);
+    current=current.parent_folder_id
+      ? subdivisionFileFolders.find(f=>String(f.id)===String(current.parent_folder_id))
+      : null;
+  }
+
+  return result;
+}
+
+function subdivisionFolderChildCount(folderId){
+  const childFolders=subdivisionFileFolders.filter(
+    f=>String(f.parent_folder_id||'')===String(folderId||'')
+  ).length;
+  const childFiles=subdivisionFiles.filter(
+    f=>String(f.folder_id||'')===String(folderId||'')
+  ).length;
+  return childFolders+childFiles;
+}
+
+async function createSubdivisionFileFolder(){
+  if(!currentSubdivision || !subdivisionFilesLotId)return;
+  if(!requireEditPermission(currentSubdivision))return;
+
+  const name=prompt('Folder name:','');
+  if(name===null)return;
+
+  const clean=String(name||'').trim();
+  if(!clean)return alert('Enter a folder name.');
+  if(clean.length>120)return alert('Folder names must be 120 characters or less.');
+
+  try{
+    const {data,error}=await db
+      .from('subdivision_file_folders')
+      .insert({
+        subdivision_id:currentSubdivision,
+        lot_id:subdivisionFilesLotId,
+        parent_folder_id:subdivisionFilesFolderId||null,
+        name:clean,
+        created_by:currentAuthUserId||null
+      })
+      .select('id,subdivision_id,lot_id,parent_folder_id,name,created_by,created_at,updated_at')
+      .single();
+
+    if(error)throw error;
+    if(data)subdivisionFileFolders.push(data);
+
+    const lot=lots.find(l=>String(l.id)===String(subdivisionFilesLotId));
+    logBowenActivity('subdivision_file_folder_created',{
+      label:`Created folder ${clean} in ${lot?.lot_name||'lot'}`,
+      entityType:'subdivision_file_folder',
+      entityId:data?.id||'',
+      subdivisionId:currentSubdivision,
+      lotId:subdivisionFilesLotId,
+      force:true,
+      metadata:{parent_folder_id:subdivisionFilesFolderId||null}
+    });
+
+    subdivisionFilesNotice(`Folder "${clean}" created.`);
+    renderSubdivisionFiles();
+  }catch(err){
+    const msg=String(err?.message||'Could not create folder.');
+    alert(msg.includes('duplicate')?'A folder with that name already exists here.':msg);
+  }
+}
+
+async function deleteSubdivisionFileFolder(folderId){
+  const folder=subdivisionFileFolders.find(f=>String(f.id)===String(folderId));
+  if(!folder)return;
+  if(!requireEditPermission(folder.subdivision_id))return;
+
+  const hasFolders=subdivisionFileFolders.some(
+    f=>String(f.parent_folder_id||'')===String(folder.id)
+  );
+  const hasFiles=subdivisionFiles.some(
+    f=>String(f.folder_id||'')===String(folder.id)
+  );
+
+  if(hasFolders||hasFiles){
+    alert('This folder is not empty. Move or delete its contents before deleting the folder.');
+    return;
+  }
+
+  if(!confirm(`Delete folder "${folder.name}"?`))return;
+
+  const {error}=await db
+    .from('subdivision_file_folders')
+    .delete()
+    .eq('id',folder.id);
+
+  if(error){
+    alert(error.message);
+    return;
+  }
+
+  subdivisionFileFolders=subdivisionFileFolders.filter(
+    f=>String(f.id)!==String(folder.id)
+  );
+
+  logBowenActivity('subdivision_file_folder_deleted',{
+    label:`Deleted folder ${folder.name}`,
+    entityType:'subdivision_file_folder',
+    entityId:folder.id,
+    subdivisionId:folder.subdivision_id,
+    lotId:folder.lot_id,
+    force:true
+  });
+
+  if(String(subdivisionFilesFolderId)===String(folder.id)){
+    subdivisionFilesFolderId=folder.parent_folder_id||null;
+  }
+  renderSubdivisionFiles();
+}
+
 function renderSubdivisionFiles(){
-  const folders=$('subdivisionFileFolders');
+  const lotFolders=$('subdivisionFileFolders');
   const list=$('subdivisionFileList');
   const back=$('subdivisionFilesBack');
+  const createFolder=$('subdivisionFilesCreateFolder');
+  const teamsImport=$('subdivisionFilesTeams');
   const upload=$('subdivisionFilesUpload');
   const breadcrumb=$('subdivisionFilesBreadcrumb');
   const sub=subdivisions.find(s=>String(s.id)===String(currentSubdivision));
 
-  if(!folders||!list)return;
+  if(!lotFolders||!list)return;
 
+  // Top level: automatic lot folders.
   if(!subdivisionFilesLotId){
-    folders.classList.remove('hidden');
+    subdivisionFilesFolderId=null;
+    lotFolders.classList.remove('hidden');
     list.classList.add('hidden');
     back?.classList.add('hidden');
+    createFolder?.classList.add('hidden');
+    teamsImport?.classList.add('hidden');
     upload?.classList.add('hidden');
     if(breadcrumb)breadcrumb.textContent='Lot folders · access follows subdivision permissions';
 
@@ -5981,25 +6187,28 @@ function renderSubdivisionFiles(){
       .sort((a,b)=>String(a.lot_name||'').localeCompare(String(b.lot_name||''),undefined,{numeric:true}));
 
     if(!lotRows.length){
-      folders.innerHTML='<div class="subdivision-file-empty">No lots are available in this subdivision yet.</div>';
+      lotFolders.innerHTML='<div class="subdivision-file-empty">No lots are available in this subdivision yet.</div>';
       return;
     }
 
-    folders.innerHTML=lotRows.map(l=>{
-      const count=subdivisionFiles.filter(f=>String(f.lot_id)===String(l.id)).length;
+    lotFolders.innerHTML=lotRows.map(l=>{
+      const fileCount=subdivisionFiles.filter(f=>String(f.lot_id)===String(l.id)).length;
+      const folderCount=subdivisionFileFolders.filter(f=>String(f.lot_id)===String(l.id)).length;
+      const total=fileCount+folderCount;
       return `<button class="subdivision-file-folder" type="button" data-subdivision-file-lot="${esc(l.id)}">
         <span class="subdivision-file-folder-icon">📁</span>
         <span class="subdivision-file-folder-copy">
           <span class="subdivision-file-folder-name">${esc(l.lot_name||'Lot')}</span>
           <span class="subdivision-file-folder-meta">${esc(l.address||l.plan_name||'Lot files')}</span>
         </span>
-        <span class="subdivision-file-count">${count}</span>
+        <span class="subdivision-file-count">${total}</span>
       </button>`;
     }).join('');
 
-    folders.querySelectorAll('[data-subdivision-file-lot]').forEach(btn=>{
+    lotFolders.querySelectorAll('[data-subdivision-file-lot]').forEach(btn=>{
       btn.onclick=()=>{
         subdivisionFilesLotId=btn.dataset.subdivisionFileLot||null;
+        subdivisionFilesFolderId=null;
         const lot=lots.find(l=>String(l.id)===String(subdivisionFilesLotId));
         logBowenActivity('view_subdivision_file_folder',{
           label:`Opened ${lot?.lot_name||'lot'} file folder`,
@@ -6015,29 +6224,68 @@ function renderSubdivisionFiles(){
     return;
   }
 
-  folders.classList.add('hidden');
+  // Inside a lot folder (root or nested).
+  lotFolders.classList.add('hidden');
   list.classList.remove('hidden');
   back?.classList.remove('hidden');
 
   const lot=lots.find(l=>String(l.id)===String(subdivisionFilesLotId));
+  const folderPath=subdivisionFileFolderPath(subdivisionFilesFolderId);
   if(breadcrumb){
-    breadcrumb.textContent=`${sub?.name||'Subdivision'} / ${lot?.lot_name||'Lot'}`;
+    breadcrumb.textContent=[
+      sub?.name||'Subdivision',
+      lot?.lot_name||'Lot',
+      ...folderPath.map(f=>f.name)
+    ].join(' / ');
+  }
+
+  if(back){
+    back.textContent=subdivisionFilesFolderId?'← Up One Folder':'← Lot Folders';
   }
 
   const canManage=canEditSubdivision(currentSubdivision);
+  createFolder?.classList.toggle('hidden',!canManage);
+  teamsImport?.classList.toggle('hidden',!canManage);
   upload?.classList.toggle('hidden',!canManage);
 
-  const files=subdivisionFiles.filter(f=>String(f.lot_id)===String(subdivisionFilesLotId));
+  const currentParent=String(subdivisionFilesFolderId||'');
+  const childFolders=subdivisionFileFolders
+    .filter(f=>
+      String(f.lot_id)===String(subdivisionFilesLotId) &&
+      String(f.parent_folder_id||'')===currentParent
+    )
+    .slice()
+    .sort((a,b)=>String(a.name||'').localeCompare(String(b.name||'')));
 
-  if(!files.length){
+  const files=subdivisionFiles.filter(f=>
+    String(f.lot_id)===String(subdivisionFilesLotId) &&
+    String(f.folder_id||'')===currentParent
+  );
+
+  if(!childFolders.length && !files.length){
     list.innerHTML=`<div class="subdivision-file-empty">
-      <strong>No files in ${esc(lot?.lot_name||'this lot')} yet.</strong>
-      <div style="margin-top:5px">${canManage?'Use Upload Files to add plans, reports, photos, PDFs, or other job documents.':'Files uploaded for this lot will appear here.'}</div>
+      <strong>This folder is empty.</strong>
+      <div style="margin-top:5px">${canManage?'Create a folder, upload files, or import files from Teams.':'Files added here will appear here.'}</div>
     </div>`;
     return;
   }
 
-  list.innerHTML=files.map(file=>{
+  const folderRows=childFolders.map(folder=>{
+    const count=subdivisionFolderChildCount(folder.id);
+    return `<div class="subdivision-file-row" data-subdivision-folder-row="${esc(folder.id)}">
+      <div class="subdivision-file-icon">📁</div>
+      <div class="subdivision-file-copy">
+        <div class="subdivision-file-name">${esc(folder.name)}</div>
+        <div class="subdivision-file-meta">${count} item${count===1?'':'s'}</div>
+      </div>
+      <div class="subdivision-file-actions">
+        <button class="secondary" type="button" data-open-subdivision-folder="${esc(folder.id)}">Open Folder</button>
+        ${canManage?`<button class="secondary" type="button" data-delete-subdivision-folder="${esc(folder.id)}" style="color:#b42318">Delete</button>`:''}
+      </div>
+    </div>`;
+  }).join('');
+
+  const fileRows=files.map(file=>{
     const date=file.created_at
       ? new Date(file.created_at).toLocaleString(undefined,{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'})
       : '';
@@ -6055,6 +6303,31 @@ function renderSubdivisionFiles(){
       </div>
     </div>`;
   }).join('');
+
+  list.innerHTML=folderRows+fileRows;
+
+  list.querySelectorAll('[data-open-subdivision-folder]').forEach(btn=>{
+    btn.onclick=()=>{
+      const folder=subdivisionFileFolders.find(
+        f=>String(f.id)===String(btn.dataset.openSubdivisionFolder)
+      );
+      if(!folder)return;
+      subdivisionFilesFolderId=folder.id;
+      logBowenActivity('view_subdivision_file_folder',{
+        label:`Opened folder ${folder.name}`,
+        entityType:'subdivision_file_folder',
+        entityId:folder.id,
+        subdivisionId:folder.subdivision_id,
+        lotId:folder.lot_id,
+        force:true
+      });
+      renderSubdivisionFiles();
+    };
+  });
+
+  list.querySelectorAll('[data-delete-subdivision-folder]').forEach(btn=>{
+    btn.onclick=()=>deleteSubdivisionFileFolder(btn.dataset.deleteSubdivisionFolder);
+  });
 
   list.querySelectorAll('[data-open-subdivision-file]').forEach(btn=>{
     btn.onclick=()=>openSubdivisionFile(btn.dataset.openSubdivisionFile);
@@ -6153,6 +6426,132 @@ async function shareSubdivisionFile(fileId){
   }
 }
 
+
+async function importTeamsFileToSubdivisionSpace(itemId,name,webUrl=''){
+  if(!currentSubdivision || !subdivisionFilesLotId)return;
+  if(!requireEditPermission(currentSubdivision))return;
+
+  const lot=lots.find(l=>String(l.id)===String(subdivisionFilesLotId));
+  if(!lot)return;
+
+  const driveId=String(lotTeamsPickerState.driveId||'').trim();
+  if(!driveId){
+    lotTeamsPickerStatus('Microsoft Teams did not provide the source drive for this file.',true);
+    return;
+  }
+
+  const cleanName=String(name||'Teams File').trim()||'Teams File';
+  lotTeamsPickerStatus(`Importing ${cleanName} into ${lot.lot_name||'this lot'}…`);
+  const grid=$('lotTeamsPickerGrid');
+  if(grid)grid.style.pointerEvents='none';
+
+  try{
+    const meta=await microsoftGraphJson(
+      `/drives/${encodeURIComponent(driveId)}/items/${encodeURIComponent(itemId)}?$select=id,name,size,file,webUrl`
+    );
+
+    const size=Number(meta?.size||0);
+    if(size>50*1024*1024){
+      throw new Error(`${meta?.name||cleanName} is larger than the 50 MB BowenBuilder file limit.`);
+    }
+
+    const token=await microsoftProviderToken();
+    if(!token){
+      throw new Error('Microsoft Teams file permission is not active. Sign out and sign back in with Microsoft.');
+    }
+
+    const response=await fetch(
+      `https://graph.microsoft.com/v1.0/drives/${encodeURIComponent(driveId)}/items/${encodeURIComponent(itemId)}/content`,
+      {
+        method:'GET',
+        headers:{Authorization:`Bearer ${token}`}
+      }
+    );
+
+    if(!response.ok){
+      if(response.status===401 || response.status===403){
+        throw new Error('Microsoft needs a fresh BowenBuilder sign-in for Teams Files. Sign out, sign back in with Microsoft, and approve the read-only file permissions.');
+      }
+      throw new Error(`Microsoft could not download this Teams file (${response.status}).`);
+    }
+
+    const blob=await response.blob();
+    if(blob.size>50*1024*1024){
+      throw new Error(`${meta?.name||cleanName} is larger than the 50 MB BowenBuilder file limit.`);
+    }
+
+    const id=globalThis.crypto?.randomUUID
+      ? globalThis.crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+    const finalName=String(meta?.name||cleanName).trim()||cleanName;
+    const safeName=subdivisionFileSafeName(finalName);
+    const path=`${currentSubdivision}/${subdivisionFilesLotId}/${subdivisionFilesFolderId||'root'}/${id}/${safeName}`;
+    const mimeType=String(meta?.file?.mimeType||blob.type||'application/octet-stream');
+
+    const {error:uploadError}=await db.storage
+      .from('bowenbuilder-files')
+      .upload(path,blob,{
+        contentType:mimeType,
+        upsert:false
+      });
+
+    if(uploadError)throw uploadError;
+
+    const {data:row,error:rowError}=await db
+      .from('subdivision_files')
+      .insert({
+        id,
+        subdivision_id:currentSubdivision,
+        lot_id:subdivisionFilesLotId,
+        folder_id:subdivisionFilesFolderId||null,
+        file_name:finalName,
+        storage_path:path,
+        mime_type:mimeType,
+        size_bytes:blob.size||size||null,
+        uploaded_by:currentAuthUserId||null
+      })
+      .select('id,subdivision_id,lot_id,folder_id,file_name,storage_path,mime_type,size_bytes,uploaded_by,created_at,updated_at')
+      .single();
+
+    if(rowError){
+      await db.storage.from('bowenbuilder-files').remove([path]);
+      throw rowError;
+    }
+
+    if(row)subdivisionFiles.unshift(row);
+
+    logBowenActivity('subdivision_file_imported_from_teams',{
+      label:`Imported ${finalName} from Teams to ${lot.lot_name||'lot'}`,
+      entityType:'subdivision_file',
+      entityId:id,
+      subdivisionId:currentSubdivision,
+      lotId:subdivisionFilesLotId,
+      force:true,
+      metadata:{
+        source:'microsoft_teams',
+        size_bytes:blob.size||size||0,
+        mime_type:mimeType,
+        folder_id:subdivisionFilesFolderId||null
+      }
+    });
+
+    closeLotTeamsDocumentPicker();
+    subdivisionFilesNotice(`${finalName} imported from Microsoft Teams.`);
+    renderSubdivisionFiles();
+  }catch(err){
+    lotTeamsPickerStatus(err?.message||'Could not import this Teams file.',true);
+  }finally{
+    if(grid)grid.style.pointerEvents='';
+  }
+}
+
+function openSubdivisionTeamsFilePicker(){
+  if(!currentSubdivision || !subdivisionFilesLotId)return;
+  if(!requireEditPermission(currentSubdivision))return;
+  openLotTeamsDocumentPicker('subdivision_file_import');
+}
+
 async function uploadSubdivisionFiles(fileList){
   if(!currentSubdivision || !subdivisionFilesLotId)return;
   if(!requireEditPermission(currentSubdivision))return;
@@ -6183,7 +6582,7 @@ async function uploadSubdivisionFiles(fileList){
         : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
       const safeName=subdivisionFileSafeName(file.name);
-      const path=`${currentSubdivision}/${subdivisionFilesLotId}/${id}/${safeName}`;
+      const path=`${currentSubdivision}/${subdivisionFilesLotId}/${subdivisionFilesFolderId||'root'}/${id}/${safeName}`;
 
       const {error:uploadError}=await db.storage
         .from('bowenbuilder-files')
@@ -6200,13 +6599,14 @@ async function uploadSubdivisionFiles(fileList){
           id,
           subdivision_id:currentSubdivision,
           lot_id:subdivisionFilesLotId,
+          folder_id:subdivisionFilesFolderId||null,
           file_name:file.name,
           storage_path:path,
           mime_type:file.type||null,
           size_bytes:file.size||null,
           uploaded_by:currentAuthUserId||null
         })
-        .select('id,subdivision_id,lot_id,file_name,storage_path,mime_type,size_bytes,uploaded_by,created_at,updated_at')
+        .select('id,subdivision_id,lot_id,folder_id,file_name,storage_path,mime_type,size_bytes,uploaded_by,created_at,updated_at')
         .single();
 
       if(rowError){
@@ -6223,7 +6623,7 @@ async function uploadSubdivisionFiles(fileList){
         subdivisionId:currentSubdivision,
         lotId:subdivisionFilesLotId,
         force:true,
-        metadata:{size_bytes:file.size||0,mime_type:file.type||''}
+        metadata:{size_bytes:file.size||0,mime_type:file.type||'',folder_id:subdivisionFilesFolderId||null}
       });
     }
 
@@ -6314,6 +6714,7 @@ function showSubdivisionPanel(mode='lots'){
    loadSubdivisionFiles();
  }else{
    subdivisionFilesLotId=null;
+   subdivisionFilesFolderId=null;
  }
 
  if(agendaMode)renderSubdivisionAgenda();
@@ -10440,7 +10841,8 @@ function renderLotTeamsPickerRows(rows,kind){
   grid.innerHTML=rows.map(item=>{
     const isFolder=!!item.folder;
     const meta=isFolder?`${item.folder?.childCount??''} item${item.folder?.childCount===1?'':'s'}`:[teamsFilesFormatBytes(item.size),item.lastModifiedDateTime?new Date(item.lastModifiedDateTime).toLocaleDateString():null].filter(Boolean).join(' · ');
-    return `<button class="teams-file-row" type="button" data-picker-item="${esc(item.id)}" data-picker-name="${esc(item.name||'File')}" data-picker-folder="${isFolder?'1':'0'}" data-picker-web-url="${esc(item.webUrl||'')}"><span class="teams-file-row-icon">${teamsFilesIcon(item)}</span><span class="teams-file-row-main"><span class="teams-file-row-name">${esc(item.name||'File')}</span><span class="teams-file-row-meta">${esc(isFolder?meta:'Select this file · '+meta)}</span></span><span class="teams-file-row-arrow">${isFolder?'›':'✓'}</span></button>`;
+    const actionLabel=lotTeamsPickerState.target==='subdivision_file_import'?'Import this file':'Select this file';
+    return `<button class="teams-file-row" type="button" data-picker-item="${esc(item.id)}" data-picker-name="${esc(item.name||'File')}" data-picker-folder="${isFolder?'1':'0'}" data-picker-web-url="${esc(item.webUrl||'')}"><span class="teams-file-row-icon">${teamsFilesIcon(item)}</span><span class="teams-file-row-main"><span class="teams-file-row-name">${esc(item.name||'File')}</span><span class="teams-file-row-meta">${esc(isFolder?meta:actionLabel+' · '+meta)}</span></span><span class="teams-file-row-arrow">${isFolder?'›':'✓'}</span></button>`;
   }).join('');
   grid.querySelectorAll('[data-picker-item]').forEach(b=>b.onclick=()=>{
     if(b.dataset.pickerFolder==='1')openLotTeamsPickerFolder(b.dataset.pickerItem,b.dataset.pickerName);
@@ -10449,13 +10851,35 @@ function renderLotTeamsPickerRows(rows,kind){
 }
 async function openLotTeamsDocumentPicker(kind){
   lotTeamsPickerState={target:kind,level:'teams',team:null,channel:null,driveId:'',folderId:'',folderStack:[]};
-  $('lotTeamsPickerTitle').textContent=`Select ${lotTeamsDocTitle(kind)} from Teams`;
-  try{$('lotDialog').close()}catch(_){}
+
+  const importingFile=kind==='subdivision_file_import';
+  $('lotTeamsPickerTitle').textContent=importingFile
+    ? 'Import File from Microsoft Teams'
+    : `Select ${lotTeamsDocTitle(kind)} from Teams`;
+
+  const subtitle=$('lotTeamsPickerSubtitle');
+  if(subtitle){
+    subtitle.textContent=importingFile
+      ? 'Choose a Teams file to copy into this lot’s BowenBuilder Files folder.'
+      : 'Read-only · choose the file BowenBuilder should link to this lot.';
+  }
+
+  if(!importingFile){
+    try{$('lotDialog').close()}catch(_){}
+  }
+
   lotTeamsPickerOverlay(true);
   await loadLotTeamsPickerTeams();
 }
 function closeLotTeamsDocumentPicker(){
+  const wasSubdivisionFileImport=lotTeamsPickerState.target==='subdivision_file_import';
   lotTeamsPickerOverlay(false);
+
+  if(wasSubdivisionFileImport){
+    lotTeamsPickerState={target:'',level:'teams',team:null,channel:null,driveId:'',folderId:'',folderStack:[]};
+    return;
+  }
+
   requestAnimationFrame(()=>{
     if(!$('lotDialog').open)$('lotDialog').showModal();
     refreshAllLotTeamsDocFields();
@@ -10554,8 +10978,14 @@ async function goBackLotTeamsPicker(){
     return loadLotTeamsPickerChannels(lotTeamsPickerState.team.id,lotTeamsPickerState.team.displayName);
   }
 }
-function selectLotTeamsDocument(itemId,name,webUrl){
+async function selectLotTeamsDocument(itemId,name,webUrl){
   const kind=lotTeamsPickerState.target;
+
+  if(kind==='subdivision_file_import'){
+    await importTeamsFileToSubdivisionSpace(itemId,name,webUrl);
+    return;
+  }
+
   const input=$(lotTeamsDocInputId(kind));
   if(!input)return;
   input.value=encodeTeamsDocumentRef({driveId:lotTeamsPickerState.driveId,itemId,name,webUrl});
@@ -11530,9 +11960,18 @@ $('subdivisionPunchoutTab').onclick=()=>showSubdivisionPanel('punchout');
 $('subdivisionInspectionTab').onclick=()=>showSubdivisionPanel('inspection');
 
 $('subdivisionFilesBack').onclick=()=>{
-  subdivisionFilesLotId=null;
+  if(subdivisionFilesFolderId){
+    const current=currentSubdivisionFileFolder();
+    subdivisionFilesFolderId=current?.parent_folder_id||null;
+  }else{
+    subdivisionFilesLotId=null;
+    subdivisionFilesFolderId=null;
+  }
   renderSubdivisionFiles();
 };
+
+$('subdivisionFilesCreateFolder').onclick=createSubdivisionFileFolder;
+$('subdivisionFilesTeams').onclick=openSubdivisionTeamsFilePicker;
 
 $('subdivisionFilesUpload').onclick=()=>{
   if(!subdivisionFilesLotId)return;
@@ -12486,9 +12925,27 @@ document.querySelectorAll('[data-clear-lot-teams-doc]').forEach(btn=>{
     refreshLotTeamsDocField(kind);
   };
 });
-if($('lotTeamsPickerClose'))$('lotTeamsPickerClose').onclick=()=>closeLotTeamsDocumentPicker();
-if($('lotTeamsPickerBack'))$('lotTeamsPickerBack').onclick=()=>goBackLotTeamsPicker();
-if($('lotTeamsPickerRefresh'))$('lotTeamsPickerRefresh').onclick=()=>loadLotTeamsPickerTeams();
+document.addEventListener('click',e=>{
+  const close=e.target.closest?.('#lotTeamsPickerClose');
+  if(close){
+    e.preventDefault();
+    closeLotTeamsDocumentPicker();
+    return;
+  }
+
+  const back=e.target.closest?.('#lotTeamsPickerBack');
+  if(back){
+    e.preventDefault();
+    goBackLotTeamsPicker();
+    return;
+  }
+
+  const refresh=e.target.closest?.('#lotTeamsPickerRefresh');
+  if(refresh){
+    e.preventDefault();
+    loadLotTeamsPickerTeams();
+  }
+});
 
 if($('teamsFilesBack'))$('teamsFilesBack').onclick=()=>goBackTeamsFiles();
 if($('teamsFilesRefresh'))$('teamsFilesRefresh').onclick=()=>loadTeamsFilesTeams(true);
@@ -12544,7 +13001,7 @@ try{
 </script>
 
 <div id="bbBuildVersion" style="text-align:center;color:#8a96a8;font-size:10px;padding:10px 8px 18px">
-  BowenBuilder 1.5</div>
+  BowenBuilder 1.7</div>
 
 
 
@@ -12553,7 +13010,7 @@ try{
     <div class="teams-picker-title-row">
       <div>
         <div id="lotTeamsPickerTitle" class="teams-picker-title">Select document from Teams</div>
-        <div class="teams-picker-sub">Read-only · choose the file BowenBuilder should link to this lot.</div>
+        <div id="lotTeamsPickerSubtitle" class="teams-picker-sub">Read-only · choose the file BowenBuilder should link to this lot.</div>
       </div>
       <button id="lotTeamsPickerClose" class="xbtn" type="button" aria-label="Cancel">×</button>
     </div>
