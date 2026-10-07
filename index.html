@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="1.4">
+<meta name="bowenbuilder-version" content="1.5">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -3261,7 +3261,7 @@ button.teams-file-row:hover{border-color:#bdccdd}
       <div id="adminGuestFilesPanel" class="hidden">
         <div class="card admin-note">
           <strong>Guest File Access</strong>
-          <div class="muted" style="margin-top:5px">Give outside subcontractors or vendors view/download access to selected subdivision file spaces without a Bowen Microsoft account. Guest links can expire or be revoked at any time.</div>
+          <div class="muted" style="margin-top:5px">Give outside subcontractors or vendors view/download access to selected subdivision file spaces without a Bowen Microsoft account. Guest links can expire or be revoked at any time. You can also edit subdivision access later without changing the guest's link.</div>
         </div>
 
         <div class="guest-access-create card">
@@ -3347,6 +3347,33 @@ button.teams-file-row:hover{border-color:#bdccdd}
   </main>
 </section>
 
+
+
+<dialog id="guestAccessEditDialog">
+  <div class="sheet">
+    <div class="dialog-head">
+      <div>
+        <h2 style="margin:0">Edit Guest Access</h2>
+        <div id="guestAccessEditGuest" class="muted" style="margin-top:3px"></div>
+      </div>
+      <button id="guestAccessEditX" class="xbtn" type="button">×</button>
+    </div>
+
+    <div class="notice" style="margin-bottom:12px">
+      The guest's existing link stays the same. Changes to subdivision access take effect immediately.
+    </div>
+
+    <div class="guest-access-subtitle">Subdivision Access</div>
+    <div id="guestAccessEditSubdivisionChoices" class="guest-access-subdivision-grid"></div>
+
+    <div id="guestAccessEditNotice" class="notice hidden" style="margin-top:12px"></div>
+
+    <div class="actions" style="position:sticky;bottom:0;background:#fff;padding-top:12px">
+      <button id="guestAccessEditCancel" class="secondary" type="button">Cancel</button>
+      <button id="guestAccessEditSave" class="primary" type="button">Save Access</button>
+    </div>
+  </div>
+</dialog>
 
 <div id="powerCompanyOverlay" class="power-company-overlay hidden" aria-hidden="true">
   <div class="power-company-bubble" role="dialog" aria-modal="true" aria-labelledby="powerCompanyBubbleName">
@@ -3760,7 +3787,7 @@ button.teams-file-row:hover{border-color:#bdccdd}
 <script>
 (async()=>{
 const $=id=>document.getElementById(id);
-const BOWENBUILDER_VERSION='1.4';
+const BOWENBUILDER_VERSION='1.5';
 const SB_URL='https://oztefiymckpyxiewgxtc.supabase.co';
 const SB_KEY='sb_publishable__ItoYGeHKEGTBFiE7JM74w_1F-qERVe';
 const db=window.supabase.createClient(SB_URL,SB_KEY);
@@ -4240,6 +4267,7 @@ let adminGuestInvites=[];
 let adminGuestInviteSubdivisions=[];
 let adminGuestFileActivity=[];
 let latestCreatedGuestLink={url:'',email:'',name:'',expiresAt:'',neverExpires:false};
+let editingGuestAccessInviteId=null;
 let adminActivityLogTimer=null;
 let activitySessionId='';
 const activityLastLogged=new Map();
@@ -9041,6 +9069,7 @@ function renderAdminGuestAccessList(){
         <div><strong>Last activity:</strong> ${esc(lastActivity)}</div>
       </div>
       <div class="guest-access-row-actions">
+        ${status==='active'?`<button class="secondary" type="button" data-guest-edit="${esc(invite.id)}">Edit Access</button>`:''}
         ${status==='active'&&url?`<button class="secondary" type="button" data-guest-email="${esc(invite.id)}">Email Invite</button>`:''}
         ${status==='active'&&url?`<button class="secondary" type="button" data-guest-copy="${esc(invite.id)}">Copy Link</button>`:''}
         ${status==='active'&&url?`<button class="secondary" type="button" data-guest-open="${esc(invite.id)}">Open Portal</button>`:''}
@@ -9048,6 +9077,10 @@ function renderAdminGuestAccessList(){
       </div>
     </div>`;
   }).join('');
+
+  list.querySelectorAll('[data-guest-edit]').forEach(btn=>{
+    btn.onclick=()=>openGuestAccessEditor(btn.dataset.guestEdit);
+  });
 
   list.querySelectorAll('[data-guest-email]').forEach(btn=>{
     btn.onclick=()=>{
@@ -9088,6 +9121,107 @@ function renderAdminGuestAccessList(){
   list.querySelectorAll('[data-guest-revoke]').forEach(btn=>{
     btn.onclick=()=>revokeGuestAccess(btn.dataset.guestRevoke);
   });
+}
+
+
+function guestAccessEditSetNotice(message='',error=false){
+  const box=$('guestAccessEditNotice');
+  if(!box)return;
+  box.textContent=message||'';
+  box.classList.toggle('hidden',!message);
+  box.style.color=error?'#b42318':'';
+}
+
+function openGuestAccessEditor(inviteId){
+  const invite=adminGuestInvites.find(x=>String(x.id)===String(inviteId));
+  if(!invite)return;
+
+  editingGuestAccessInviteId=String(invite.id);
+  guestAccessEditSetNotice('');
+
+  const currentIds=new Set(
+    adminGuestInviteSubdivisions
+      .filter(row=>String(row.invite_id)===String(invite.id))
+      .map(row=>String(row.subdivision_id))
+  );
+
+  $('guestAccessEditGuest').textContent=
+    `${invite.guest_name||'Guest'} · ${invite.email||''}`;
+
+  const root=$('guestAccessEditSubdivisionChoices');
+  root.innerHTML=subdivisions
+    .filter(s=>s.active!==false)
+    .map(s=>`<label class="guest-access-subdivision-check">
+      <input type="checkbox"
+             data-guest-edit-subdivision="${esc(s.id)}"
+             ${currentIds.has(String(s.id))?'checked':''}>
+      <span>${esc(s.name)}</span>
+    </label>`)
+    .join('');
+
+  $('guestAccessEditDialog').showModal();
+}
+
+function closeGuestAccessEditor(){
+  editingGuestAccessInviteId=null;
+  guestAccessEditSetNotice('');
+  try{$('guestAccessEditDialog').close();}catch(_){}
+}
+
+async function saveGuestAccessEditor(){
+  if(!isBowenBuilderAdmin() || !editingGuestAccessInviteId)return;
+
+  const invite=adminGuestInvites.find(
+    x=>String(x.id)===String(editingGuestAccessInviteId)
+  );
+  if(!invite)return;
+
+  const subdivisionIds=[
+    ...document.querySelectorAll('[data-guest-edit-subdivision]:checked')
+  ].map(x=>x.dataset.guestEditSubdivision).filter(Boolean);
+
+  if(!subdivisionIds.length){
+    guestAccessEditSetNotice('Choose at least one subdivision.',true);
+    return;
+  }
+
+  const button=$('guestAccessEditSave');
+  const original=button.textContent;
+  button.disabled=true;
+  button.textContent='Saving…';
+  guestAccessEditSetNotice('');
+
+  try{
+    const {error}=await db.rpc(
+      'bowenbuilder_admin_update_guest_file_invite_subdivisions',
+      {
+        p_invite_id:invite.id,
+        p_subdivision_ids:subdivisionIds
+      }
+    );
+
+    if(error)throw error;
+
+    logBowenActivity('admin_guest_file_access_updated',{
+      label:`Updated guest subdivision access for ${invite.guest_name||invite.email}`,
+      entityType:'guest_file_invite',
+      entityId:invite.id,
+      screen:'Admin',
+      force:true,
+      metadata:{subdivision_count:subdivisionIds.length}
+    });
+
+    closeGuestAccessEditor();
+    await loadAdminGuestAccess();
+  }catch(err){
+    guestAccessEditSetNotice(
+      err?.message||'Could not update guest subdivision access.',
+      true
+    );
+  }finally{
+    button.disabled=false;
+    button.textContent=original;
+  }
 }
 
 async function createGuestAccess(){
@@ -11836,6 +11970,13 @@ $('adminActivityLogTab').onclick=()=>showAdminPanel('activity');
 
 $('guestAccessCreate').onclick=createGuestAccess;
 $('guestAccessNeverExpires').onchange=syncGuestAccessExpirationMode;
+
+$('guestAccessEditSave').onclick=saveGuestAccessEditor;
+$('guestAccessEditCancel').onclick=closeGuestAccessEditor;
+$('guestAccessEditX').onclick=closeGuestAccessEditor;
+$('guestAccessEditDialog').addEventListener('click',e=>{
+  if(e.target===e.currentTarget)closeGuestAccessEditor();
+});
 $('guestAccessRefresh').onclick=loadAdminGuestAccess;
 $('guestAccessCreatedEmail').onclick=()=>{
   if(!latestCreatedGuestLink.url)return;
@@ -12403,7 +12544,7 @@ try{
 </script>
 
 <div id="bbBuildVersion" style="text-align:center;color:#8a96a8;font-size:10px;padding:10px 8px 18px">
-  BowenBuilder 1.4</div>
+  BowenBuilder 1.5</div>
 
 
 
