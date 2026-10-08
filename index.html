@@ -2993,174 +2993,293 @@ button.teams-file-row:hover{border-color:#bdccdd}
   display:flex;
   align-items:center;
   gap:10px;
-  color:#667085;
+  margin:16px 0 12px;
+  color:#98a2b3;
   font-size:11px;
   font-weight:800;
   text-transform:uppercase;
-  letter-spacing:.04em;
-  margin:15px 0 10px;
+  letter-spacing:.05em;
 }
-.portal-login-divider:before,.portal-login-divider:after{
+.portal-login-divider::before,.portal-login-divider::after{
   content:"";
   height:1px;
-  background:#e2e8f0;
+  background:#e4e7ec;
   flex:1;
 }
-.portal-entry-button{width:100%;min-height:46px}
+.portal-login-entry{width:100%;min-height:46px}
 
-.portal-public{
+.portal-auth{
   min-height:100vh;
-  background:#eef3f8;
-  padding:24px;
-  padding-top:max(24px,env(safe-area-inset-top));
-  padding-bottom:max(24px,env(safe-area-inset-bottom));
+  display:grid;
+  place-items:center;
+  padding:22px;
+  background:linear-gradient(160deg,#eef4fa,#f8fafc 60%,#edf4fb);
 }
-.portal-shell{width:min(520px,100%);margin:0 auto}
-.portal-public-brand{
+.portal-auth.hidden{display:none}
+.portal-auth-card{
+  width:min(450px,100%);
+  background:#fff;
+  border:1px solid #dce5ef;
+  border-radius:24px;
+  padding:22px;
+  box-shadow:0 24px 70px rgba(24,52,84,.14);
+}
+.portal-auth-brand{
   display:flex;
   align-items:center;
-  gap:11px;
-  margin-bottom:18px;
+  gap:12px;
+  margin-bottom:20px;
 }
-.portal-public-brand strong{font-size:19px;color:#173f6c}
-.portal-auth-card{
-  background:#fff;
-  border:1px solid #dbe3ee;
-  border-radius:22px;
-  padding:20px;
-  box-shadow:0 12px 38px rgba(25,55,88,.08);
+.portal-auth-brand h1{margin:0;color:var(--navy);font-size:22px}
+.portal-auth-brand p{margin:3px 0 0;color:var(--muted)}
+.portal-auth-card h2{color:var(--navy);margin:0 0 4px}
+.portal-auth-card label{display:block;margin-top:12px}
+.portal-auth-card input{width:100%}
+.portal-auth-card .primary{width:100%;margin-top:16px;min-height:46px}
+.portal-auth-link{
+  width:100%;
+  margin-top:10px;
+  text-align:center;
 }
-.portal-auth-card h1{margin:0 0 6px;color:#173f6c;font-size:24px}
-.portal-full-button{width:100%;min-height:47px;margin-top:8px}
-.link-button{
-  border:0;background:transparent;color:#1769aa;font-weight:800;
-  padding:10px 2px;cursor:pointer;
+.portal-auth-back{width:100%;margin-top:18px}
+.portal-invite-badge{
+  display:inline-flex;
+  border-radius:999px;
+  padding:5px 9px;
+  background:#eaf3fc;
+  color:#18548d;
+  font-weight:900;
+  font-size:11px;
+  text-transform:uppercase;
 }
-.portal-auth-foot{
-  margin:8px 0 12px;
-  padding:10px 11px;
-  border-radius:12px;
-  background:#f7f9fc;
-  color:#667085;
-  font-size:12px;
-  line-height:1.4;
+.portal-invite-company{
+  margin-top:10px;
+  font-weight:900;
+  color:var(--navy);
+  font-size:18px;
 }
-.portal-invite-preview{
-  margin:12px 0;
-  padding:12px;
-  border:1px solid #cfe0f0;
-  border-radius:14px;
-  background:#f5f9fd;
-}
-.portal-app{min-height:100vh;background:#f3f6fa}
+
+.portal-app{min-height:100vh;background:#f4f7fa}
+.portal-app.hidden{display:none}
 .portal-topbar{
-  position:sticky;top:0;z-index:100;
-  display:flex;justify-content:space-between;align-items:center;gap:12px;
-  padding:13px max(16px,env(safe-area-inset-right)) 13px max(16px,env(safe-area-inset-left));
-  padding-top:max(13px,env(safe-area-inset-top));
-  background:#fff;border-bottom:1px solid #dbe3ee;
+  position:sticky;
+  top:0;
+  z-index:50;
+  display:flex;
+  justify-content:space-between;
+  gap:14px;
+  align-items:center;
+  padding:12px 18px;
+  background:#fff;
+  border-bottom:1px solid #dce5ee;
 }
-.portal-topbar strong{display:block;color:#173f6c;font-size:17px}
-.portal-topbar small{display:block;color:#667085;margin-top:2px}
-.portal-app-main{width:min(1100px,100%);margin:0 auto;padding:18px 16px 40px}
-.portal-welcome{
-  display:flex;align-items:flex-start;justify-content:space-between;gap:12px;
+.portal-topbar-brand{
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+.portal-topbar-brand strong{display:block;color:var(--navy);font-size:16px}
+.portal-topbar-brand small{display:block;color:var(--muted);margin-top:1px}
+.portal-topbar-actions{display:flex;align-items:center;gap:10px}
+.portal-user-name{font-size:12px;color:#667085;font-weight:750}
+.portal-shell{max-width:1100px;margin:0 auto;padding:18px}
+.portal-page-head{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-end;
+  gap:12px;
+  flex-wrap:wrap;
   margin-bottom:14px;
 }
-.portal-welcome h1{margin:0;color:#173f6c;font-size:25px}
-.portal-user-badge{
-  border-radius:999px;padding:7px 10px;background:#eaf2fb;color:#245683;
-  font-size:11px;font-weight:850;white-space:nowrap;
-}
+.portal-page-head h1,.portal-page-head h2{margin:0;color:var(--navy)}
 .portal-project-grid{
-  display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px;
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(230px,1fr));
+  gap:12px;
 }
 .portal-project-card{
-  display:flex;gap:12px;align-items:center;text-align:left;
-  width:100%;padding:15px;border:1px solid #d8e3ef;border-radius:16px;
-  background:#fff;color:#173f6c;cursor:pointer;
+  border:1px solid #d8e3ee;
+  border-radius:17px;
+  background:#fff;
+  padding:16px;
+  text-align:left;
+  cursor:pointer;
+  color:#173f6c;
+  min-height:110px;
 }
-.portal-project-card:hover{border-color:#9bb8d3}
-.portal-project-icon{
-  width:44px;height:42px;border-radius:12px;display:grid;place-items:center;
-  background:#eaf2fb;font-size:22px;flex:0 0 auto;
-}
-.portal-project-copy{min-width:0;flex:1}
-.portal-project-copy strong{display:block;font-size:15px}
-.portal-project-copy small{display:block;color:#667085;margin-top:4px;line-height:1.35}
-.portal-toolbar{
-  display:flex;justify-content:space-between;gap:10px;align-items:center;
-  flex-wrap:wrap;margin-bottom:12px;
-}
-.portal-toolbar-actions{display:flex;gap:8px;flex-wrap:wrap}
-.portal-file-list{display:grid;gap:9px}
+.portal-project-card strong{display:block;font-size:17px}
+.portal-project-card small{display:block;margin-top:5px;color:#667085;line-height:1.35}
+.portal-project-card .portal-project-arrow{float:right;font-size:20px;color:#6b8bab}
+.portal-files-list{display:grid;gap:9px}
 .portal-file-row{
-  display:grid;grid-template-columns:42px minmax(0,1fr) auto;
-  gap:10px;align-items:center;
-  background:#fff;border:1px solid #dbe3ee;border-radius:14px;padding:10px 11px;
+  display:grid;
+  grid-template-columns:42px minmax(0,1fr) auto;
+  gap:10px;
+  align-items:center;
+  border:1px solid #dbe3ee;
+  border-radius:14px;
+  padding:10px 11px;
+  background:#fff;
 }
 .portal-file-icon{
-  width:39px;height:39px;border-radius:10px;display:grid;place-items:center;
-  background:#eef4fb;color:#28547f;font-size:11px;font-weight:900;
+  width:38px;height:38px;border-radius:10px;
+  display:grid;place-items:center;background:#eef4fb;color:#244f7e;
+  font-size:11px;font-weight:900;
 }
 .portal-file-name{font-weight:850;color:#173f6c;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .portal-file-meta{font-size:11px;color:#667085;margin-top:3px}
 .portal-file-actions{display:flex;gap:7px;flex-wrap:wrap}
-.portal-upload-permission{
-  display:inline-flex;padding:5px 8px;border-radius:999px;background:#edf8f1;color:#28734c;
-  font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.03em;
+.portal-upload-actions{display:flex;gap:8px;flex-wrap:wrap}
+.portal-empty{
+  border:1px dashed #c9d6e3;
+  background:#fff;
+  border-radius:16px;
+  padding:25px 16px;
+  text-align:center;
+  color:#667085;
 }
 
-.portal-admin-create{margin-top:12px}
-.portal-admin-section-title{font-size:17px;font-weight:900;color:#173f6c;margin-bottom:10px}
-.portal-company-list{display:grid;gap:13px}
+.portal-admin-chooser{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:10px;
+  margin:12px 0;
+}
+.portal-admin-choice{
+  display:flex;
+  align-items:center;
+  gap:11px;
+  text-align:left;
+  padding:13px;
+  border-radius:15px;
+  border:1px solid #dbe3ee;
+  background:#fff;
+  color:#344054;
+}
+.portal-admin-choice.active{
+  border-color:#7aa7d2;
+  background:#f1f7fd;
+  color:#174f86;
+}
+.portal-admin-choice-icon{
+  width:40px;height:40px;border-radius:11px;
+  display:grid;place-items:center;background:#eaf2fb;color:#174f86;
+  font-size:20px;flex:0 0 auto;
+}
+.portal-admin-choice strong{display:block}
+.portal-admin-choice small{display:block;margin-top:3px;color:#667085}
+
+.portal-company-list-head,.portal-company-detail-head,.portal-company-section-head{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:12px;
+  flex-wrap:wrap;
+}
+.portal-company-list{
+  display:grid;
+  gap:9px;
+}
 .portal-company-card{
-  border:1px solid #dbe3ee;border-radius:17px;background:#fff;padding:14px;
+  display:grid;
+  grid-template-columns:48px minmax(0,1fr) auto;
+  align-items:center;
+  gap:12px;
+  width:100%;
+  text-align:left;
+  padding:13px;
+  border:1px solid #dbe3ee;
+  border-radius:15px;
+  background:#fff;
+  color:#344054;
+  cursor:pointer;
 }
-.portal-company-head{
-  display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:11px;
+.portal-company-card:hover{border-color:#adc3d8}
+.portal-company-logo{
+  width:44px;height:44px;border-radius:12px;
+  display:grid;place-items:center;
+  background:#eaf2fb;color:#174f86;
+  font-weight:950;font-size:15px;
 }
-.portal-company-name{font-size:18px;font-weight:900;color:#173f6c}
-.portal-company-trade{color:#667085;font-size:12px;margin-top:3px}
+.portal-company-card-name{font-weight:900;color:var(--navy);font-size:15px}
+.portal-company-card-meta{margin-top:3px;color:#667085;font-size:12px;line-height:1.4}
+.portal-company-card-arrow{font-size:22px;color:#87a0b9}
+.portal-company-card.inactive{opacity:.62}
 .portal-company-status{
-  display:inline-flex;padding:5px 8px;border-radius:999px;
-  font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.04em;
+  display:inline-flex;
+  padding:3px 7px;border-radius:999px;
+  font-size:10px;font-weight:900;text-transform:uppercase;
+  margin-left:6px;background:#eaf8ef;color:#28734c;
 }
-.portal-company-status.active{background:#eaf8ef;color:#28734c}
-.portal-company-status.disabled{background:#fdecea;color:#a1271d}
-.portal-company-fields{
-  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;
+.portal-company-status.inactive{background:#f2f4f7;color:#667085}
+.portal-company-detail-title-wrap{flex:1;min-width:220px}
+.portal-company-detail-title-wrap h2{margin:0;color:var(--navy)}
+.portal-company-section{margin-top:12px}
+.portal-company-active-toggle{
+  display:flex!important;
+  gap:10px;
+  align-items:flex-start;
+  border:1px solid #dbe3ee;
+  border-radius:12px;
+  padding:10px 12px;
 }
-.portal-access-grid{
-  display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:8px;margin-top:9px;
+.portal-company-active-toggle input{width:20px;height:20px;margin:1px 0 0}
+.portal-company-active-toggle strong,.portal-company-active-toggle small{display:block}
+.portal-company-active-toggle small{margin-top:2px;color:#667085}
+.portal-company-access-grid{display:grid;gap:8px;margin-top:12px}
+.portal-access-row{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 90px 90px;
+  align-items:center;
+  gap:10px;
+  padding:10px 11px;
+  border:1px solid #e0e6ed;
+  border-radius:12px;
 }
-.portal-access-sub{
-  border:1px solid #dbe3ee;border-radius:12px;padding:9px 10px;background:#fafcff;
+.portal-access-row-name{font-weight:800;color:#344054}
+.portal-access-check{
+  display:flex;align-items:center;gap:6px;margin:0!important;
+  font-size:12px;font-weight:750;color:#667085;
 }
-.portal-access-sub-name{font-weight:850;color:#344054;margin-bottom:7px}
-.portal-access-sub-checks{display:flex;gap:12px;flex-wrap:wrap}
-.portal-access-sub-checks label{display:flex;align-items:center;gap:6px;margin:0;font-size:12px}
-.portal-company-users{display:grid;gap:7px;margin-top:9px}
-.portal-company-user{
-  display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;
-  padding:10px;border:1px solid #e1e8f0;border-radius:12px;background:#fbfcfe;
+.portal-access-check input{width:19px;height:19px;margin:0}
+.portal-company-users-list{display:grid;gap:8px;margin-top:12px}
+.portal-user-row{
+  display:grid;
+  grid-template-columns:42px minmax(0,1fr) auto;
+  gap:10px;
+  align-items:center;
+  padding:10px 11px;
+  border:1px solid #e0e6ed;
+  border-radius:12px;
 }
-.portal-company-user-name{font-weight:850;color:#344054}
-.portal-company-user-meta{color:#667085;font-size:11px;margin-top:3px;line-height:1.4}
-.portal-company-user-actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
-.portal-invite-form{
-  display:grid;grid-template-columns:1fr 1fr 150px auto;gap:8px;align-items:end;margin-top:10px;
+.portal-user-avatar{
+  width:38px;height:38px;border-radius:50%;
+  display:grid;place-items:center;background:#eef4fb;color:#174f86;
+  font-weight:900;font-size:12px;
 }
-.portal-invite-form label{margin:0}
-@media(max-width:760px){
-  .portal-company-fields{grid-template-columns:1fr}
-  .portal-invite-form{grid-template-columns:1fr}
-  .portal-company-user{grid-template-columns:1fr}
-  .portal-company-user-actions{justify-content:flex-start}
+.portal-user-row-name{font-weight:850;color:#344054}
+.portal-user-row-meta{font-size:11px;color:#667085;margin-top:3px;line-height:1.4}
+.portal-user-row-actions{display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+.portal-user-row-actions select{width:auto;min-width:120px;padding:7px 8px}
+.portal-user-invite{
+  margin-top:14px;
+  padding-top:14px;
+  border-top:1px solid #e5e9ef;
+}
+.portal-user-invite-title{font-weight:900;color:var(--navy);margin-bottom:8px}
+
+@media(max-width:700px){
+  .portal-topbar{align-items:flex-start}
+  .portal-user-name{display:none}
+  .portal-shell{padding:12px}
+  .portal-admin-chooser{grid-template-columns:1fr}
+  .portal-company-card{grid-template-columns:42px minmax(0,1fr) auto}
+  .portal-company-logo{width:38px;height:38px}
+  .portal-access-row{grid-template-columns:1fr 76px 76px}
+  .portal-user-row{grid-template-columns:38px minmax(0,1fr)}
+  .portal-user-row-actions{grid-column:2;justify-content:flex-start}
   .portal-file-row{grid-template-columns:38px minmax(0,1fr)}
   .portal-file-actions{grid-column:2}
-  .portal-welcome{display:block}
-  .portal-user-badge{display:inline-flex;margin-top:8px}
 }
 
 </style>
@@ -3178,98 +3297,10 @@ button.teams-file-row:hover{border-color:#bdccdd}
   <div class="crew-shell">
     <div class="crew-brand">
       <div class="brand-mark">BB</div>
-      <div><strong>Bowen Builder Portal</strong><div class="muted">Guest Access · Bowen &amp; Bowen Homebuilders</div></div>
+      <div><strong>Bowen Builder Portal</strong><div class="muted">Bowen &amp; Bowen Homebuilders · Guest Access</div></div>
     </div>
     <div id="guestFilesContent"><div class="crew-card">Loading guest file access…</div></div>
   </div>
-</section>
-
-
-<section id="portalAuthView" class="portal-public hidden">
-  <div class="portal-shell">
-    <div class="portal-public-brand">
-      <div class="brand-mark">BB</div>
-      <div>
-        <strong>Bowen Builder Portal</strong>
-        <div class="muted">Bowen &amp; Bowen Homebuilders</div>
-      </div>
-    </div>
-
-    <div id="portalLoginCard" class="portal-auth-card">
-      <h1>Vendor Sign In</h1>
-      <p class="muted">Sign in to access the subdivisions and files assigned to your company.</p>
-      <form id="portalLoginForm">
-        <label>Email Address
-          <input id="portalLoginEmail" type="email" autocomplete="email" required>
-        </label>
-        <label>Password
-          <input id="portalLoginPassword" type="password" autocomplete="current-password" required>
-        </label>
-        <div id="portalLoginNotice" class="notice hidden"></div>
-        <button id="portalLoginSubmit" class="primary portal-full-button" type="submit">Sign In</button>
-      </form>
-      <button id="portalForgotPassword" class="link-button" type="button">Forgot password?</button>
-      <div class="portal-auth-foot">
-        Portal accounts are invitation-only. Contact Bowen &amp; Bowen if your company needs access.
-      </div>
-      <button id="portalBackToBowenBuilder" class="secondary portal-full-button" type="button">Bowen Employee Sign In</button>
-    </div>
-
-    <div id="portalInviteCard" class="portal-auth-card hidden">
-      <h1>Create Your Portal Account</h1>
-      <div id="portalInvitePreview" class="portal-invite-preview"></div>
-      <form id="portalInviteForm">
-        <label>Email Address
-          <input id="portalInviteEmail" type="email" readonly>
-        </label>
-        <label>Create Password
-          <input id="portalInvitePassword" type="password" autocomplete="new-password" minlength="8" required>
-        </label>
-        <label>Confirm Password
-          <input id="portalInvitePasswordConfirm" type="password" autocomplete="new-password" minlength="8" required>
-        </label>
-        <div id="portalInviteNotice" class="notice hidden"></div>
-        <button id="portalInviteSubmit" class="primary portal-full-button" type="submit">Create Account</button>
-      </form>
-      <button id="portalInviteExistingLogin" class="secondary portal-full-button" type="button">I Already Have an Account</button>
-    </div>
-
-    <div id="portalResetCard" class="portal-auth-card hidden">
-      <h1>Set New Password</h1>
-      <p class="muted">Choose a new password for your Bowen Builder Portal account.</p>
-      <form id="portalResetForm">
-        <label>New Password
-          <input id="portalResetPassword" type="password" autocomplete="new-password" minlength="8" required>
-        </label>
-        <label>Confirm Password
-          <input id="portalResetPasswordConfirm" type="password" autocomplete="new-password" minlength="8" required>
-        </label>
-        <div id="portalResetNotice" class="notice hidden"></div>
-        <button class="primary portal-full-button" type="submit">Save New Password</button>
-      </form>
-    </div>
-  </div>
-</section>
-
-<section id="portalAppView" class="portal-app hidden">
-  <header class="portal-topbar">
-    <div>
-      <strong>Bowen Builder Portal</strong>
-      <small id="portalCompanyLabel">Vendor Portal</small>
-    </div>
-    <button id="portalSignOut" class="secondary" type="button">Sign Out</button>
-  </header>
-  <main class="portal-app-main">
-    <div class="portal-welcome">
-      <div>
-        <h1 id="portalPageTitle">Your Projects</h1>
-        <p id="portalPageSub" class="muted"></p>
-      </div>
-      <div id="portalUserBadge" class="portal-user-badge"></div>
-    </div>
-    <div id="portalAppContent"></div>
-    <input id="portalUploadInput" type="file" multiple hidden>
-  </main>
 </section>
 
 <section id="login" class="login">
@@ -3279,9 +3310,90 @@ button.teams-file-row:hover{border-color:#bdccdd}
     
     
     <button id="msLogin" class="ms-btn" type="button">▦  Sign in with Microsoft</button>
-    <div class="portal-login-divider"><span>External vendors &amp; trade partners</span></div>
-    <button id="openVendorPortal" class="secondary portal-entry-button" type="button">Bowen Builder Portal</button>
+    <div class="portal-login-divider"><span>External vendors</span></div>
+    <button id="openVendorPortal" class="secondary portal-login-entry" type="button">Bowen Builder Portal</button>
   </form>
+</section>
+
+<section id="portalAuthView" class="portal-auth hidden">
+  <div class="portal-auth-card">
+    <div class="portal-auth-brand">
+      <div class="brand-mark">BB</div>
+      <div>
+        <h1>Bowen Builder Portal</h1>
+        <p>Bowen &amp; Bowen Homebuilders</p>
+      </div>
+    </div>
+
+    <div id="portalAuthNotice" class="notice hidden"></div>
+
+    <div id="portalLoginCard">
+      <h2>Portal Sign In</h2>
+      <p class="muted">For approved vendor company users.</p>
+      <label>Email
+        <input id="portalLoginEmail" type="email" autocomplete="email" placeholder="you@company.com">
+      </label>
+      <label>Password
+        <input id="portalLoginPassword" type="password" autocomplete="current-password">
+      </label>
+      <button id="portalLoginSubmit" class="primary" type="button">Sign In</button>
+      <button id="portalForgotPassword" class="linkish portal-auth-link" type="button">Forgot password?</button>
+    </div>
+
+    <div id="portalInviteCard" class="hidden">
+      <div class="portal-invite-badge">Vendor Invitation</div>
+      <h2 id="portalInviteTitle">Create your Portal account</h2>
+      <div id="portalInviteCompany" class="portal-invite-company"></div>
+      <div id="portalInviteDetails" class="muted"></div>
+      <label>Email
+        <input id="portalInviteEmail" type="email" readonly>
+      </label>
+      <label>Create Password
+        <input id="portalInvitePassword" type="password" autocomplete="new-password" minlength="8">
+      </label>
+      <label>Confirm Password
+        <input id="portalInvitePasswordConfirm" type="password" autocomplete="new-password" minlength="8">
+      </label>
+      <button id="portalInviteCreateAccount" class="primary" type="button">Create Portal Account</button>
+      <button id="portalInviteUseExisting" class="linkish portal-auth-link" type="button">Already have an account? Sign in</button>
+    </div>
+
+    <div id="portalResetCard" class="hidden">
+      <h2>Set a New Password</h2>
+      <p class="muted">Enter your new Bowen Builder Portal password.</p>
+      <label>New Password
+        <input id="portalResetPassword" type="password" autocomplete="new-password" minlength="8">
+      </label>
+      <label>Confirm Password
+        <input id="portalResetPasswordConfirm" type="password" autocomplete="new-password" minlength="8">
+      </label>
+      <button id="portalResetSave" class="primary" type="button">Save New Password</button>
+    </div>
+
+    <button id="portalBackToBowenBuilder" class="secondary portal-auth-back" type="button">← BowenBuilder Employee Sign In</button>
+  </div>
+</section>
+
+<section id="portalAppView" class="portal-app hidden">
+  <header class="portal-topbar">
+    <div class="portal-topbar-brand">
+      <div class="brand-mark">BB</div>
+      <div>
+        <strong>Bowen Builder Portal</strong>
+        <small id="portalCompanyName">Vendor Portal</small>
+      </div>
+    </div>
+    <div class="portal-topbar-actions">
+      <span id="portalUserName" class="portal-user-name"></span>
+      <button id="portalLogout" class="secondary" type="button">Sign Out</button>
+    </div>
+  </header>
+
+  <main class="portal-shell">
+    <div id="portalAppNotice" class="notice hidden"></div>
+    <div id="portalAppContent"></div>
+    <input id="portalFileInput" type="file" multiple hidden>
+  </main>
 </section>
 
 <section id="app" class="app hidden">
@@ -3324,7 +3436,7 @@ button.teams-file-row:hover{border-color:#bdccdd}
         <div class="subdivision-files-shell">
           <div class="subdivision-files-head">
             <div>
-              <strong id="subdivisionFilesName">Subdivision Portal</strong>
+              <strong id="subdivisionFilesName">Portal</strong>
               <div id="subdivisionFilesBreadcrumb" class="muted">Choose a lot folder.</div>
             </div>
             <div class="subdivision-files-head-actions">
@@ -3519,7 +3631,7 @@ button.teams-file-row:hover{border-color:#bdccdd}
       <div class="toolbar">
         <div>
           <h2 style="margin:0">Admin</h2>
-          <div class="muted">Manage BowenBuilder contacts, power companies, and user permissions.</div>
+          <div class="muted">Manage BowenBuilder contacts, permissions, Portal access, and activity.</div>
         </div>
       </div>
 
@@ -3528,8 +3640,7 @@ button.teams-file-row:hover{border-color:#bdccdd}
         <button id="adminPowerTab" class="admin-inner-tab" type="button">Power Companies</button>
         <button id="adminPermissionsTab" class="admin-inner-tab" type="button">User Permissions</button>
         <button id="adminOnlineTab" class="admin-inner-tab" type="button">Online Now</button>
-        <button id="adminPortalAccessTab" class="admin-inner-tab" type="button">Portal Access</button>
-        <button id="adminGuestFilesTab" class="admin-inner-tab" type="button">Guest Links</button>
+        <button id="adminGuestFilesTab" class="admin-inner-tab" type="button">Portal Access</button>
         <button id="adminActivityLogTab" class="admin-inner-tab" type="button">Activity Log</button>
       </div>
 
@@ -3584,135 +3695,211 @@ button.teams-file-row:hover{border-color:#bdccdd}
       </div>
 
 
+      
+<div id="adminGuestFilesPanel" class="hidden">
+  <div class="card admin-note">
+    <strong>Portal Access</strong>
+    <div class="muted" style="margin-top:5px">Manage vendor companies, Portal users, subdivision permissions, and quick guest links.</div>
+  </div>
 
-      <div id="adminPortalAccessPanel" class="hidden">
-        <div class="card admin-note">
-          <strong>Bowen Builder Portal Access</strong>
-          <div class="muted" style="margin-top:5px">
-            Organize outside users by vendor company. Company users inherit the company's subdivision permissions.
-            Portal accounts are separate from Bowen employee Microsoft accounts.
+  <div id="portalAdminChooser" class="portal-admin-chooser">
+    <button id="portalAdminCompaniesBtn" class="portal-admin-choice active" type="button">
+      <span class="portal-admin-choice-icon">▦</span>
+      <span><strong>Vendor Companies</strong><small>Companies, users &amp; permissions</small></span>
+    </button>
+    <button id="portalAdminGuestLinksBtn" class="portal-admin-choice" type="button">
+      <span class="portal-admin-choice-icon">↗</span>
+      <span><strong>Guest Links</strong><small>No-account file access</small></span>
+    </button>
+  </div>
+
+  <div id="portalAdminCompaniesView">
+    <div id="portalCompanyListView">
+      <div class="portal-company-list-head">
+        <div>
+          <strong>Vendor Companies</strong>
+          <div class="muted">Tap a company to manage its users and Portal access.</div>
+        </div>
+        <button id="portalCompanyAdd" class="primary" type="button">+ Add Company</button>
+      </div>
+      <label class="admin-search">Find Company
+        <input id="portalCompanySearch" type="search" placeholder="Search company or trade...">
+      </label>
+      <div id="portalCompanyListNotice" class="notice hidden" style="margin:12px 0"></div>
+      <div id="portalCompanyList" class="portal-company-list"></div>
+    </div>
+
+    <div id="portalCompanyDetailView" class="hidden">
+      <div class="portal-company-detail-head">
+        <button id="portalCompanyBack" class="secondary" type="button">← Vendor Companies</button>
+        <div class="portal-company-detail-title-wrap">
+          <h2 id="portalCompanyDetailTitle">Vendor Company</h2>
+          <div id="portalCompanyDetailMeta" class="muted"></div>
+        </div>
+      </div>
+
+      <div id="portalCompanyDetailNotice" class="notice hidden" style="margin-bottom:12px"></div>
+
+      <div class="card portal-company-section">
+        <div class="portal-company-section-head">
+          <div>
+            <strong>Company Information</strong>
+            <div class="muted">The vendor record shown in BowenBuilder.</div>
+          </div>
+        </div>
+        <div class="two">
+          <label>Company Name
+            <input id="portalCompanyNameInput" type="text" placeholder="e.g. Renegade Cabinets">
+          </label>
+          <label>Trade / Category
+            <input id="portalCompanyTradeInput" type="text" placeholder="e.g. Cabinets">
+          </label>
+        </div>
+        <div class="two">
+          <label>Primary Contact
+            <input id="portalCompanyContactName" type="text">
+          </label>
+          <label>Primary Email
+            <input id="portalCompanyContactEmail" type="email">
+          </label>
+        </div>
+        <label>Primary Phone
+          <input id="portalCompanyContactPhone" type="tel">
+        </label>
+        <label>Notes
+          <textarea id="portalCompanyNotes" rows="3" placeholder="Optional internal notes"></textarea>
+        </label>
+        <label class="portal-company-active-toggle">
+          <input id="portalCompanyActive" type="checkbox" checked>
+          <span><strong>Company active</strong><small>Inactive companies cannot sign into the Portal.</small></span>
+        </label>
+        <div class="actions">
+          <button id="portalCompanySave" class="primary" type="button">Save Company</button>
+        </div>
+      </div>
+
+      <div id="portalCompanyAccessSection" class="card portal-company-section hidden">
+        <div class="portal-company-section-head">
+          <div>
+            <strong>Subdivision Access</strong>
+            <div class="muted">All active users at this company inherit these permissions.</div>
+          </div>
+          <button id="portalCompanyAccessSave" class="primary" type="button">Save Access</button>
+        </div>
+        <div id="portalCompanyAccessGrid" class="portal-company-access-grid"></div>
+      </div>
+
+      <div id="portalCompanyUsersSection" class="card portal-company-section hidden">
+        <div class="portal-company-section-head">
+          <div>
+            <strong>Portal Users</strong>
+            <div class="muted">Everyone registered under this vendor company.</div>
           </div>
         </div>
 
-        <div class="portal-admin-create card">
-          <div class="portal-admin-section-title">Add Vendor Company</div>
+        <div id="portalCompanyUsersList" class="portal-company-users-list"></div>
+
+        <div class="portal-user-invite">
+          <div class="portal-user-invite-title">Invite User</div>
           <div class="two">
-            <label>Company Name
-              <input id="portalCompanyName" type="text" placeholder="e.g. Renegade Cabinets">
+            <label>Name
+              <input id="portalInviteUserName" type="text" placeholder="Full name">
             </label>
-            <label>Trade / Category
-              <input id="portalCompanyTrade" type="text" placeholder="e.g. Cabinets">
+            <label>Email
+              <input id="portalInviteUserEmail" type="email" placeholder="user@company.com">
             </label>
           </div>
-          <div class="two">
-            <label>Primary Contact
-              <input id="portalCompanyContact" type="text" placeholder="Name">
-            </label>
-            <label>Contact Email
-              <input id="portalCompanyEmail" type="email" placeholder="office@vendor.com">
-            </label>
-          </div>
-          <label>Contact Phone
-            <input id="portalCompanyPhone" type="tel" placeholder="Phone">
+          <label>Portal Role
+            <select id="portalInviteUserRole">
+              <option value="member">Member</option>
+              <option value="company_admin">Company Admin</option>
+            </select>
           </label>
-          <label>Notes
-            <textarea id="portalCompanyNotes" rows="2" placeholder="Optional notes"></textarea>
-          </label>
-          <div id="portalCompanyCreateNotice" class="notice hidden"></div>
           <div class="actions">
-            <button id="portalCompanyCreate" class="primary" type="button">+ Add Vendor Company</button>
+            <button id="portalInviteUserCreate" class="primary" type="button">Create Invitation</button>
           </div>
         </div>
 
         <div id="portalInviteCreated" class="guest-access-created hidden">
           <div>
-            <strong>Portal invitation ready</strong>
-            <div class="muted">Send this registration link to the invited user.</div>
+            <strong>Portal invitation created</strong>
+            <div class="muted">Send this invitation to the user. Their account will automatically belong to this company.</div>
           </div>
           <div id="portalInviteCreatedUrl" class="guest-access-created-url"></div>
           <div class="guest-access-created-actions">
             <button id="portalInviteCreatedEmail" class="primary" type="button">Email Invite</button>
             <button id="portalInviteCreatedCopy" class="secondary" type="button">Copy Link</button>
-            <button id="portalInviteCreatedOpen" class="secondary" type="button">Open Registration</button>
           </div>
-        </div>
-
-        <div class="admin-section">
-          <div class="admin-section-head">
-            <div>
-              <strong>Vendor Companies</strong>
-              <div class="muted">Manage company access and the Portal users registered under each company.</div>
-            </div>
-            <button id="portalAccessRefresh" class="secondary" type="button">↻ Refresh</button>
-          </div>
-          <div id="portalCompanyList" class="portal-company-list"></div>
         </div>
       </div>
+    </div>
+  </div>
 
-      <div id="adminGuestFilesPanel" class="hidden">
-        <div class="card admin-note">
-          <strong>Guest Links</strong>
-          <div class="muted" style="margin-top:5px">Give outside subcontractors or vendors view/download access to selected subdivision file spaces without a Bowen Microsoft account. Guest links can expire or be revoked at any time. You can also edit subdivision access later without changing the guest's link.</div>
-        </div>
+  <div id="portalAdminGuestLinksView" class="hidden">
+    <div class="card admin-note">
+      <strong>Guest Links</strong>
+      <div class="muted" style="margin-top:5px">Quick view/download access without creating a Portal account. Links can expire, never expire, or be revoked.</div>
+    </div>
 
-        <div class="guest-access-create card">
-          <div class="guest-access-create-title">Create Guest Access</div>
-          <div class="two">
-            <label>Guest Name
-              <input id="guestAccessName" type="text" placeholder="e.g. ABC Plumbing">
-            </label>
-            <label>Email Address
-              <input id="guestAccessEmail" type="email" placeholder="contractor@gmail.com">
-            </label>
-          </div>
-          <div class="guest-access-expiration">
-            <label id="guestAccessExpiresLabel">Access Expires
-              <input id="guestAccessExpires" type="date">
-            </label>
-            <label class="guest-access-never-check">
-              <input id="guestAccessNeverExpires" type="checkbox">
-              <span><strong>Link never expires</strong><small>Access stays active until you manually revoke it.</small></span>
-            </label>
-          </div>
-          <div>
-            <div class="guest-access-subtitle">Subdivision Access</div>
-            <div id="guestAccessSubdivisionChoices" class="guest-access-subdivision-grid"></div>
-          </div>
-          <div id="guestAccessCreateNotice" class="notice hidden"></div>
-          <div class="actions" style="margin-top:12px">
-            <button id="guestAccessCreate" class="primary" type="button">Create Guest Link</button>
-          </div>
-        </div>
-
-        <div id="guestAccessCreated" class="guest-access-created hidden">
-          <div>
-            <strong>Guest link created</strong>
-            <div class="muted">Send this link to the guest. They do not need a BowenBuilder account.</div>
-          </div>
-          <div id="guestAccessCreatedUrl" class="guest-access-created-url"></div>
-          <div class="guest-access-created-actions">
-            <button id="guestAccessCreatedEmail" class="primary" type="button">Email Invite</button>
-            <button id="guestAccessCreatedCopy" class="secondary" type="button">Copy Link</button>
-            <button id="guestAccessCreatedOpen" class="secondary" type="button">Open Portal</button>
-          </div>
-        </div>
-
-        <div class="admin-section">
-          <div class="admin-section-head">
-            <div>
-              <strong>Existing Guest Access</strong>
-              <div class="muted">Active, expired, and revoked guest links.</div>
-            </div>
-            <button id="guestAccessRefresh" class="secondary" type="button">↻ Refresh</button>
-          </div>
-          <div id="guestAccessList" class="guest-access-list"></div>
-        </div>
+    <div class="guest-access-create card">
+      <div class="guest-access-create-title">Create Guest Access</div>
+      <div class="two">
+        <label>Guest Name
+          <input id="guestAccessName" type="text" placeholder="e.g. ABC Plumbing">
+        </label>
+        <label>Email Address
+          <input id="guestAccessEmail" type="email" placeholder="contractor@gmail.com">
+        </label>
       </div>
+      <div class="guest-access-expiration">
+        <label id="guestAccessExpiresLabel">Access Expires
+          <input id="guestAccessExpires" type="date">
+        </label>
+        <label class="guest-access-never-check">
+          <input id="guestAccessNeverExpires" type="checkbox">
+          <span><strong>Link never expires</strong><small>Access stays active until you manually revoke it.</small></span>
+        </label>
+      </div>
+      <div>
+        <div class="guest-access-subtitle">Subdivision Access</div>
+        <div id="guestAccessSubdivisionChoices" class="guest-access-subdivision-grid"></div>
+      </div>
+      <div id="guestAccessCreateNotice" class="notice hidden"></div>
+      <div class="actions" style="margin-top:12px">
+        <button id="guestAccessCreate" class="primary" type="button">Create Guest Link</button>
+      </div>
+    </div>
 
-      <div id="adminActivityLogPanel" class="hidden">
+    <div id="guestAccessCreated" class="guest-access-created hidden">
+      <div>
+        <strong>Guest link created</strong>
+        <div class="muted">Send this link to the guest. They do not need a Bowen Builder Portal account.</div>
+      </div>
+      <div id="guestAccessCreatedUrl" class="guest-access-created-url"></div>
+      <div class="guest-access-created-actions">
+        <button id="guestAccessCreatedEmail" class="primary" type="button">Email Invite</button>
+        <button id="guestAccessCreatedCopy" class="secondary" type="button">Copy Link</button>
+        <button id="guestAccessCreatedOpen" class="secondary" type="button">Open Portal</button>
+      </div>
+    </div>
+
+    <div class="admin-section">
+      <div class="admin-section-head">
+        <div>
+          <strong>Existing Guest Access</strong>
+          <div class="muted">Active, expired, and revoked guest links.</div>
+        </div>
+        <button id="guestAccessRefresh" class="secondary" type="button">↻ Refresh</button>
+      </div>
+      <div id="guestAccessList" class="guest-access-list"></div>
+    </div>
+  </div>
+</div>
+
+<div id="adminActivityLogPanel" class="hidden">
         <div class="card admin-note">
           <strong>Activity Log</strong>
-          <div class="muted" style="margin-top:5px">Private administrator-only history of what signed-in BowenBuilder and Bowen Builder Portal users are viewing and changing. Passwords, Microsoft tokens, email bodies, and file contents are not logged.</div>
+          <div class="muted" style="margin-top:5px">Private administrator-only history of what signed-in BowenBuilder users are viewing and changing. Passwords, Microsoft tokens, email bodies, and file contents are not logged.</div>
         </div>
         <div class="admin-activity-toolbar">
           <label>User<select id="adminActivityUser"><option value="">All users</option></select></label>
@@ -3725,6 +3912,7 @@ button.teams-file-row:hover{border-color:#bdccdd}
             <option value="punchout">Punchout</option>
             <option value="communication">Email / Text</option>
             <option value="interaction">Tabs / Buttons</option>
+            <option value="portal">Portal</option>
             <option value="files">Files</option>
             <option value="admin">Admin</option>
           </select></label>
@@ -4186,6 +4374,1275 @@ const db=window.supabase.createClient(SB_URL,SB_KEY);
 const crewTokenFromUrl=()=>new URLSearchParams(location.search).get('crew')||'';
 
 const guestTokenFromUrl=()=>new URLSearchParams(location.search).get('guest')||'';
+
+const portalModeFromUrl=()=>new URLSearchParams(location.search).get('portal')==='1';
+const portalInviteTokenFromUrl=()=>new URLSearchParams(location.search).get('portal_invite')||'';
+const portalResetFromUrl=()=>new URLSearchParams(location.search).get('portal_reset')==='1';
+
+let portalBootstrapData=null;
+let portalCurrentSubdivisionId=null;
+let portalCurrentLotId=null;
+let portalCurrentFolderId=null;
+let portalPendingInviteToken='';
+let portalPendingInvitePreview=null;
+
+let portalAdminMode='companies';
+let portalAdminCompanies=[];
+let portalAdminUsers=[];
+let portalAdminAccess=[];
+let portalAdminSelectedCompanyId=null;
+let latestPortalInvite={url:'',email:'',name:'',company:''};
+
+function portalBaseUrl(){
+  const url=new URL(location.href);
+  url.hash='';
+  url.search='';
+  url.searchParams.set('portal','1');
+  return url.href;
+}
+
+function portalInviteUrl(token){
+  const url=new URL(location.href);
+  url.hash='';
+  url.search='';
+  url.searchParams.set('portal_invite',String(token||''));
+  return url.href;
+}
+
+function portalResetUrl(){
+  const url=new URL(location.href);
+  url.hash='';
+  url.search='';
+  url.searchParams.set('portal','1');
+  url.searchParams.set('portal_reset','1');
+  return url.href;
+}
+
+function showPortalAuthNotice(message='',error=false){
+  const box=$('portalAuthNotice');
+  if(!box)return;
+  box.textContent=message||'';
+  box.classList.toggle('hidden',!message);
+  box.style.color=error?'#b42318':'';
+}
+
+function showPortalOnly(section='login'){
+  $('login')?.classList.add('hidden');
+  $('app')?.classList.add('hidden');
+  $('crewPublicView')?.classList.add('hidden');
+  $('guestFilesView')?.classList.add('hidden');
+  $('portalAppView')?.classList.add('hidden');
+  $('portalAuthView')?.classList.remove('hidden');
+
+  $('portalLoginCard')?.classList.toggle('hidden',section!=='login');
+  $('portalInviteCard')?.classList.toggle('hidden',section!=='invite');
+  $('portalResetCard')?.classList.toggle('hidden',section!=='reset');
+}
+
+function portalFileSize(bytes){
+  const n=Number(bytes||0);
+  if(!Number.isFinite(n)||n<=0)return '';
+  if(n<1024)return `${n} B`;
+  if(n<1024*1024)return `${(n/1024).toFixed(n<10240?1:0)} KB`;
+  return `${(n/(1024*1024)).toFixed(n<10*1024*1024?1:0)} MB`;
+}
+
+function portalDateTime(value){
+  const d=new Date(value);
+  if(Number.isNaN(d.getTime()))return '';
+  return d.toLocaleString(undefined,{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'});
+}
+
+function portalInitials(value){
+  return String(value||'Vendor').trim().split(/\s+/).slice(0,2).map(x=>x[0]||'').join('').toUpperCase()||'V';
+}
+
+function portalCanUpload(subdivisionId){
+  const rows=Array.isArray(portalBootstrapData?.access)?portalBootstrapData.access:[];
+  return !!rows.find(row=>
+    String(row.subdivision_id)===String(subdivisionId) &&
+    row.can_view===true &&
+    row.can_upload===true
+  );
+}
+
+async function portalLog(action,{label='',subdivisionId=null,lotId=null,fileId=null,metadata={}}={}){
+  try{
+    await db.rpc('bowenbuilder_portal_log_activity',{
+      p_action:String(action||'activity'),
+      p_label:String(label||'').slice(0,240)||null,
+      p_subdivision_id:subdivisionId||null,
+      p_lot_id:lotId||null,
+      p_file_id:fileId||null,
+      p_metadata:(metadata&&typeof metadata==='object')?metadata:{}
+    });
+  }catch(_){}
+}
+
+function portalShowApp(data){
+  portalBootstrapData=typeof data==='string'?JSON.parse(data):data;
+  portalCurrentSubdivisionId=null;
+  portalCurrentLotId=null;
+  portalCurrentFolderId=null;
+
+  $('login')?.classList.add('hidden');
+  $('app')?.classList.add('hidden');
+  $('crewPublicView')?.classList.add('hidden');
+  $('guestFilesView')?.classList.add('hidden');
+  $('portalAuthView')?.classList.add('hidden');
+  $('portalAppView')?.classList.remove('hidden');
+
+  $('portalCompanyName').textContent=portalBootstrapData?.company?.name||'Vendor Portal';
+  $('portalUserName').textContent=portalBootstrapData?.portal_user?.full_name||portalBootstrapData?.portal_user?.email||'';
+  renderPortalApp();
+}
+
+async function bootstrapPortalAccount(){
+  const {data,error}=await db.rpc('bowenbuilder_portal_bootstrap');
+  if(error)throw error;
+  if(!data)return null;
+  const parsed=typeof data==='string'?JSON.parse(data):data;
+  return parsed;
+}
+
+async function loadPortalInvitationPreview(token){
+  portalPendingInviteToken=String(token||'').trim();
+  showPortalOnly('invite');
+  showPortalAuthNotice('');
+
+  const {data,error}=await db.rpc('bowenbuilder_portal_invitation_preview',{
+    p_token:portalPendingInviteToken
+  });
+
+  if(error||!data){
+    showPortalAuthNotice(error?.message||'This Portal invitation is invalid or expired.',true);
+    $('portalInviteCreateAccount').disabled=true;
+    return null;
+  }
+
+  const preview=typeof data==='string'?JSON.parse(data):data;
+  portalPendingInvitePreview=preview;
+  $('portalInviteCompany').textContent=preview?.company?.name||'Vendor Company';
+  $('portalInviteDetails').textContent=[
+    preview?.full_name||'',
+    preview?.company?.trade_category||''
+  ].filter(Boolean).join(' · ');
+  $('portalInviteEmail').value=preview?.email||'';
+  $('portalLoginEmail').value=preview?.email||'';
+  $('portalInviteCreateAccount').disabled=false;
+  return preview;
+}
+
+async function acceptPendingPortalInvitation(){
+  if(!portalPendingInviteToken)return null;
+  const {data,error}=await db.rpc('bowenbuilder_portal_accept_invitation',{
+    p_token:portalPendingInviteToken
+  });
+  if(error)throw error;
+  return data;
+}
+
+async function portalSignIn(){
+  const email=String($('portalLoginEmail').value||'').trim();
+  const password=String($('portalLoginPassword').value||'');
+
+  if(!email||!password){
+    showPortalAuthNotice('Enter your email and password.',true);
+    return;
+  }
+
+  const button=$('portalLoginSubmit');
+  button.disabled=true;
+  button.textContent='Signing In…';
+  showPortalAuthNotice('');
+
+  try{
+    const current=(await db.auth.getSession()).data.session;
+    if(current && String(current.user?.email||'').toLowerCase()!==email.toLowerCase()){
+      await db.auth.signOut();
+    }
+
+    const {data,error}=await db.auth.signInWithPassword({email,password});
+    if(error)throw error;
+
+    currentAuthUserId=String(data.user?.id||data.session?.user?.id||'');
+
+    if(portalPendingInviteToken){
+      await acceptPendingPortalInvitation();
+    }
+
+    const portal=await bootstrapPortalAccount();
+    if(!portal){
+      await db.auth.signOut();
+      throw new Error('This account does not have active Bowen Builder Portal access.');
+    }
+
+    startBowenBuilderVersionWatch();
+    portalShowApp(portal);
+  }catch(err){
+    showPortalAuthNotice(err?.message||'Portal sign in failed.',true);
+  }finally{
+    button.disabled=false;
+    button.textContent='Sign In';
+  }
+}
+
+async function portalCreateAccount(){
+  const preview=portalPendingInvitePreview;
+  if(!preview || !portalPendingInviteToken)return;
+
+  const password=String($('portalInvitePassword').value||'');
+  const confirm=String($('portalInvitePasswordConfirm').value||'');
+
+  if(password.length<8){
+    showPortalAuthNotice('Password must be at least 8 characters.',true);
+    return;
+  }
+  if(password!==confirm){
+    showPortalAuthNotice('Passwords do not match.',true);
+    return;
+  }
+
+  const button=$('portalInviteCreateAccount');
+  button.disabled=true;
+  button.textContent='Creating Account…';
+  showPortalAuthNotice('');
+
+  try{
+    const {data,error}=await db.auth.signUp({
+      email:preview.email,
+      password,
+      options:{
+        data:{full_name:preview.full_name||''},
+        emailRedirectTo:portalInviteUrl(portalPendingInviteToken)
+      }
+    });
+
+    if(error)throw error;
+
+    if(data.session){
+      currentAuthUserId=String(data.user?.id||data.session?.user?.id||'');
+      await acceptPendingPortalInvitation();
+      const portal=await bootstrapPortalAccount();
+      if(!portal)throw new Error('Portal account could not be loaded.');
+      startBowenBuilderVersionWatch();
+      portalShowApp(portal);
+      return;
+    }
+
+    showPortalAuthNotice(
+      `Check ${preview.email} for the confirmation email. After confirming, you'll return to Bowen Builder Portal to finish signing in.`
+    );
+    button.textContent='Confirmation Email Sent';
+  }catch(err){
+    const msg=String(err?.message||'Could not create Portal account.');
+    if(/already registered|already exists/i.test(msg)){
+      $('portalLoginEmail').value=preview.email||'';
+      showPortalOnly('login');
+      showPortalAuthNotice('This email already has an account. Sign in to accept the Portal invitation.');
+    }else{
+      showPortalAuthNotice(msg,true);
+    }
+  }finally{
+    button.disabled=false;
+    if(button.textContent==='Creating Account…')button.textContent='Create Portal Account';
+  }
+}
+
+async function portalForgotPassword(){
+  const email=String($('portalLoginEmail').value||'').trim();
+  if(!email){
+    showPortalAuthNotice('Enter your email first, then tap Forgot password.',true);
+    return;
+  }
+
+  const {error}=await db.auth.resetPasswordForEmail(email,{
+    redirectTo:portalResetUrl()
+  });
+
+  if(error){
+    showPortalAuthNotice(error.message,true);
+    return;
+  }
+
+  showPortalAuthNotice(`Password reset email sent to ${email}.`);
+}
+
+async function portalSaveResetPassword(){
+  const password=String($('portalResetPassword').value||'');
+  const confirm=String($('portalResetPasswordConfirm').value||'');
+
+  if(password.length<8){
+    showPortalAuthNotice('Password must be at least 8 characters.',true);
+    return;
+  }
+  if(password!==confirm){
+    showPortalAuthNotice('Passwords do not match.',true);
+    return;
+  }
+
+  const button=$('portalResetSave');
+  button.disabled=true;
+  button.textContent='Saving…';
+
+  try{
+    const {error}=await db.auth.updateUser({password});
+    if(error)throw error;
+    showPortalAuthNotice('Password updated. Opening the Portal…');
+
+    const portal=await bootstrapPortalAccount();
+    if(!portal)throw new Error('Portal access could not be loaded for this account.');
+    portalShowApp(portal);
+  }catch(err){
+    showPortalAuthNotice(err?.message||'Could not update password.',true);
+  }finally{
+    button.disabled=false;
+    button.textContent='Save New Password';
+  }
+}
+
+function portalCurrentFolder(){
+  const folders=Array.isArray(portalBootstrapData?.folders)?portalBootstrapData.folders:[];
+  return folders.find(f=>String(f.id)===String(portalCurrentFolderId))||null;
+}
+
+function portalFolderPath(folderId){
+  const folders=Array.isArray(portalBootstrapData?.folders)?portalBootstrapData.folders:[];
+  const result=[];
+  const seen=new Set();
+  let current=folders.find(f=>String(f.id)===String(folderId));
+
+  while(current && !seen.has(String(current.id))){
+    seen.add(String(current.id));
+    result.unshift(current);
+    current=current.parent_folder_id
+      ? folders.find(f=>String(f.id)===String(current.parent_folder_id))
+      : null;
+  }
+  return result;
+}
+
+async function portalOpenFile(fileId){
+  const files=Array.isArray(portalBootstrapData?.files)?portalBootstrapData.files:[];
+  const file=files.find(f=>String(f.id)===String(fileId));
+  if(!file)return;
+
+  try{
+    const {data,error}=await db.storage
+      .from('bowenbuilder-files')
+      .createSignedUrl(file.storage_path,3600);
+
+    if(error)throw error;
+
+    await portalLog('portal_file_opened',{
+      label:`Opened ${file.file_name||'file'}`,
+      subdivisionId:file.subdivision_id,
+      lotId:file.lot_id,
+      fileId:file.id
+    });
+
+    window.open(data?.signedUrl||'','_blank','noopener');
+  }catch(err){
+    alert(err?.message||'Could not open this file.');
+  }
+}
+
+async function portalDownloadFile(fileId){
+  const files=Array.isArray(portalBootstrapData?.files)?portalBootstrapData.files:[];
+  const file=files.find(f=>String(f.id)===String(fileId));
+  if(!file)return;
+
+  try{
+    const {data,error}=await db.storage
+      .from('bowenbuilder-files')
+      .download(file.storage_path);
+
+    if(error)throw error;
+
+    const url=URL.createObjectURL(data);
+    const a=document.createElement('a');
+    a.href=url;
+    a.download=file.file_name||'BowenBuilder-file';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),2000);
+
+    await portalLog('portal_file_downloaded',{
+      label:`Downloaded ${file.file_name||'file'}`,
+      subdivisionId:file.subdivision_id,
+      lotId:file.lot_id,
+      fileId:file.id
+    });
+  }catch(err){
+    alert(err?.message||'Could not download this file.');
+  }
+}
+
+async function portalCreateFolder(){
+  if(!portalCurrentSubdivisionId || !portalCanUpload(portalCurrentSubdivisionId))return;
+
+  const name=prompt('Folder name:','');
+  if(name===null)return;
+  const clean=String(name||'').trim();
+  if(!clean)return alert('Enter a folder name.');
+  if(clean.length>120)return alert('Folder names must be 120 characters or less.');
+
+  const {data,error}=await db
+    .from('subdivision_file_folders')
+    .insert({
+      subdivision_id:portalCurrentSubdivisionId,
+      lot_id:portalCurrentLotId||null,
+      parent_folder_id:portalCurrentFolderId||null,
+      name:clean,
+      created_by:currentAuthUserId||null
+    })
+    .select('id,subdivision_id,lot_id,parent_folder_id,name,created_at')
+    .single();
+
+  if(error){
+    alert(error.message);
+    return;
+  }
+
+  portalBootstrapData.folders=portalBootstrapData.folders||[];
+  portalBootstrapData.folders.push(data);
+
+  await portalLog('portal_folder_created',{
+    label:`Created folder ${clean}`,
+    subdivisionId:portalCurrentSubdivisionId,
+    lotId:portalCurrentLotId,
+    metadata:{folder_id:data.id,parent_folder_id:portalCurrentFolderId||null}
+  });
+
+  renderPortalApp();
+}
+
+async function portalUploadFiles(fileList){
+  if(!portalCurrentSubdivisionId || !portalCanUpload(portalCurrentSubdivisionId))return;
+  const files=[...(fileList||[])];
+  if(!files.length)return;
+
+  const notice=$('portalAppNotice');
+  notice.classList.remove('hidden');
+  notice.textContent=`Uploading ${files.length} file${files.length===1?'':'s'}…`;
+
+  try{
+    for(const file of files){
+      if(file.size>50*1024*1024){
+        throw new Error(`${file.name} is larger than the 50 MB file limit.`);
+      }
+
+      const id=crypto.randomUUID
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+      const safeName=subdivisionFileSafeName(file.name);
+      const storageScope=portalCurrentLotId||'shared';
+      const path=`${portalCurrentSubdivisionId}/${storageScope}/${portalCurrentFolderId||'root'}/${id}/${safeName}`;
+
+      const {error:uploadError}=await db.storage
+        .from('bowenbuilder-files')
+        .upload(path,file,{
+          contentType:file.type||'application/octet-stream',
+          upsert:false
+        });
+
+      if(uploadError)throw uploadError;
+
+      const {data:row,error:rowError}=await db
+        .from('subdivision_files')
+        .insert({
+          id,
+          subdivision_id:portalCurrentSubdivisionId,
+          lot_id:portalCurrentLotId||null,
+          folder_id:portalCurrentFolderId||null,
+          file_name:file.name,
+          storage_path:path,
+          mime_type:file.type||null,
+          size_bytes:file.size||null,
+          uploaded_by:currentAuthUserId||null
+        })
+        .select('id,subdivision_id,lot_id,folder_id,file_name,storage_path,mime_type,size_bytes,created_at')
+        .single();
+
+      if(rowError){
+        await db.storage.from('bowenbuilder-files').remove([path]);
+        throw rowError;
+      }
+
+      portalBootstrapData.files=portalBootstrapData.files||[];
+      portalBootstrapData.files.unshift(row);
+
+      await portalLog('portal_file_uploaded',{
+        label:`Uploaded ${file.name}`,
+        subdivisionId:portalCurrentSubdivisionId,
+        lotId:portalCurrentLotId,
+        fileId:row.id,
+        metadata:{folder_id:portalCurrentFolderId||null,size_bytes:file.size||0}
+      });
+    }
+
+    notice.textContent=`${files.length} file${files.length===1?'':'s'} uploaded.`;
+    renderPortalApp();
+  }catch(err){
+    notice.textContent=err?.message||'Upload failed.';
+    notice.style.color='#b42318';
+  }finally{
+    $('portalFileInput').value='';
+  }
+}
+
+function renderPortalApp(){
+  const root=$('portalAppContent');
+  if(!root||!portalBootstrapData)return;
+
+  const subs=Array.isArray(portalBootstrapData.subdivisions)?portalBootstrapData.subdivisions:[];
+  const lotsData=Array.isArray(portalBootstrapData.lots)?portalBootstrapData.lots:[];
+  const folders=Array.isArray(portalBootstrapData.folders)?portalBootstrapData.folders:[];
+  const files=Array.isArray(portalBootstrapData.files)?portalBootstrapData.files:[];
+
+  if(!portalCurrentSubdivisionId){
+    root.innerHTML=`
+      <div class="portal-page-head">
+        <div>
+          <h1>Your Projects</h1>
+          <div class="muted">${esc(portalBootstrapData?.company?.name||'Vendor Company')} · Bowen Builder Portal</div>
+        </div>
+      </div>
+      <div class="portal-project-grid">
+        ${subs.map(sub=>{
+          const lotCount=lotsData.filter(l=>String(l.subdivision_id)===String(sub.id)).length;
+          const upload=portalCanUpload(sub.id);
+          return `<button class="portal-project-card" type="button" data-portal-sub="${esc(sub.id)}">
+            <span class="portal-project-arrow">›</span>
+            <strong>${esc(sub.name)}</strong>
+            <small>${lotCount} lot${lotCount===1?'':'s'} · ${upload?'View & Upload':'View & Download'}</small>
+          </button>`;
+        }).join('')||'<div class="portal-empty">No subdivisions have been assigned to your company yet.</div>'}
+      </div>`;
+
+    root.querySelectorAll('[data-portal-sub]').forEach(btn=>{
+      btn.onclick=async()=>{
+        portalCurrentSubdivisionId=btn.dataset.portalSub;
+        portalCurrentLotId=null;
+        portalCurrentFolderId=null;
+        const sub=subs.find(x=>String(x.id)===String(portalCurrentSubdivisionId));
+        await portalLog('portal_view_subdivision',{
+          label:`Opened ${sub?.name||'subdivision'}`,
+          subdivisionId:portalCurrentSubdivisionId
+        });
+        renderPortalApp();
+      };
+    });
+    return;
+  }
+
+  const sub=subs.find(s=>String(s.id)===String(portalCurrentSubdivisionId));
+  const canUpload=portalCanUpload(portalCurrentSubdivisionId);
+
+  if(!portalCurrentLotId && !portalCurrentFolderId){
+    const sharedFolders=folders
+      .filter(f=>String(f.subdivision_id)===String(portalCurrentSubdivisionId)&&!f.lot_id&&!f.parent_folder_id)
+      .slice()
+      .sort((a,b)=>String(a.name||'').localeCompare(String(b.name||'')));
+
+    const subLots=lotsData
+      .filter(l=>String(l.subdivision_id)===String(portalCurrentSubdivisionId))
+      .slice()
+      .sort((a,b)=>String(a.lot_name||'').localeCompare(String(b.lot_name||''),undefined,{numeric:true}));
+
+    root.innerHTML=`
+      <div class="portal-page-head">
+        <div>
+          <button class="secondary" type="button" data-portal-back-projects>← Projects</button>
+          <h2 style="margin-top:10px">${esc(sub?.name||'Subdivision')}</h2>
+          <div class="muted">Subdivision folders and lot folders</div>
+        </div>
+        ${canUpload?`<div class="portal-upload-actions"><button class="secondary" type="button" data-portal-new-folder>+ New Folder</button></div>`:''}
+      </div>
+      <div class="portal-project-grid">
+        ${sharedFolders.map(folder=>`
+          <button class="portal-project-card" type="button" data-portal-folder="${esc(folder.id)}">
+            <span class="portal-project-arrow">›</span>
+            <strong>📁 ${esc(folder.name)}</strong>
+            <small>Subdivision folder</small>
+          </button>`).join('')}
+        ${subLots.map(lot=>`
+          <button class="portal-project-card" type="button" data-portal-lot="${esc(lot.id)}">
+            <span class="portal-project-arrow">›</span>
+            <strong>📁 ${esc(lot.lot_name||'Lot')}</strong>
+            <small>${esc(lot.address||lot.plan_name||'Lot files')}</small>
+          </button>`).join('')}
+        ${(!sharedFolders.length&&!subLots.length)?'<div class="portal-empty">No folders are available in this subdivision yet.</div>':''}
+      </div>`;
+
+    root.querySelector('[data-portal-back-projects]')?.addEventListener('click',()=>{
+      portalCurrentSubdivisionId=null;
+      renderPortalApp();
+    });
+    root.querySelector('[data-portal-new-folder]')?.addEventListener('click',portalCreateFolder);
+    root.querySelectorAll('[data-portal-folder]').forEach(btn=>{
+      btn.onclick=async()=>{
+        portalCurrentLotId=null;
+        portalCurrentFolderId=btn.dataset.portalFolder;
+        const folder=folders.find(f=>String(f.id)===String(portalCurrentFolderId));
+        await portalLog('portal_view_folder',{
+          label:`Opened folder ${folder?.name||''}`,
+          subdivisionId:portalCurrentSubdivisionId,
+          metadata:{folder_id:portalCurrentFolderId}
+        });
+        renderPortalApp();
+      };
+    });
+    root.querySelectorAll('[data-portal-lot]').forEach(btn=>{
+      btn.onclick=async()=>{
+        portalCurrentLotId=btn.dataset.portalLot;
+        portalCurrentFolderId=null;
+        const lot=lotsData.find(l=>String(l.id)===String(portalCurrentLotId));
+        await portalLog('portal_view_lot',{
+          label:`Opened ${lot?.lot_name||'lot'}`,
+          subdivisionId:portalCurrentSubdivisionId,
+          lotId:portalCurrentLotId
+        });
+        renderPortalApp();
+      };
+    });
+    return;
+  }
+
+  const lot=portalCurrentLotId
+    ? lotsData.find(l=>String(l.id)===String(portalCurrentLotId))
+    : null;
+  const currentFolder=portalCurrentFolder();
+  const parentKey=String(portalCurrentFolderId||'');
+  const scopeLot=String(portalCurrentLotId||'');
+
+  const childFolders=folders
+    .filter(f=>
+      String(f.subdivision_id)===String(portalCurrentSubdivisionId) &&
+      String(f.lot_id||'')===scopeLot &&
+      String(f.parent_folder_id||'')===parentKey
+    )
+    .slice()
+    .sort((a,b)=>String(a.name||'').localeCompare(String(b.name||'')));
+
+  const currentFiles=files.filter(f=>
+    String(f.subdivision_id)===String(portalCurrentSubdivisionId) &&
+    String(f.lot_id||'')===scopeLot &&
+    String(f.folder_id||'')===parentKey
+  );
+
+  const folderPath=portalFolderPath(portalCurrentFolderId);
+  const title=lot?.lot_name||folderPath[0]?.name||sub?.name||'Portal';
+  const detail=[
+    lot?.address||lot?.plan_name||sub?.name||'',
+    ...(lot?folderPath.map(f=>f.name):folderPath.slice(1).map(f=>f.name))
+  ].filter(Boolean).join(' / ');
+
+  root.innerHTML=`
+    <div class="portal-page-head">
+      <div>
+        <button class="secondary" type="button" data-portal-up>${portalCurrentFolderId?'← Up One Folder':'← Main Portal'}</button>
+        <h2 style="margin-top:10px">${esc(title)}</h2>
+        <div class="muted">${esc(detail)}</div>
+      </div>
+      ${canUpload?`<div class="portal-upload-actions">
+        <button class="secondary" type="button" data-portal-new-folder>+ New Folder</button>
+        <button class="primary" type="button" data-portal-upload>+ Upload Files</button>
+      </div>`:''}
+    </div>
+
+    <div class="portal-files-list">
+      ${childFolders.map(folder=>`
+        <button class="portal-project-card" style="min-height:78px" type="button" data-portal-folder="${esc(folder.id)}">
+          <span class="portal-project-arrow">›</span>
+          <strong>📁 ${esc(folder.name)}</strong>
+          <small>Folder</small>
+        </button>`).join('')}
+
+      ${currentFiles.map(file=>`
+        <div class="portal-file-row">
+          <div class="portal-file-icon">${esc(subdivisionFileIcon(file))}</div>
+          <div>
+            <div class="portal-file-name">${esc(file.file_name||'File')}</div>
+            <div class="portal-file-meta">${esc([portalFileSize(file.size_bytes),portalDateTime(file.created_at)].filter(Boolean).join(' · '))}</div>
+          </div>
+          <div class="portal-file-actions">
+            <button class="secondary" type="button" data-portal-open-file="${esc(file.id)}">Open</button>
+            <button class="secondary" type="button" data-portal-download-file="${esc(file.id)}">Download</button>
+          </div>
+        </div>`).join('')}
+
+      ${(!childFolders.length&&!currentFiles.length)?'<div class="portal-empty">This folder is empty.</div>':''}
+    </div>`;
+
+  root.querySelector('[data-portal-up]')?.addEventListener('click',()=>{
+    if(portalCurrentFolderId){
+      portalCurrentFolderId=currentFolder?.parent_folder_id||null;
+      if(!portalCurrentLotId && !portalCurrentFolderId){
+        renderPortalApp();
+        return;
+      }
+    }else{
+      portalCurrentLotId=null;
+    }
+    renderPortalApp();
+  });
+  root.querySelector('[data-portal-new-folder]')?.addEventListener('click',portalCreateFolder);
+  root.querySelector('[data-portal-upload]')?.addEventListener('click',()=>{
+    $('portalFileInput').value='';
+    $('portalFileInput').click();
+  });
+  root.querySelectorAll('[data-portal-folder]').forEach(btn=>{
+    btn.onclick=()=>{
+      portalCurrentFolderId=btn.dataset.portalFolder;
+      renderPortalApp();
+    };
+  });
+  root.querySelectorAll('[data-portal-open-file]').forEach(btn=>{
+    btn.onclick=()=>portalOpenFile(btn.dataset.portalOpenFile);
+  });
+  root.querySelectorAll('[data-portal-download-file]').forEach(btn=>{
+    btn.onclick=()=>portalDownloadFile(btn.dataset.portalDownloadFile);
+  });
+}
+
+// ---------------- Admin Portal Access ----------------
+function portalAdminSetNotice(message='',error=false){
+  const box=$('portalCompanyListNotice');
+  if(!box)return;
+  box.textContent=message||'';
+  box.classList.toggle('hidden',!message);
+  box.style.color=error?'#b42318':'';
+}
+
+function portalCompanyDetailSetNotice(message='',error=false){
+  const box=$('portalCompanyDetailNotice');
+  if(!box)return;
+  box.textContent=message||'';
+  box.classList.toggle('hidden',!message);
+  box.style.color=error?'#b42318':'';
+}
+
+function portalAdminCompanyAccessRows(companyId){
+  return portalAdminAccess.filter(a=>String(a.company_id)===String(companyId));
+}
+
+function portalAdminCompanyUsers(companyId){
+  return portalAdminUsers.filter(u=>String(u.company_id)===String(companyId));
+}
+
+function portalCompanyStatusText(user){
+  if(!user.active)return 'Disabled';
+  if(user.user_id)return 'Active';
+  if(user.invite_expires_at && new Date(user.invite_expires_at)<=new Date())return 'Invite Expired';
+  return 'Invited';
+}
+
+function portalUserInviteLink(user){
+  return user?.invite_token_value?portalInviteUrl(user.invite_token_value):'';
+}
+
+function portalInvitationEmailHref({url,email,name,company}){
+  const subject='Bowen Builder Portal Invitation';
+  const body=[
+    name?`Hi ${name},`:'Hello,',
+    '',
+    `${company||'Bowen & Bowen Homebuilders'} has invited you to the Bowen Builder Portal.`,
+    '',
+    'Use this secure invitation link to create your Portal account:',
+    url,
+    '',
+    'Your Portal access is tied to your vendor company and the projects assigned by Bowen & Bowen Homebuilders.'
+  ].join('\n');
+  return `mailto:${encodeURIComponent(email||'')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
+
+async function loadAdminPortalAccess(){
+  if(!isBowenBuilderAdmin())return;
+
+  portalAdminSetNotice('');
+  const [{data:companies,error:ce},{data:users,error:ue},{data:access,error:ae}]=await Promise.all([
+    db.from('vendor_companies').select('*').order('name'),
+    db.from('portal_users').select('*').order('full_name'),
+    db.from('portal_company_subdivision_access').select('*')
+  ]);
+
+  if(ce||ue||ae){
+    portalAdminSetNotice((ce||ue||ae).message,true);
+    return;
+  }
+
+  portalAdminCompanies=companies||[];
+  portalAdminUsers=users||[];
+  portalAdminAccess=access||[];
+
+  if(portalAdminSelectedCompanyId){
+    const exists=portalAdminCompanies.some(c=>String(c.id)===String(portalAdminSelectedCompanyId));
+    if(!exists)portalAdminSelectedCompanyId=null;
+  }
+
+  renderPortalAdmin();
+}
+
+function showPortalAdminMode(mode='companies'){
+  portalAdminMode=mode==='guest_links'?'guest_links':'companies';
+  $('portalAdminCompaniesView').classList.toggle('hidden',portalAdminMode!=='companies');
+  $('portalAdminGuestLinksView').classList.toggle('hidden',portalAdminMode!=='guest_links');
+  $('portalAdminCompaniesBtn').classList.toggle('active',portalAdminMode==='companies');
+  $('portalAdminGuestLinksBtn').classList.toggle('active',portalAdminMode==='guest_links');
+
+  if(portalAdminMode==='guest_links'){
+    loadAdminGuestAccess();
+  }else{
+    loadAdminPortalAccess();
+  }
+}
+
+function renderPortalAdmin(){
+  if(portalAdminMode!=='companies')return;
+
+  const listView=$('portalCompanyListView');
+  const detailView=$('portalCompanyDetailView');
+
+  if(portalAdminSelectedCompanyId==='__new__' || portalAdminSelectedCompanyId){
+    listView.classList.add('hidden');
+    detailView.classList.remove('hidden');
+    renderPortalCompanyDetail();
+  }else{
+    detailView.classList.add('hidden');
+    listView.classList.remove('hidden');
+    renderPortalCompanyList();
+  }
+}
+
+function renderPortalCompanyList(){
+  const root=$('portalCompanyList');
+  if(!root)return;
+
+  const q=String($('portalCompanySearch')?.value||'').trim().toLowerCase();
+  const companies=portalAdminCompanies.filter(company=>{
+    if(!q)return true;
+    return [company.name,company.trade_category,company.primary_contact_name,company.primary_contact_email]
+      .some(v=>String(v||'').toLowerCase().includes(q));
+  });
+
+  if(!companies.length){
+    root.innerHTML='<div class="card muted">No vendor companies match this search.</div>';
+    return;
+  }
+
+  root.innerHTML=companies.map(company=>{
+    const users=portalAdminCompanyUsers(company.id);
+    const activeUsers=users.filter(u=>u.active).length;
+    const access=portalAdminCompanyAccessRows(company.id).filter(a=>a.can_view);
+    const subNames=access
+      .map(a=>subdivisions.find(s=>String(s.id)===String(a.subdivision_id))?.name)
+      .filter(Boolean);
+
+    return `<button class="portal-company-card${company.active?'':' inactive'}" type="button" data-portal-company="${esc(company.id)}">
+      <span class="portal-company-logo">${esc(portalInitials(company.name))}</span>
+      <span>
+        <span class="portal-company-card-name">${esc(company.name||'Vendor Company')}<span class="portal-company-status${company.active?'':' inactive'}">${company.active?'Active':'Inactive'}</span></span>
+        <span class="portal-company-card-meta">${esc([
+          company.trade_category||'Vendor',
+          `${activeUsers} active user${activeUsers===1?'':'s'}`,
+          subNames.length?`${subNames.length} subdivision${subNames.length===1?'':'s'}`:'No subdivision access'
+        ].join(' · '))}</span>
+      </span>
+      <span class="portal-company-card-arrow">›</span>
+    </button>`;
+  }).join('');
+
+  root.querySelectorAll('[data-portal-company]').forEach(btn=>{
+    btn.onclick=()=>{
+      portalAdminSelectedCompanyId=btn.dataset.portalCompany;
+      $('portalInviteCreated').classList.add('hidden');
+      renderPortalAdmin();
+    };
+  });
+}
+
+function renderPortalCompanyDetail(){
+  const isNew=portalAdminSelectedCompanyId==='__new__';
+  const company=isNew?null:portalAdminCompanies.find(c=>String(c.id)===String(portalAdminSelectedCompanyId));
+
+  if(!isNew&&!company){
+    portalAdminSelectedCompanyId=null;
+    renderPortalAdmin();
+    return;
+  }
+
+  $('portalCompanyDetailTitle').textContent=isNew?'New Vendor Company':company.name;
+  $('portalCompanyDetailMeta').textContent=isNew
+    ?'Create the company first, then assign projects and invite users.'
+    :[company.trade_category||'Vendor',company.active?'Active':'Inactive'].join(' · ');
+
+  $('portalCompanyNameInput').value=company?.name||'';
+  $('portalCompanyTradeInput').value=company?.trade_category||'';
+  $('portalCompanyContactName').value=company?.primary_contact_name||'';
+  $('portalCompanyContactEmail').value=company?.primary_contact_email||'';
+  $('portalCompanyContactPhone').value=company?.primary_contact_phone||'';
+  $('portalCompanyNotes').value=company?.notes||'';
+  $('portalCompanyActive').checked=company?.active!==false;
+
+  $('portalCompanyAccessSection').classList.toggle('hidden',isNew);
+  $('portalCompanyUsersSection').classList.toggle('hidden',isNew);
+
+  if(isNew)return;
+
+  const accessRows=portalAdminCompanyAccessRows(company.id);
+  const accessMap=new Map(accessRows.map(a=>[String(a.subdivision_id),a]));
+
+  $('portalCompanyAccessGrid').innerHTML=subdivisions.map(sub=>{
+    const access=accessMap.get(String(sub.id));
+    const canView=!!access?.can_view;
+    const canUpload=!!access?.can_upload;
+    return `<div class="portal-access-row">
+      <div class="portal-access-row-name">${esc(sub.name)}</div>
+      <label class="portal-access-check"><input type="checkbox" data-portal-access-view="${esc(sub.id)}" ${canView?'checked':''}> View</label>
+      <label class="portal-access-check"><input type="checkbox" data-portal-access-upload="${esc(sub.id)}" ${canUpload?'checked':''} ${canView?'':'disabled'}> Upload</label>
+    </div>`;
+  }).join('');
+
+  $('portalCompanyAccessGrid').querySelectorAll('[data-portal-access-view]').forEach(cb=>{
+    cb.onchange=()=>{
+      const upload=$('portalCompanyAccessGrid').querySelector(`[data-portal-access-upload="${CSS.escape(cb.dataset.portalAccessView)}"]`);
+      if(upload){
+        upload.disabled=!cb.checked;
+        if(!cb.checked)upload.checked=false;
+      }
+    };
+  });
+
+  renderPortalCompanyUsers(company);
+}
+
+function renderPortalCompanyUsers(company){
+  const root=$('portalCompanyUsersList');
+  const users=portalAdminCompanyUsers(company.id)
+    .slice()
+    .sort((a,b)=>String(a.full_name||'').localeCompare(String(b.full_name||'')));
+
+  if(!users.length){
+    root.innerHTML='<div class="muted">No Portal users have been added to this company yet.</div>';
+    return;
+  }
+
+  root.innerHTML=users.map(user=>{
+    const status=portalCompanyStatusText(user);
+    const last=user.last_login_at?`Last login ${portalDateTime(user.last_login_at)}`:(user.user_id?'No login recorded':'Invitation pending');
+    const inviteUrl=portalUserInviteLink(user);
+
+    return `<div class="portal-user-row">
+      <div class="portal-user-avatar">${esc(portalInitials(user.full_name))}</div>
+      <div>
+        <div class="portal-user-row-name">${esc(user.full_name||user.email)}</div>
+        <div class="portal-user-row-meta">${esc(user.email||'')} · ${esc(status)} · ${esc(last)}</div>
+      </div>
+      <div class="portal-user-row-actions">
+        <select data-portal-user-role="${esc(user.id)}">
+          <option value="member" ${user.role==='member'?'selected':''}>Member</option>
+          <option value="company_admin" ${user.role==='company_admin'?'selected':''}>Company Admin</option>
+        </select>
+        ${!user.user_id?`<button class="secondary" type="button" data-portal-user-resend="${esc(user.id)}">Resend Invite</button>`:''}
+        ${!user.user_id&&inviteUrl?`<button class="secondary" type="button" data-portal-user-copy="${esc(user.id)}">Copy Invite</button>`:''}
+        <button class="secondary" type="button" data-portal-user-toggle="${esc(user.id)}">${user.active?'Disable':'Enable'}</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  root.querySelectorAll('[data-portal-user-role]').forEach(sel=>{
+    sel.onchange=()=>updatePortalUserRole(sel.dataset.portalUserRole,sel.value);
+  });
+  root.querySelectorAll('[data-portal-user-resend]').forEach(btn=>{
+    btn.onclick=()=>resendPortalUserInvite(btn.dataset.portalUserResend);
+  });
+  root.querySelectorAll('[data-portal-user-copy]').forEach(btn=>{
+    btn.onclick=async()=>{
+      const user=portalAdminUsers.find(u=>String(u.id)===String(btn.dataset.portalUserCopy));
+      const url=portalUserInviteLink(user);
+      if(!url)return;
+      try{
+        await navigator.clipboard.writeText(url);
+        alert('Portal invitation link copied.');
+      }catch{
+        prompt('Copy this Portal invitation:',url);
+      }
+    };
+  });
+  root.querySelectorAll('[data-portal-user-toggle]').forEach(btn=>{
+    btn.onclick=()=>togglePortalUserActive(btn.dataset.portalUserToggle);
+  });
+}
+
+async function savePortalCompany(){
+  const name=String($('portalCompanyNameInput').value||'').trim();
+  if(!name){
+    portalCompanyDetailSetNotice('Company name is required.',true);
+    return;
+  }
+
+  const payload={
+    name,
+    trade_category:String($('portalCompanyTradeInput').value||'').trim()||null,
+    primary_contact_name:String($('portalCompanyContactName').value||'').trim()||null,
+    primary_contact_email:String($('portalCompanyContactEmail').value||'').trim()||null,
+    primary_contact_phone:String($('portalCompanyContactPhone').value||'').trim()||null,
+    notes:String($('portalCompanyNotes').value||'').trim()||null,
+    active:!!$('portalCompanyActive').checked,
+    updated_at:new Date().toISOString()
+  };
+
+  const button=$('portalCompanySave');
+  button.disabled=true;
+  button.textContent='Saving…';
+  portalCompanyDetailSetNotice('');
+
+  try{
+    let row;
+    if(portalAdminSelectedCompanyId==='__new__'){
+      const {data,error}=await db.from('vendor_companies')
+        .insert({...payload,created_by:currentAuthUserId||null})
+        .select('*')
+        .single();
+      if(error)throw error;
+      row=data;
+      portalAdminCompanies.push(row);
+      portalAdminSelectedCompanyId=row.id;
+
+      logBowenActivity('admin_portal_company_created',{
+        label:`Created Portal vendor company ${row.name}`,
+        entityType:'vendor_company',
+        entityId:row.id,
+        screen:'Admin',
+        force:true
+      });
+    }else{
+      const {data,error}=await db.from('vendor_companies')
+        .update(payload)
+        .eq('id',portalAdminSelectedCompanyId)
+        .select('*')
+        .single();
+      if(error)throw error;
+      row=data;
+      const idx=portalAdminCompanies.findIndex(c=>String(c.id)===String(row.id));
+      if(idx>=0)portalAdminCompanies[idx]=row;
+
+      logBowenActivity('admin_portal_company_updated',{
+        label:`Updated Portal vendor company ${row.name}`,
+        entityType:'vendor_company',
+        entityId:row.id,
+        screen:'Admin',
+        force:true
+      });
+    }
+
+    portalCompanyDetailSetNotice('Company saved.');
+    renderPortalAdmin();
+  }catch(err){
+    portalCompanyDetailSetNotice(err?.message||'Could not save company.',true);
+  }finally{
+    button.disabled=false;
+    button.textContent='Save Company';
+  }
+}
+
+async function savePortalCompanyAccess(){
+  const company=portalAdminCompanies.find(c=>String(c.id)===String(portalAdminSelectedCompanyId));
+  if(!company)return;
+
+  const rows=subdivisions.map(sub=>{
+    const view=$('portalCompanyAccessGrid').querySelector(`[data-portal-access-view="${CSS.escape(String(sub.id))}"]`);
+    const upload=$('portalCompanyAccessGrid').querySelector(`[data-portal-access-upload="${CSS.escape(String(sub.id))}"]`);
+    return {
+      company_id:company.id,
+      subdivision_id:sub.id,
+      can_view:!!view?.checked,
+      can_upload:!!view?.checked && !!upload?.checked,
+      updated_at:new Date().toISOString()
+    };
+  });
+
+  const button=$('portalCompanyAccessSave');
+  button.disabled=true;
+  button.textContent='Saving…';
+
+  try{
+    const {data,error}=await db.from('portal_company_subdivision_access')
+      .upsert(rows,{onConflict:'company_id,subdivision_id'})
+      .select('*');
+    if(error)throw error;
+
+    portalAdminAccess=portalAdminAccess.filter(a=>String(a.company_id)!==String(company.id));
+    portalAdminAccess.push(...(data||[]));
+
+    portalCompanyDetailSetNotice('Subdivision access saved.');
+    logBowenActivity('admin_portal_company_access_updated',{
+      label:`Updated Portal access for ${company.name}`,
+      entityType:'vendor_company',
+      entityId:company.id,
+      screen:'Admin',
+      force:true,
+      metadata:{
+        view_count:rows.filter(r=>r.can_view).length,
+        upload_count:rows.filter(r=>r.can_upload).length
+      }
+    });
+  }catch(err){
+    portalCompanyDetailSetNotice(err?.message||'Could not save Portal access.',true);
+  }finally{
+    button.disabled=false;
+    button.textContent='Save Access';
+  }
+}
+
+async function createPortalUserInvite(){
+  const company=portalAdminCompanies.find(c=>String(c.id)===String(portalAdminSelectedCompanyId));
+  if(!company)return;
+
+  const name=String($('portalInviteUserName').value||'').trim();
+  const email=String($('portalInviteUserEmail').value||'').trim();
+  const role=String($('portalInviteUserRole').value||'member');
+
+  if(!name||!email){
+    portalCompanyDetailSetNotice('Enter the user name and email.',true);
+    return;
+  }
+
+  const token=guestAccessToken();
+  const expires=new Date(Date.now()+7*24*60*60*1000);
+  const button=$('portalInviteUserCreate');
+  button.disabled=true;
+  button.textContent='Creating…';
+
+  try{
+    const {data:id,error}=await db.rpc('bowenbuilder_admin_portal_invite_user',{
+      p_company_id:company.id,
+      p_full_name:name,
+      p_email:email,
+      p_role:role,
+      p_token:token,
+      p_expires_at:expires.toISOString()
+    });
+    if(error)throw error;
+
+    const url=portalInviteUrl(token);
+    latestPortalInvite={url,email,name,company:company.name};
+    $('portalInviteCreatedUrl').textContent=url;
+    $('portalInviteCreated').classList.remove('hidden');
+
+    $('portalInviteUserName').value='';
+    $('portalInviteUserEmail').value='';
+    $('portalInviteUserRole').value='member';
+
+    logBowenActivity('admin_portal_user_invited',{
+      label:`Invited ${name} to ${company.name}`,
+      entityType:'portal_user',
+      entityId:String(id||''),
+      screen:'Admin',
+      force:true
+    });
+
+    await loadAdminPortalAccess();
+    portalAdminSelectedCompanyId=company.id;
+    renderPortalAdmin();
+  }catch(err){
+    portalCompanyDetailSetNotice(err?.message||'Could not create Portal invitation.',true);
+  }finally{
+    button.disabled=false;
+    button.textContent='Create Invitation';
+  }
+}
+
+async function resendPortalUserInvite(userId){
+  const user=portalAdminUsers.find(u=>String(u.id)===String(userId));
+  const company=portalAdminCompanies.find(c=>String(c.id)===String(user?.company_id));
+  if(!user||!company)return;
+
+  const token=guestAccessToken();
+  const expires=new Date(Date.now()+7*24*60*60*1000);
+
+  const {error}=await db.rpc('bowenbuilder_admin_portal_resend_invite',{
+    p_portal_user_id:user.id,
+    p_token:token,
+    p_expires_at:expires.toISOString()
+  });
+
+  if(error){
+    alert(error.message);
+    return;
+  }
+
+  const url=portalInviteUrl(token);
+  latestPortalInvite={url,email:user.email,name:user.full_name,company:company.name};
+  location.href=portalInvitationEmailHref(latestPortalInvite);
+
+  await loadAdminPortalAccess();
+  portalAdminSelectedCompanyId=company.id;
+  renderPortalAdmin();
+}
+
+async function togglePortalUserActive(userId){
+  const user=portalAdminUsers.find(u=>String(u.id)===String(userId));
+  if(!user)return;
+
+  const next=!user.active;
+  if(!confirm(`${next?'Enable':'Disable'} Portal access for ${user.full_name||user.email}?`))return;
+
+  const {data,error}=await db.from('portal_users')
+    .update({active:next,updated_at:new Date().toISOString()})
+    .eq('id',user.id)
+    .select('*')
+    .single();
+
+  if(error){
+    alert(error.message);
+    return;
+  }
+
+  const idx=portalAdminUsers.findIndex(u=>String(u.id)===String(user.id));
+  if(idx>=0)portalAdminUsers[idx]=data;
+  renderPortalCompanyDetail();
+
+  logBowenActivity('admin_portal_user_status_updated',{
+    label:`${next?'Enabled':'Disabled'} Portal user ${user.full_name||user.email}`,
+    entityType:'portal_user',
+    entityId:user.id,
+    screen:'Admin',
+    force:true
+  });
+}
+
+async function updatePortalUserRole(userId,role){
+  const user=portalAdminUsers.find(u=>String(u.id)===String(userId));
+  if(!user)return;
+
+  const {data,error}=await db.from('portal_users')
+    .update({role,updated_at:new Date().toISOString()})
+    .eq('id',user.id)
+    .select('*')
+    .single();
+
+  if(error){
+    alert(error.message);
+    renderPortalCompanyDetail();
+    return;
+  }
+
+  const idx=portalAdminUsers.findIndex(u=>String(u.id)===String(user.id));
+  if(idx>=0)portalAdminUsers[idx]=data;
+
+  logBowenActivity('admin_portal_user_role_updated',{
+    label:`Changed ${user.full_name||user.email} Portal role to ${role==='company_admin'?'Company Admin':'Member'}`,
+    entityType:'portal_user',
+    entityId:user.id,
+    screen:'Admin',
+    force:true
+  });
+}
+
 let guestPortalToken='';
 let guestPortalData=null;
 let guestPortalSubdivisionId=null;
@@ -4235,7 +5692,7 @@ function renderGuestFilePortal(){
   const guestFolders=Array.isArray(guestPortalData.folders)?guestPortalData.folders:[];
 
   const heading=`<div class="guest-portal-hero">
-    <h1>Guest File Access</h1>
+    <h1>Bowen Builder Portal</h1>
     <p>${guest.name?`Access for ${esc(guest.name)} · `:''}${esc(guest.email||'')}<br>${guest.expires_at?`Access expires ${esc(guestPortalDate(guest.expires_at))}`:'This access does not expire unless revoked.'}</p>
   </div>`;
 
@@ -4481,738 +5938,6 @@ async function showGuestFilePortal(token){
 
 
 
-const portalInviteTokenFromUrl=()=>new URLSearchParams(location.search).get('portal_invite')||'';
-const portalRequestedFromUrl=()=>new URLSearchParams(location.search).get('portal')==='1';
-const portalResetRequestedFromUrl=()=>new URLSearchParams(location.search).get('reset')==='1';
-
-function portalBaseUrl(extra={}){
-  const url=new URL(location.href);
-  url.hash='';
-  url.search='';
-  Object.entries(extra).forEach(([k,v])=>{
-    if(v!==null && v!==undefined && v!=='')url.searchParams.set(k,String(v));
-  });
-  return url.href;
-}
-
-function portalInviteUrl(token){
-  return portalBaseUrl({portal_invite:token});
-}
-
-function portalSetNotice(id,message='',error=false){
-  const el=$(id);
-  if(!el)return;
-  el.textContent=message||'';
-  el.classList.toggle('hidden',!message);
-  el.style.color=error?'#b42318':'';
-}
-
-function portalHideAll(){
-  $('login')?.classList.add('hidden');
-  $('app')?.classList.add('hidden');
-  $('crewPublicView')?.classList.add('hidden');
-  $('guestFilesView')?.classList.add('hidden');
-  $('portalAuthView')?.classList.add('hidden');
-  $('portalAppView')?.classList.add('hidden');
-}
-
-function portalShowAuthCard(which='login'){
-  portalHideAll();
-  $('portalAuthView').classList.remove('hidden');
-  $('portalLoginCard').classList.toggle('hidden',which!=='login');
-  $('portalInviteCard').classList.toggle('hidden',which!=='invite');
-  $('portalResetCard').classList.toggle('hidden',which!=='reset');
-}
-
-async function portalLoadInvitationPreview(token){
-  const {data,error}=await db.rpc('bowenbuilder_portal_invitation_preview',{p_token:token});
-  if(error)throw error;
-  return typeof data==='string'?JSON.parse(data):data;
-}
-
-async function showPortalInvitation(token){
-  portalShowAuthCard('invite');
-  portalSetNotice('portalInviteNotice','');
-  $('portalInvitePreview').innerHTML='<div class="muted">Loading invitation…</div>';
-
-  try{
-    portalInvitePreviewData=await portalLoadInvitationPreview(token);
-    const company=portalInvitePreviewData?.company||{};
-    $('portalInviteEmail').value=portalInvitePreviewData?.email||'';
-    $('portalInvitePreview').innerHTML=`
-      <strong>${esc(portalInvitePreviewData?.full_name||'Portal User')}</strong>
-      <div class="muted" style="margin-top:4px">${esc(company.name||'Vendor Company')}${company.trade_category?` · ${esc(company.trade_category)}`:''}</div>
-      <div class="muted" style="margin-top:5px">You have been invited to create a Bowen Builder Portal account.</div>
-    `;
-  }catch(err){
-    $('portalInvitePreview').innerHTML=`<div class="notice">${esc(err?.message||'This invitation is unavailable.')}</div>`;
-    $('portalInviteSubmit').disabled=true;
-  }
-}
-
-async function portalAcceptInvitation(token){
-  const {error}=await db.rpc('bowenbuilder_portal_accept_invitation',{p_token:token});
-  if(error)throw error;
-}
-
-async function portalBootstrap(){
-  const {data,error}=await db.rpc('bowenbuilder_portal_bootstrap');
-  if(error)throw error;
-  return data?(typeof data==='string'?JSON.parse(data):data):null;
-}
-
-async function portalLog(action,{
-  label='',
-  subdivisionId=null,
-  lotId=null,
-  fileId=null,
-  metadata={}
-}={}){
-  try{
-    await db.rpc('bowenbuilder_portal_log_activity',{
-      p_action:String(action||'activity'),
-      p_label:label||null,
-      p_subdivision_id:subdivisionId||null,
-      p_lot_id:lotId||null,
-      p_file_id:fileId||null,
-      p_metadata:metadata||{}
-    });
-  }catch(err){
-    console.warn('Portal activity log failed:',err);
-  }
-}
-
-function portalAccessForSubdivision(subdivisionId){
-  return (portalAccountData?.access||[]).find(
-    a=>String(a.subdivision_id)===String(subdivisionId)
-  )||null;
-}
-
-function portalCanUpload(subdivisionId){
-  return !!portalAccessForSubdivision(subdivisionId)?.can_upload;
-}
-
-function portalFileIcon(file){
-  const mime=String(file?.mime_type||'').toLowerCase();
-  const name=String(file?.file_name||'').toLowerCase();
-  if(mime.startsWith('image/'))return 'IMG';
-  if(mime.includes('pdf')||name.endsWith('.pdf'))return 'PDF';
-  if(/\.(xlsx?|csv)$/i.test(name))return 'XL';
-  if(/\.(docx?|rtf)$/i.test(name))return 'DOC';
-  return 'FILE';
-}
-
-function portalFileSize(bytes){
-  const n=Number(bytes||0);
-  if(!Number.isFinite(n)||n<=0)return '';
-  if(n<1024)return `${n} B`;
-  if(n<1024*1024)return `${(n/1024).toFixed(n<10240?1:0)} KB`;
-  return `${(n/(1024*1024)).toFixed(n<10*1024*1024?1:0)} MB`;
-}
-
-function portalCurrentFolder(){
-  return (portalAccountData?.folders||[]).find(
-    f=>String(f.id)===String(portalSelectedFolderId)
-  )||null;
-}
-
-function portalFolderPath(folderId){
-  const folders=portalAccountData?.folders||[];
-  const result=[];
-  const seen=new Set();
-  let current=folders.find(f=>String(f.id)===String(folderId));
-  while(current&&!seen.has(String(current.id))){
-    seen.add(String(current.id));
-    result.unshift(current);
-    current=current.parent_folder_id
-      ?folders.find(f=>String(f.id)===String(current.parent_folder_id))
-      :null;
-  }
-  return result;
-}
-
-function portalFolderDirectCount(folderId,lotId){
-  const folders=portalAccountData?.folders||[];
-  const files=portalAccountData?.files||[];
-  const key=String(folderId||'');
-  const lotKey=String(lotId||'');
-  return folders.filter(f=>String(f.lot_id||'')===lotKey&&String(f.parent_folder_id||'')===key).length+
-    files.filter(f=>String(f.lot_id||'')===lotKey&&String(f.folder_id||'')===key).length;
-}
-
-function portalRenderHome(){
-  portalSelectedSubdivisionId=null;
-  portalSelectedLotId=null;
-  portalSelectedFolderId=null;
-
-  const company=portalAccountData?.company||{};
-  const user=portalAccountData?.portal_user||{};
-  const subs=portalAccountData?.subdivisions||[];
-
-  $('portalPageTitle').textContent='Your Projects';
-  $('portalPageSub').textContent=`${company.name||'Vendor Company'} · Choose a subdivision to access its Portal files.`;
-  $('portalUserBadge').textContent=user.full_name||user.email||'Portal User';
-
-  $('portalAppContent').innerHTML=`
-    <div class="portal-project-grid">
-      ${subs.map(sub=>{
-        const access=portalAccessForSubdivision(sub.id);
-        return `<button class="portal-project-card" type="button" data-portal-sub="${esc(sub.id)}">
-          <span class="portal-project-icon">📁</span>
-          <span class="portal-project-copy">
-            <strong>${esc(sub.name)}</strong>
-            <small>${access?.can_upload?'View, download & upload':'View & download'} access</small>
-          </span>
-        </button>`;
-      }).join('')||'<div class="card muted">No subdivision access is assigned to this company yet.</div>'}
-    </div>`;
-
-  document.querySelectorAll('[data-portal-sub]').forEach(btn=>{
-    btn.onclick=()=>{
-      portalSelectedSubdivisionId=btn.dataset.portalSub;
-      portalSelectedLotId=null;
-      portalSelectedFolderId=null;
-      const sub=subs.find(s=>String(s.id)===String(portalSelectedSubdivisionId));
-      portalLog('portal_view_subdivision',{
-        label:`Opened ${sub?.name||'subdivision'}`,
-        subdivisionId:portalSelectedSubdivisionId
-      });
-      portalRenderSubdivision();
-    };
-  });
-}
-
-function portalRenderSubdivision(){
-  const sub=(portalAccountData?.subdivisions||[]).find(
-    s=>String(s.id)===String(portalSelectedSubdivisionId)
-  );
-  if(!sub)return portalRenderHome();
-
-  const lots=(portalAccountData?.lots||[])
-    .filter(l=>String(l.subdivision_id)===String(sub.id))
-    .slice()
-    .sort((a,b)=>String(a.lot_name||'').localeCompare(String(b.lot_name||''),undefined,{numeric:true}));
-
-  const sharedFolders=(portalAccountData?.folders||[])
-    .filter(f=>String(f.subdivision_id)===String(sub.id)&&!f.lot_id&&!f.parent_folder_id)
-    .slice()
-    .sort((a,b)=>String(a.name||'').localeCompare(String(b.name||'')));
-
-  $('portalPageTitle').textContent=sub.name||'Subdivision';
-  $('portalPageSub').textContent=portalCanUpload(sub.id)
-    ?'Company access: View, download and upload.'
-    :'Company access: View and download.';
-
-  $('portalAppContent').innerHTML=`
-    <div class="portal-toolbar">
-      <button class="secondary" type="button" data-portal-home>← Your Projects</button>
-      ${portalCanUpload(sub.id)?'<span class="portal-upload-permission">Upload Enabled</span>':''}
-    </div>
-    <div class="portal-project-grid">
-      ${sharedFolders.map(folder=>`
-        <button class="portal-project-card" type="button" data-portal-shared-folder="${esc(folder.id)}">
-          <span class="portal-project-icon">📁</span>
-          <span class="portal-project-copy">
-            <strong>${esc(folder.name)}</strong>
-            <small>Subdivision folder · ${portalFolderDirectCount(folder.id,null)} item${portalFolderDirectCount(folder.id,null)===1?'':'s'}</small>
-          </span>
-        </button>`).join('')}
-      ${lots.map(lot=>`
-        <button class="portal-project-card" type="button" data-portal-lot="${esc(lot.id)}">
-          <span class="portal-project-icon">📁</span>
-          <span class="portal-project-copy">
-            <strong>${esc(lot.lot_name||'Lot')}</strong>
-            <small>${esc(lot.address||lot.plan_name||'Lot files')}</small>
-          </span>
-        </button>`).join('')}
-      ${(!sharedFolders.length&&!lots.length)?'<div class="card muted">No Portal folders are available yet.</div>':''}
-    </div>`;
-
-  document.querySelector('[data-portal-home]')?.addEventListener('click',portalRenderHome);
-
-  document.querySelectorAll('[data-portal-shared-folder]').forEach(btn=>{
-    btn.onclick=()=>{
-      portalSelectedLotId=null;
-      portalSelectedFolderId=btn.dataset.portalSharedFolder;
-      portalRenderFolder();
-    };
-  });
-
-  document.querySelectorAll('[data-portal-lot]').forEach(btn=>{
-    btn.onclick=()=>{
-      portalSelectedLotId=btn.dataset.portalLot;
-      portalSelectedFolderId=null;
-      const lot=lots.find(l=>String(l.id)===String(portalSelectedLotId));
-      portalLog('portal_view_lot',{
-        label:`Opened ${lot?.lot_name||'lot'} files`,
-        subdivisionId:portalSelectedSubdivisionId,
-        lotId:portalSelectedLotId
-      });
-      portalRenderFolder();
-    };
-  });
-}
-
-function portalRenderFolder(){
-  const sub=(portalAccountData?.subdivisions||[]).find(
-    s=>String(s.id)===String(portalSelectedSubdivisionId)
-  );
-  if(!sub)return portalRenderHome();
-
-  const lot=portalSelectedLotId
-    ?(portalAccountData?.lots||[]).find(l=>String(l.id)===String(portalSelectedLotId))
-    :null;
-
-  const currentFolder=portalCurrentFolder();
-  const parentKey=String(portalSelectedFolderId||'');
-  const lotKey=String(portalSelectedLotId||'');
-
-  const folders=(portalAccountData?.folders||[])
-    .filter(f=>
-      String(f.subdivision_id)===String(portalSelectedSubdivisionId) &&
-      String(f.lot_id||'')===lotKey &&
-      String(f.parent_folder_id||'')===parentKey
-    )
-    .slice()
-    .sort((a,b)=>String(a.name||'').localeCompare(String(b.name||'')));
-
-  const files=(portalAccountData?.files||[])
-    .filter(f=>
-      String(f.subdivision_id)===String(portalSelectedSubdivisionId) &&
-      String(f.lot_id||'')===lotKey &&
-      String(f.folder_id||'')===parentKey
-    );
-
-  const path=portalFolderPath(portalSelectedFolderId);
-  const canUpload=portalCanUpload(portalSelectedSubdivisionId);
-
-  $('portalPageTitle').textContent=lot?.lot_name||path[0]?.name||sub.name||'Portal';
-  $('portalPageSub').textContent=[
-    sub.name,
-    lot?.address||lot?.plan_name||null,
-    ...(lot?path.map(f=>f.name):path.slice(1).map(f=>f.name))
-  ].filter(Boolean).join(' / ');
-
-  $('portalAppContent').innerHTML=`
-    <div class="portal-toolbar">
-      <button class="secondary" type="button" data-portal-back>${portalSelectedFolderId?'← Up One Folder':'← '+esc(sub.name)}</button>
-      <div class="portal-toolbar-actions">
-        ${canUpload?'<button class="secondary" type="button" data-portal-new-folder>+ New Folder</button>':''}
-        ${canUpload?'<button class="primary" type="button" data-portal-upload>+ Upload Files</button>':''}
-      </div>
-    </div>
-    <div class="portal-file-list">
-      ${folders.map(folder=>`
-        <button class="portal-project-card" type="button" data-portal-folder="${esc(folder.id)}">
-          <span class="portal-project-icon">📁</span>
-          <span class="portal-project-copy">
-            <strong>${esc(folder.name)}</strong>
-            <small>${portalFolderDirectCount(folder.id,portalSelectedLotId)} item${portalFolderDirectCount(folder.id,portalSelectedLotId)===1?'':'s'}</small>
-          </span>
-        </button>`).join('')}
-      ${files.map(file=>`
-        <div class="portal-file-row">
-          <div class="portal-file-icon">${esc(portalFileIcon(file))}</div>
-          <div>
-            <div class="portal-file-name">${esc(file.file_name||'File')}</div>
-            <div class="portal-file-meta">${esc([portalFileSize(file.size_bytes),file.created_at?new Date(file.created_at).toLocaleDateString():''].filter(Boolean).join(' · '))}</div>
-          </div>
-          <div class="portal-file-actions">
-            <button class="secondary" type="button" data-portal-open-file="${esc(file.id)}">Open</button>
-            <button class="secondary" type="button" data-portal-download-file="${esc(file.id)}">Download</button>
-          </div>
-        </div>`).join('')}
-      ${(!folders.length&&!files.length)?'<div class="subdivision-file-empty">This folder is empty.</div>':''}
-    </div>`;
-
-  document.querySelector('[data-portal-back]')?.addEventListener('click',()=>{
-    if(portalSelectedFolderId){
-      portalSelectedFolderId=currentFolder?.parent_folder_id||null;
-      if(!portalSelectedLotId && !portalSelectedFolderId)return portalRenderSubdivision();
-      portalRenderFolder();
-    }else{
-      portalRenderSubdivision();
-    }
-  });
-
-  document.querySelectorAll('[data-portal-folder]').forEach(btn=>{
-    btn.onclick=()=>{
-      portalSelectedFolderId=btn.dataset.portalFolder;
-      const folder=(portalAccountData?.folders||[]).find(f=>String(f.id)===String(portalSelectedFolderId));
-      portalLog('portal_view_folder',{
-        label:`Opened folder ${folder?.name||'folder'}`,
-        subdivisionId:portalSelectedSubdivisionId,
-        lotId:portalSelectedLotId
-      });
-      portalRenderFolder();
-    };
-  });
-
-  document.querySelectorAll('[data-portal-open-file]').forEach(btn=>{
-    btn.onclick=()=>portalOpenFile(btn.dataset.portalOpenFile,false);
-  });
-  document.querySelectorAll('[data-portal-download-file]').forEach(btn=>{
-    btn.onclick=()=>portalOpenFile(btn.dataset.portalDownloadFile,true);
-  });
-
-  document.querySelector('[data-portal-upload]')?.addEventListener('click',()=>{
-    const input=$('portalUploadInput');
-    input.value='';
-    input.click();
-  });
-  document.querySelector('[data-portal-new-folder]')?.addEventListener('click',portalCreateFolder);
-}
-
-async function portalOpenFile(fileId,download=false){
-  const file=(portalAccountData?.files||[]).find(f=>String(f.id)===String(fileId));
-  if(!file)return;
-
-  try{
-    const {data,error}=await db.storage
-      .from('bowenbuilder-files')
-      .createSignedUrl(file.storage_path,3600);
-    if(error)throw error;
-    const url=data?.signedUrl||'';
-    if(!url)throw new Error('Could not create a secure file link.');
-
-    await portalLog(download?'portal_file_downloaded':'portal_file_opened',{
-      label:`${download?'Downloaded':'Opened'} ${file.file_name||'file'}`,
-      subdivisionId:file.subdivision_id,
-      lotId:file.lot_id,
-      fileId:file.id
-    });
-
-    if(download){
-      const response=await fetch(url);
-      if(!response.ok)throw new Error('Could not download this file.');
-      const blob=await response.blob();
-      const objectUrl=URL.createObjectURL(blob);
-      const a=document.createElement('a');
-      a.href=objectUrl;
-      a.download=file.file_name||'Bowen-Builder-Portal-File';
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(()=>URL.revokeObjectURL(objectUrl),3000);
-    }else{
-      window.open(url,'_blank','noopener');
-    }
-  }catch(err){
-    alert(err?.message||'Could not open this file.');
-  }
-}
-
-async function portalCreateFolder(){
-  if(!portalSelectedSubdivisionId || !portalCanUpload(portalSelectedSubdivisionId))return;
-
-  const name=prompt('Folder name:','');
-  if(name===null)return;
-  const clean=String(name||'').trim();
-  if(!clean)return alert('Enter a folder name.');
-
-  const {data,error}=await db
-    .from('subdivision_file_folders')
-    .insert({
-      subdivision_id:portalSelectedSubdivisionId,
-      lot_id:portalSelectedLotId||null,
-      parent_folder_id:portalSelectedFolderId||null,
-      name:clean,
-      created_by:currentAuthUserId||null
-    })
-    .select('id,subdivision_id,lot_id,parent_folder_id,name,created_at')
-    .single();
-
-  if(error){
-    alert(error.message);
-    return;
-  }
-
-  await portalLog('portal_folder_created',{
-    label:`Created folder ${clean}`,
-    subdivisionId:portalSelectedSubdivisionId,
-    lotId:portalSelectedLotId,
-    metadata:{folder_id:data?.id||null}
-  });
-
-  await refreshPortalAccountData();
-}
-
-async function portalUploadFiles(fileList){
-  if(!portalSelectedSubdivisionId || !portalCanUpload(portalSelectedSubdivisionId))return;
-
-  const selected=[...(fileList||[])];
-  if(!selected.length)return;
-
-  try{
-    for(const file of selected){
-      if(file.size>50*1024*1024){
-        throw new Error(`${file.name} is larger than the 50 MB file limit.`);
-      }
-
-      const id=globalThis.crypto?.randomUUID
-        ?globalThis.crypto.randomUUID()
-        :`${Date.now()}-${Math.random().toString(36).slice(2)}`;
-
-      const safeName=subdivisionFileSafeName(file.name);
-      const scope=portalSelectedLotId||'shared';
-      const path=`${portalSelectedSubdivisionId}/${scope}/${portalSelectedFolderId||'root'}/${id}/${safeName}`;
-
-      const {error:uploadError}=await db.storage
-        .from('bowenbuilder-files')
-        .upload(path,file,{
-          contentType:file.type||'application/octet-stream',
-          upsert:false
-        });
-      if(uploadError)throw uploadError;
-
-      const {error:rowError}=await db
-        .from('subdivision_files')
-        .insert({
-          id,
-          subdivision_id:portalSelectedSubdivisionId,
-          lot_id:portalSelectedLotId||null,
-          folder_id:portalSelectedFolderId||null,
-          file_name:file.name,
-          storage_path:path,
-          mime_type:file.type||null,
-          size_bytes:file.size||null,
-          uploaded_by:currentAuthUserId||null
-        });
-
-      if(rowError){
-        await db.storage.from('bowenbuilder-files').remove([path]);
-        throw rowError;
-      }
-
-      await portalLog('portal_file_uploaded',{
-        label:`Uploaded ${file.name}`,
-        subdivisionId:portalSelectedSubdivisionId,
-        lotId:portalSelectedLotId,
-        fileId:id,
-        metadata:{size_bytes:file.size||0,mime_type:file.type||'',folder_id:portalSelectedFolderId||null}
-      });
-    }
-
-    await refreshPortalAccountData();
-  }catch(err){
-    alert(err?.message||'Portal upload failed.');
-  }finally{
-    $('portalUploadInput').value='';
-  }
-}
-
-async function refreshPortalAccountData(){
-  const subId=portalSelectedSubdivisionId;
-  const lotId=portalSelectedLotId;
-  const folderId=portalSelectedFolderId;
-  const data=await portalBootstrap();
-  if(!data){
-    alert('Your Portal access is no longer active.');
-    return;
-  }
-  portalAccountData=data;
-  portalSelectedSubdivisionId=subId;
-  portalSelectedLotId=lotId;
-  portalSelectedFolderId=folderId;
-  if(portalSelectedSubdivisionId){
-    if(portalSelectedLotId||portalSelectedFolderId)portalRenderFolder();
-    else portalRenderSubdivision();
-  }else portalRenderHome();
-}
-
-async function showPortalApp(data){
-  portalAccountData=data;
-  const company=data?.company||{};
-  const user=data?.portal_user||{};
-
-  portalHideAll();
-  $('portalAppView').classList.remove('hidden');
-  $('portalCompanyLabel').textContent=company.name||'Vendor Portal';
-  $('portalUserBadge').textContent=user.full_name||user.email||'Portal User';
-  currentAuthUserId=String(user.user_id||currentAuthUserId||'');
-
-  startBowenBuilderVersionWatch();
-  portalRenderHome();
-}
-
-async function portalHandleSignedInSession({inviteToken=''}={}){
-  if(inviteToken){
-    try{
-      await portalAcceptInvitation(inviteToken);
-    }catch(err){
-      // If bootstrap succeeds, the matching invited email may have already
-      // been linked automatically. Only surface this if Portal access fails.
-      console.warn('Portal invite accept:',err);
-    }
-  }
-
-  const data=await portalBootstrap();
-  if(!data)throw new Error('This account does not have active Bowen Builder Portal access.');
-  await showPortalApp(data);
-}
-
-async function portalSignIn(){
-  const email=String($('portalLoginEmail').value||'').trim();
-  const password=String($('portalLoginPassword').value||'');
-
-  portalSetNotice('portalLoginNotice','');
-  const button=$('portalLoginSubmit');
-  button.disabled=true;
-  button.textContent='Signing In…';
-
-  try{
-    const {data,error}=await db.auth.signInWithPassword({email,password});
-    if(error)throw error;
-    currentAuthUserId=String(data?.user?.id||'');
-    await portalHandleSignedInSession({inviteToken:portalInviteTokenFromUrl()});
-  }catch(err){
-    portalSetNotice('portalLoginNotice',err?.message||'Could not sign in.',true);
-  }finally{
-    button.disabled=false;
-    button.textContent='Sign In';
-  }
-}
-
-async function portalCreateAccountFromInvite(){
-  const token=portalInviteTokenFromUrl();
-  if(!token||!portalInvitePreviewData)return;
-
-  const email=String(portalInvitePreviewData.email||'').trim();
-  const password=String($('portalInvitePassword').value||'');
-  const confirmPassword=String($('portalInvitePasswordConfirm').value||'');
-
-  if(password.length<8){
-    portalSetNotice('portalInviteNotice','Password must be at least 8 characters.',true);
-    return;
-  }
-  if(password!==confirmPassword){
-    portalSetNotice('portalInviteNotice','Passwords do not match.',true);
-    return;
-  }
-
-  const button=$('portalInviteSubmit');
-  button.disabled=true;
-  button.textContent='Creating Account…';
-  portalSetNotice('portalInviteNotice','');
-
-  try{
-    const {data,error}=await db.auth.signUp({
-      email,
-      password,
-      options:{
-        emailRedirectTo:portalInviteUrl(token),
-        data:{full_name:portalInvitePreviewData.full_name||''}
-      }
-    });
-    if(error)throw error;
-
-    if(data?.session){
-      currentAuthUserId=String(data.user?.id||'');
-      await portalHandleSignedInSession({inviteToken:token});
-    }else{
-      portalSetNotice(
-        'portalInviteNotice',
-        'Account created. Check your email to verify your address, then return to this invitation link to finish signing in.'
-      );
-    }
-  }catch(err){
-    portalSetNotice('portalInviteNotice',err?.message||'Could not create your Portal account.',true);
-  }finally{
-    button.disabled=false;
-    button.textContent='Create Account';
-  }
-}
-
-async function portalForgotPassword(){
-  const email=String($('portalLoginEmail').value||'').trim();
-  if(!email){
-    portalSetNotice('portalLoginNotice','Enter your email address first.',true);
-    return;
-  }
-  const {error}=await db.auth.resetPasswordForEmail(email,{
-    redirectTo:portalBaseUrl({portal:'1',reset:'1'})
-  });
-  if(error){
-    portalSetNotice('portalLoginNotice',error.message,true);
-    return;
-  }
-  portalSetNotice('portalLoginNotice','Password reset email sent.');
-}
-
-async function portalSaveResetPassword(){
-  const password=String($('portalResetPassword').value||'');
-  const confirmPassword=String($('portalResetPasswordConfirm').value||'');
-
-  if(password.length<8){
-    portalSetNotice('portalResetNotice','Password must be at least 8 characters.',true);
-    return;
-  }
-  if(password!==confirmPassword){
-    portalSetNotice('portalResetNotice','Passwords do not match.',true);
-    return;
-  }
-
-  const {error}=await db.auth.updateUser({password});
-  if(error){
-    portalSetNotice('portalResetNotice',error.message,true);
-    return;
-  }
-
-  try{
-    await portalHandleSignedInSession();
-    history.replaceState({},'',portalBaseUrl({portal:'1'}));
-  }catch(err){
-    portalSetNotice('portalResetNotice',err?.message||'Password updated. Sign in again.',true);
-  }
-}
-
-async function portalSignOut(){
-  if(bowenBuilderVersionWatchTimer)clearInterval(bowenBuilderVersionWatchTimer);
-  try{await db.auth.signOut()}catch(_){}
-  currentAuthUserId='';
-  location.replace(portalBaseUrl({portal:'1'}));
-}
-
-async function routePortalEntry({session=null}={}){
-  const inviteToken=portalInviteTokenFromUrl();
-
-  if(portalResetRequestedFromUrl() && session){
-    portalShowAuthCard('reset');
-    return true;
-  }
-
-  if(inviteToken){
-    if(session){
-      try{
-        await portalHandleSignedInSession({inviteToken});
-        return true;
-      }catch(_){}
-    }
-    await showPortalInvitation(inviteToken);
-    return true;
-  }
-
-  if(portalRequestedFromUrl()){
-    if(session){
-      try{
-        await portalHandleSignedInSession();
-        return true;
-      }catch(err){
-        await db.auth.signOut().catch(()=>{});
-        portalShowAuthCard('login');
-        portalSetNotice('portalLoginNotice',err?.message||'This account is not assigned Portal access.',true);
-        return true;
-      }
-    }
-    portalShowAuthCard('login');
-    return true;
-  }
-
-  return false;
-}
-
-
-
 let bowenBuilderVersionWatchTimer=null;
 let bowenBuilderVersionCheckPromise=null;
 let bowenBuilderUpdateLocked=false;
@@ -5269,15 +5994,9 @@ async function forceBowenBuilderVersionUpdate(latestVersion){
     });
   }catch(_){}
 
-  const portalVisible=!$('portalAppView')?.classList.contains('hidden');
   const versionLabel=$('bbUpdateVersion');
   if(versionLabel){
     versionLabel.textContent=`BowenBuilder ${BOWENBUILDER_VERSION} → ${latestVersion}`;
-  }
-  if($('bbUpdateTitle')){
-    $('bbUpdateTitle').textContent=portalVisible
-      ?'Bowen Builder Portal has been updated'
-      :'BowenBuilder has been updated';
   }
 
   $('bbUpdateLock')?.classList.remove('hidden');
@@ -5515,16 +6234,6 @@ let adminMemberships=[];
 let currentMembershipPermissions=[];
 let activeAdminPanel='contacts';
 let adminActivityRows=[];
-let adminPortalCompanies=[];
-let adminPortalUsers=[];
-let adminPortalAccessRows=[];
-let latestPortalInvite={url:'',email:'',name:'',companyName:'',expiresAt:''};
-let portalAccountData=null;
-let portalSelectedSubdivisionId=null;
-let portalSelectedLotId=null;
-let portalSelectedFolderId=null;
-let portalInvitePreviewData=null;
-
 let adminGuestInvites=[];
 let adminGuestInviteSubdivisions=[];
 let adminGuestFileActivity=[];
@@ -6568,13 +7277,13 @@ function activityCategory(action){
   if(a.startsWith('punchout_'))return 'punchout';
   if(a.startsWith('email_')||a.startsWith('text_'))return 'communication';
   if(a==='ui_click')return 'interaction';
-  if(a.startsWith('subdivision_file_')||a.startsWith('portal_file_')||a.startsWith('portal_folder_'))return 'files';
-  if(a==='portal_login'||a.startsWith('portal_view_'))return 'navigation';
+  if(a.startsWith('portal_'))return 'portal';
+  if(a.startsWith('subdivision_file_'))return 'files';
   if(a.startsWith('admin_'))return 'admin';
   return 'other';
 }
 function activityCategoryLabel(action){
-  return ({navigation:'Navigation',schedule:'Schedule',lot:'Lot',checklist:'Checklist',punchout:'Punchout',communication:'Email / Text',interaction:'Tabs / Buttons',files:'Files',admin:'Admin',other:'Activity'})[activityCategory(action)]||'Activity';
+  return ({navigation:'Navigation',schedule:'Schedule',lot:'Lot',checklist:'Checklist',punchout:'Punchout',communication:'Email / Text',interaction:'Tabs / Buttons',portal:'Portal',files:'Files',admin:'Admin',other:'Activity'})[activityCategory(action)]||'Activity';
 }
 function logBowenActivity(action,{label='',entityType='',entityId='',subdivisionId=null,lotId=null,screen='',metadata={},force=false}={}){
   if(!currentAuthUserId||!action)return;
@@ -8101,7 +8810,7 @@ function showLots(){
  $('heroSub').textContent='Lots and schedules in this subdivision.';updateHeroSiteMap(s);
  $('subdivisionName').textContent=s?.name||'';
  $('subdivisionAgendaName').textContent=s?.name||'';
- if($('subdivisionFilesName'))$('subdivisionFilesName').textContent=`${s?.name||'Subdivision'} Portal`;
+ if($('subdivisionFilesName'))$('subdivisionFilesName').textContent=`${s?.name||'Subdivision'} Files`;
  if($('subdivisionPunchoutName'))$('subdivisionPunchoutName').textContent=s?.name||'';
  if($('subdivisionInspectionName'))$('subdivisionInspectionName').textContent=s?.name||'';
 
@@ -10651,7 +11360,7 @@ async function showAdminView(){
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.view==='admin'));
   logBowenActivity('view_admin',{label:'Opened Admin',screen:'Admin'});
   $('heroTitle').textContent='Admin';
-  $('heroSub').textContent='Manage BowenBuilder contacts, permissions, Portal companies, guest links, and activity.';
+  $('heroSub').textContent='Manage BowenBuilder contacts, permissions, Portal access, and activity.';
   updateHeroSiteMap(null);
   showAdminPanel(activeAdminPanel);
 }
@@ -10751,7 +11460,7 @@ function showLatestCreatedGuestLink({url,email,name,expiresAt,neverExpires=false
 
 function guestInviteEmailHref({url,email,name,expiresAt,neverExpires=false}){
   const guestName=String(name||'').trim();
-  const subject='BowenBuilder Guest File Access';
+  const subject='Bowen Builder Portal Guest Access';
   const expiration=expiresAt?new Date(expiresAt).toLocaleDateString():'';
   const accessLine=neverExpires || !expiresAt
     ? 'This access does not expire unless Bowen & Bowen revokes the link.'
@@ -10761,7 +11470,7 @@ function guestInviteEmailHref({url,email,name,expiresAt,neverExpires=false}){
     '',
     'You have been given guest access to project files from Bowen & Bowen Homebuilders.',
     '',
-    'Open your secure BowenBuilder guest file portal here:',
+    'Open your secure Bowen Builder Portal guest access here:',
     url,
     '',
     accessLine,
@@ -11099,484 +11808,22 @@ async function revokeGuestAccess(inviteId){
   await loadAdminGuestAccess();
 }
 
-
-function portalAdminToken(){
-  const bytes=new Uint8Array(32);
-  crypto.getRandomValues(bytes);
-  let binary='';
-  bytes.forEach(b=>binary+=String.fromCharCode(b));
-  return btoa(binary).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
-}
-
-function portalAdminInviteExpires(){
-  const d=new Date();
-  d.setDate(d.getDate()+7);
-  return d.toISOString();
-}
-
-function portalAdminSetNotice(id,message='',error=false){
-  const el=$(id);
-  if(!el)return;
-  el.textContent=message||'';
-  el.classList.toggle('hidden',!message);
-  el.style.color=error?'#b42318':'';
-}
-
-function portalAdminInviteEmailHref(invite){
-  const body=[
-    `Hi ${invite.name||''},`,
-    '',
-    `${invite.companyName||'Your company'} has been invited to use Bowen Builder Portal.`,
-    '',
-    'Create your Portal account here:',
-    invite.url,
-    '',
-    'This registration link expires in 7 days.',
-    'After registration, use the same Portal account whenever you need project files.'
-  ].join('\n');
-  return `mailto:${encodeURIComponent(invite.email||'')}?subject=${encodeURIComponent('Bowen Builder Portal Invitation')}&body=${encodeURIComponent(body)}`;
-}
-
-function showLatestPortalInvite(invite){
-  latestPortalInvite=invite;
-  $('portalInviteCreatedUrl').textContent=invite.url||'';
-  $('portalInviteCreated').classList.remove('hidden');
-}
-
-async function loadAdminPortalAccess(){
-  if(!isBowenBuilderAdmin())return;
-  const root=$('portalCompanyList');
-  if(root)root.innerHTML='<div class="muted">Loading vendor companies…</div>';
-
-  const [{data:companies,error:ce},{data:users,error:ue},{data:access,error:ae}]=await Promise.all([
-    db.from('vendor_companies').select('*').order('name'),
-    db.from('portal_users').select('*').order('full_name'),
-    db.from('portal_company_subdivision_access').select('*')
-  ]);
-
-  if(ce||ue||ae){
-    if(root)root.innerHTML=`<div class="notice">${esc((ce||ue||ae).message)}</div>`;
-    return;
-  }
-
-  adminPortalCompanies=companies||[];
-  adminPortalUsers=users||[];
-  adminPortalAccessRows=access||[];
-  renderAdminPortalCompanies();
-}
-
-function portalAdminUserStatus(user){
-  if(!user.active)return 'Disabled';
-  if(user.user_id)return 'Active';
-  if(user.invite_expires_at && new Date(user.invite_expires_at)<=new Date())return 'Invite Expired';
-  return 'Invitation Pending';
-}
-
-function renderAdminPortalCompanies(){
-  const root=$('portalCompanyList');
-  if(!root)return;
-
-  if(!adminPortalCompanies.length){
-    root.innerHTML='<div class="card muted">No vendor companies have been created yet.</div>';
-    return;
-  }
-
-  root.innerHTML=adminPortalCompanies.map(company=>{
-    const companyUsers=adminPortalUsers
-      .filter(u=>String(u.company_id)===String(company.id))
-      .slice()
-      .sort((a,b)=>String(a.full_name||'').localeCompare(String(b.full_name||'')));
-
-    const accessMap=new Map(
-      adminPortalAccessRows
-        .filter(a=>String(a.company_id)===String(company.id))
-        .map(a=>[String(a.subdivision_id),a])
-    );
-
-    return `<div class="portal-company-card" data-portal-company="${esc(company.id)}">
-      <div class="portal-company-head">
-        <div>
-          <div class="portal-company-name">${esc(company.name)}</div>
-          <div class="portal-company-trade">${esc(company.trade_category||'Vendor / Trade Partner')}</div>
-        </div>
-        <span class="portal-company-status ${company.active?'active':'disabled'}">${company.active?'Active':'Disabled'}</span>
-      </div>
-
-      <div class="portal-company-fields">
-        <label>Company Name
-          <input data-pc-name value="${esc(company.name||'')}">
-        </label>
-        <label>Trade / Category
-          <input data-pc-trade value="${esc(company.trade_category||'')}">
-        </label>
-        <label>Primary Contact
-          <input data-pc-contact value="${esc(company.primary_contact_name||'')}">
-        </label>
-        <label>Contact Email
-          <input data-pc-email type="email" value="${esc(company.primary_contact_email||'')}">
-        </label>
-        <label>Phone
-          <input data-pc-phone type="tel" value="${esc(company.primary_contact_phone||'')}">
-        </label>
-        <label>Notes
-          <input data-pc-notes value="${esc(company.notes||'')}">
-        </label>
-      </div>
-
-      <div class="actions" style="margin-top:9px">
-        <button class="secondary" type="button" data-pc-save="${esc(company.id)}">Save Company</button>
-        <button class="secondary" type="button" data-pc-toggle="${esc(company.id)}">${company.active?'Disable Company':'Enable Company'}</button>
-      </div>
-
-      <div class="portal-admin-section-title" style="font-size:14px;margin-top:16px">Subdivision Access</div>
-      <div class="portal-access-grid">
-        ${subdivisions.map(sub=>{
-          const row=accessMap.get(String(sub.id));
-          const view=!!row?.can_view;
-          const upload=!!row?.can_upload;
-          return `<div class="portal-access-sub">
-            <div class="portal-access-sub-name">${esc(sub.name)}</div>
-            <div class="portal-access-sub-checks">
-              <label><input type="checkbox" data-pc-view="${esc(sub.id)}" ${view?'checked':''}> View</label>
-              <label><input type="checkbox" data-pc-upload="${esc(sub.id)}" ${upload?'checked':''} ${view?'':'disabled'}> Upload</label>
-            </div>
-          </div>`;
-        }).join('')}
-      </div>
-      <div class="actions" style="margin-top:9px">
-        <button class="primary" type="button" data-pc-save-access="${esc(company.id)}">Save Portal Access</button>
-      </div>
-
-      <div class="portal-admin-section-title" style="font-size:14px;margin-top:16px">Portal Users</div>
-      <div class="portal-company-users">
-        ${companyUsers.map(user=>{
-          const status=portalAdminUserStatus(user);
-          const inviteUrl=user.invite_token_value?portalInviteUrl(user.invite_token_value):'';
-          return `<div class="portal-company-user">
-            <div>
-              <div class="portal-company-user-name">${esc(user.full_name)}</div>
-              <div class="portal-company-user-meta">
-                ${esc(user.email)} · ${user.role==='company_admin'?'Company Admin':'Member'} · ${esc(status)}
-                ${user.last_login_at?`<br>Last login: ${esc(new Date(user.last_login_at).toLocaleString())}`:''}
-              </div>
-            </div>
-            <div class="portal-company-user-actions">
-              ${inviteUrl&&!user.user_id?`<button class="secondary" type="button" data-pu-email="${esc(user.id)}">Email Invite</button>`:''}
-              ${inviteUrl&&!user.user_id?`<button class="secondary" type="button" data-pu-copy="${esc(user.id)}">Copy Invite</button>`:''}
-              ${!user.user_id?`<button class="secondary" type="button" data-pu-refresh="${esc(user.id)}">Refresh Invite</button>`:''}
-              <button class="secondary" type="button" data-pu-toggle="${esc(user.id)}">${user.active?'Disable':'Enable'}</button>
-            </div>
-          </div>`;
-        }).join('')||'<div class="muted">No Portal users under this company yet.</div>'}
-      </div>
-
-      <div class="portal-invite-form">
-        <label>User Name
-          <input data-pc-invite-name placeholder="Full name">
-        </label>
-        <label>Email
-          <input data-pc-invite-email type="email" placeholder="user@vendor.com">
-        </label>
-        <label>Role
-          <select data-pc-invite-role>
-            <option value="member">Member</option>
-            <option value="company_admin">Company Admin</option>
-          </select>
-        </label>
-        <button class="primary" type="button" data-pc-invite="${esc(company.id)}">Invite User</button>
-      </div>
-    </div>`;
-  }).join('');
-
-  root.querySelectorAll('[data-pc-view]').forEach(box=>{
-    box.onchange=()=>{
-      const card=box.closest('[data-portal-company]');
-      const upload=card?.querySelector(`[data-pc-upload="${CSS.escape(box.dataset.pcView)}"]`);
-      if(upload){
-        upload.disabled=!box.checked;
-        if(!box.checked)upload.checked=false;
-      }
-    };
-  });
-
-  root.querySelectorAll('[data-pc-save]').forEach(btn=>{
-    btn.onclick=()=>savePortalCompany(btn.dataset.pcSave);
-  });
-  root.querySelectorAll('[data-pc-toggle]').forEach(btn=>{
-    btn.onclick=()=>togglePortalCompany(btn.dataset.pcToggle);
-  });
-  root.querySelectorAll('[data-pc-save-access]').forEach(btn=>{
-    btn.onclick=()=>savePortalCompanyAccess(btn.dataset.pcSaveAccess);
-  });
-  root.querySelectorAll('[data-pc-invite]').forEach(btn=>{
-    btn.onclick=()=>invitePortalUser(btn.dataset.pcInvite);
-  });
-  root.querySelectorAll('[data-pu-toggle]').forEach(btn=>{
-    btn.onclick=()=>togglePortalUser(btn.dataset.puToggle);
-  });
-  root.querySelectorAll('[data-pu-refresh]').forEach(btn=>{
-    btn.onclick=()=>refreshPortalUserInvite(btn.dataset.puRefresh);
-  });
-  root.querySelectorAll('[data-pu-copy]').forEach(btn=>{
-    btn.onclick=()=>copyPortalUserInvite(btn.dataset.puCopy);
-  });
-  root.querySelectorAll('[data-pu-email]').forEach(btn=>{
-    btn.onclick=()=>emailPortalUserInvite(btn.dataset.puEmail);
-  });
-}
-
-async function createPortalCompany(){
-  const payload={
-    name:String($('portalCompanyName').value||'').trim(),
-    trade_category:String($('portalCompanyTrade').value||'').trim()||null,
-    primary_contact_name:String($('portalCompanyContact').value||'').trim()||null,
-    primary_contact_email:String($('portalCompanyEmail').value||'').trim()||null,
-    primary_contact_phone:String($('portalCompanyPhone').value||'').trim()||null,
-    notes:String($('portalCompanyNotes').value||'').trim()||null,
-    active:true,
-    created_by:currentAuthUserId||null
-  };
-  if(!payload.name){
-    portalAdminSetNotice('portalCompanyCreateNotice','Enter a company name.',true);
-    return;
-  }
-
-  const {data,error}=await db.from('vendor_companies').insert(payload).select('*').single();
-  if(error){
-    portalAdminSetNotice('portalCompanyCreateNotice',error.message,true);
-    return;
-  }
-
-  logBowenActivity('admin_portal_company_created',{
-    label:`Created Portal company ${payload.name}`,
-    entityType:'vendor_company',
-    entityId:data?.id||'',
-    screen:'Admin',
-    force:true
-  });
-
-  ['portalCompanyName','portalCompanyTrade','portalCompanyContact','portalCompanyEmail','portalCompanyPhone','portalCompanyNotes']
-    .forEach(id=>$(id).value='');
-  portalAdminSetNotice('portalCompanyCreateNotice','Company added.');
-  await loadAdminPortalAccess();
-}
-
-async function savePortalCompany(companyId){
-  const card=document.querySelector(`[data-portal-company="${CSS.escape(companyId)}"]`);
-  if(!card)return;
-  const payload={
-    name:String(card.querySelector('[data-pc-name]')?.value||'').trim(),
-    trade_category:String(card.querySelector('[data-pc-trade]')?.value||'').trim()||null,
-    primary_contact_name:String(card.querySelector('[data-pc-contact]')?.value||'').trim()||null,
-    primary_contact_email:String(card.querySelector('[data-pc-email]')?.value||'').trim()||null,
-    primary_contact_phone:String(card.querySelector('[data-pc-phone]')?.value||'').trim()||null,
-    notes:String(card.querySelector('[data-pc-notes]')?.value||'').trim()||null,
-    updated_at:new Date().toISOString()
-  };
-  if(!payload.name)return alert('Company name is required.');
-
-  const {error}=await db.from('vendor_companies').update(payload).eq('id',companyId);
-  if(error)return alert(error.message);
-
-  logBowenActivity('admin_portal_company_updated',{
-    label:`Updated Portal company ${payload.name}`,
-    entityType:'vendor_company',
-    entityId:companyId,
-    screen:'Admin',
-    force:true
-  });
-  await loadAdminPortalAccess();
-}
-
-async function togglePortalCompany(companyId){
-  const company=adminPortalCompanies.find(c=>String(c.id)===String(companyId));
-  if(!company)return;
-  const active=!company.active;
-  if(!active&&!confirm(`Disable ${company.name}? Its Portal users will immediately lose access.`))return;
-
-  const {error}=await db.from('vendor_companies')
-    .update({active,updated_at:new Date().toISOString()})
-    .eq('id',company.id);
-  if(error)return alert(error.message);
-
-  logBowenActivity('admin_portal_company_status',{
-    label:`${active?'Enabled':'Disabled'} Portal company ${company.name}`,
-    entityType:'vendor_company',
-    entityId:company.id,
-    screen:'Admin',
-    force:true
-  });
-  await loadAdminPortalAccess();
-}
-
-async function savePortalCompanyAccess(companyId){
-  const card=document.querySelector(`[data-portal-company="${CSS.escape(companyId)}"]`);
-  if(!card)return;
-
-  const viewIds=[...card.querySelectorAll('[data-pc-view]:checked')]
-    .map(x=>x.dataset.pcView).filter(Boolean);
-  const uploadIds=[...card.querySelectorAll('[data-pc-upload]:checked')]
-    .map(x=>x.dataset.pcUpload).filter(Boolean);
-
-  const {error}=await db.rpc('bowenbuilder_admin_set_portal_company_access',{
-    p_company_id:companyId,
-    p_view_subdivision_ids:viewIds,
-    p_upload_subdivision_ids:uploadIds
-  });
-  if(error)return alert(error.message);
-
-  const company=adminPortalCompanies.find(c=>String(c.id)===String(companyId));
-  logBowenActivity('admin_portal_company_access_updated',{
-    label:`Updated Portal access for ${company?.name||'vendor company'}`,
-    entityType:'vendor_company',
-    entityId:companyId,
-    screen:'Admin',
-    force:true,
-    metadata:{view_count:viewIds.length,upload_count:uploadIds.length}
-  });
-  await loadAdminPortalAccess();
-}
-
-async function invitePortalUser(companyId){
-  const card=document.querySelector(`[data-portal-company="${CSS.escape(companyId)}"]`);
-  if(!card)return;
-
-  const name=String(card.querySelector('[data-pc-invite-name]')?.value||'').trim();
-  const email=String(card.querySelector('[data-pc-invite-email]')?.value||'').trim();
-  const role=String(card.querySelector('[data-pc-invite-role]')?.value||'member');
-  if(!name||!email)return alert('Enter the user name and email address.');
-
-  const token=portalAdminToken();
-  const expiresAt=portalAdminInviteExpires();
-  const {data,error}=await db.rpc('bowenbuilder_admin_invite_portal_user',{
-    p_company_id:companyId,
-    p_full_name:name,
-    p_email:email,
-    p_role:role,
-    p_token:token,
-    p_expires_at:expiresAt
-  });
-  if(error)return alert(error.message);
-
-  const company=adminPortalCompanies.find(c=>String(c.id)===String(companyId));
-  const invite={
-    url:portalInviteUrl(token),
-    email,
-    name,
-    companyName:company?.name||'Vendor Company',
-    expiresAt
-  };
-  showLatestPortalInvite(invite);
-
-  logBowenActivity('admin_portal_user_invited',{
-    label:`Invited ${name} · ${company?.name||'Vendor Company'}`,
-    entityType:'portal_user',
-    entityId:String(data||''),
-    screen:'Admin',
-    force:true
-  });
-
-  card.querySelector('[data-pc-invite-name]').value='';
-  card.querySelector('[data-pc-invite-email]').value='';
-  await loadAdminPortalAccess();
-}
-
-function portalInviteForUser(user){
-  const company=adminPortalCompanies.find(c=>String(c.id)===String(user.company_id));
-  return {
-    url:user.invite_token_value?portalInviteUrl(user.invite_token_value):'',
-    email:user.email,
-    name:user.full_name,
-    companyName:company?.name||'Vendor Company',
-    expiresAt:user.invite_expires_at
-  };
-}
-
-async function refreshPortalUserInvite(userId){
-  const user=adminPortalUsers.find(u=>String(u.id)===String(userId));
-  if(!user||user.user_id)return;
-
-  const token=portalAdminToken();
-  const expiresAt=portalAdminInviteExpires();
-  const {error}=await db.rpc('bowenbuilder_admin_refresh_portal_invite',{
-    p_portal_user_id:user.id,
-    p_token:token,
-    p_expires_at:expiresAt
-  });
-  if(error)return alert(error.message);
-
-  const company=adminPortalCompanies.find(c=>String(c.id)===String(user.company_id));
-  showLatestPortalInvite({
-    url:portalInviteUrl(token),
-    email:user.email,
-    name:user.full_name,
-    companyName:company?.name||'Vendor Company',
-    expiresAt
-  });
-  await loadAdminPortalAccess();
-}
-
-async function togglePortalUser(userId){
-  const user=adminPortalUsers.find(u=>String(u.id)===String(userId));
-  if(!user)return;
-  const active=!user.active;
-  const {error}=await db.from('portal_users')
-    .update({active,updated_at:new Date().toISOString()})
-    .eq('id',user.id);
-  if(error)return alert(error.message);
-
-  logBowenActivity('admin_portal_user_status',{
-    label:`${active?'Enabled':'Disabled'} Portal user ${user.full_name}`,
-    entityType:'portal_user',
-    entityId:user.id,
-    screen:'Admin',
-    force:true
-  });
-  await loadAdminPortalAccess();
-}
-
-async function copyPortalUserInvite(userId){
-  const user=adminPortalUsers.find(u=>String(u.id)===String(userId));
-  if(!user?.invite_token_value)return;
-  const url=portalInviteUrl(user.invite_token_value);
-  try{
-    await navigator.clipboard.writeText(url);
-    alert('Portal invitation link copied.');
-  }catch{
-    prompt('Copy this Portal invitation link:',url);
-  }
-}
-
-function emailPortalUserInvite(userId){
-  const user=adminPortalUsers.find(u=>String(u.id)===String(userId));
-  if(!user?.invite_token_value)return;
-  location.href=portalAdminInviteEmailHref(portalInviteForUser(user));
-}
-
 function showAdminPanel(panel='contacts'){
  activeAdminPanel=panel;
- const contacts=panel==='contacts',
-       power=panel==='power',
-       permissions=panel==='permissions',
-       online=panel==='online',
-       portalAccess=panel==='portal_access',
-       guestFiles=panel==='guest_files',
-       activity=panel==='activity';
+ const contacts=panel==='contacts',power=panel==='power',permissions=panel==='permissions',online=panel==='online',portalAccess=panel==='guest_files',activity=panel==='activity';
 
  $('adminContactsPanel').classList.toggle('hidden',!contacts);
  $('adminPowerPanel').classList.toggle('hidden',!power);
  $('adminPermissionsPanel').classList.toggle('hidden',!permissions);
  $('adminOnlinePanel').classList.toggle('hidden',!online);
- $('adminPortalAccessPanel').classList.toggle('hidden',!portalAccess);
- $('adminGuestFilesPanel').classList.toggle('hidden',!guestFiles);
+ $('adminGuestFilesPanel').classList.toggle('hidden',!portalAccess);
  $('adminActivityLogPanel').classList.toggle('hidden',!activity);
 
  $('adminContactsTab').classList.toggle('active',contacts);
  $('adminPowerTab').classList.toggle('active',power);
  $('adminPermissionsTab').classList.toggle('active',permissions);
  $('adminOnlineTab').classList.toggle('active',online);
- $('adminPortalAccessTab').classList.toggle('active',portalAccess);
- $('adminGuestFilesTab').classList.toggle('active',guestFiles);
+ $('adminGuestFilesTab').classList.toggle('active',portalAccess);
  $('adminActivityLogTab').classList.toggle('active',activity);
 
  if(activity){
@@ -11588,8 +11835,7 @@ function showAdminPanel(panel='contacts'){
    else if(power)renderAdminPowerCompanies();
    else if(permissions)renderAdminUserPermissions();
    else if(online){syncAppPresenceState();loadAdminPresenceProfiles().then(()=>renderAdminOnlineUsers());}
-   else if(portalAccess)loadAdminPortalAccess();
-   else if(guestFiles)loadAdminGuestAccess();
+   else if(portalAccess)showPortalAdminMode(portalAdminMode);
  }
  updateAppPresenceLocation();
 }
@@ -13907,20 +14153,30 @@ async function saveSchedule(e){
 }
 $('msLogin').onclick=signIn;
 $('loginForm').onsubmit=e=>{e.preventDefault();signIn()};
-$('openVendorPortal').onclick=()=>location.href=portalBaseUrl({portal:'1'});
 
-$('portalLoginForm').onsubmit=e=>{e.preventDefault();portalSignIn()};
-$('portalForgotPassword').onclick=portalForgotPassword;
-$('portalBackToBowenBuilder').onclick=()=>location.href=portalBaseUrl();
-$('portalInviteForm').onsubmit=e=>{e.preventDefault();portalCreateAccountFromInvite()};
-$('portalInviteExistingLogin').onclick=()=>{
-  const email=String(portalInvitePreviewData?.email||'');
-  location.href=portalBaseUrl({portal:'1',email});
+$('openVendorPortal').onclick=()=>{location.href=portalBaseUrl();};
+$('portalBackToBowenBuilder').onclick=()=>{
+  const url=new URL(location.href);url.search='';url.hash='';location.href=url.href;
 };
-$('portalResetForm').onsubmit=e=>{e.preventDefault();portalSaveResetPassword()};
-$('portalSignOut').onclick=portalSignOut;
-$('portalUploadInput').onchange=e=>{
-  if(e.target.files?.length)portalUploadFiles(e.target.files);
+$('portalLoginSubmit').onclick=portalSignIn;
+$('portalLoginPassword').addEventListener('keydown',e=>{if(e.key==='Enter')portalSignIn();});
+$('portalForgotPassword').onclick=portalForgotPassword;
+$('portalInviteCreateAccount').onclick=portalCreateAccount;
+$('portalInviteUseExisting').onclick=()=>{
+  $('portalLoginEmail').value=portalPendingInvitePreview?.email||'';
+  showPortalOnly('login');
+  showPortalAuthNotice('Sign in with the invited email address to accept this invitation.');
+};
+$('portalResetSave').onclick=portalSaveResetPassword;
+$('portalLogout').onclick=async()=>{
+  await db.auth.signOut();
+  currentAuthUserId='';
+  portalBootstrapData=null;
+  location.href=portalBaseUrl();
+};
+$('portalFileInput').onchange=e=>{
+  const selected=e.target.files;
+  if(selected?.length)portalUploadFiles(selected);
 };
 
 if($('bbUpdateReload')){
@@ -14411,14 +14667,29 @@ $('adminContactsTab').onclick=()=>showAdminPanel('contacts');
 $('adminPowerTab').onclick=()=>showAdminPanel('power');
 $('adminPermissionsTab').onclick=()=>showAdminPanel('permissions');
 $('adminOnlineTab').onclick=()=>showAdminPanel('online');
-$('adminPortalAccessTab').onclick=()=>showAdminPanel('portal_access');
 $('adminGuestFilesTab').onclick=()=>showAdminPanel('guest_files');
 $('adminActivityLogTab').onclick=()=>showAdminPanel('activity');
 
-$('portalCompanyCreate').onclick=createPortalCompany;
-$('portalAccessRefresh').onclick=loadAdminPortalAccess;
+$('portalAdminCompaniesBtn').onclick=()=>showPortalAdminMode('companies');
+$('portalAdminGuestLinksBtn').onclick=()=>showPortalAdminMode('guest_links');
+$('portalCompanySearch').oninput=renderPortalCompanyList;
+$('portalCompanyAdd').onclick=()=>{
+  portalAdminSelectedCompanyId='__new__';
+  portalCompanyDetailSetNotice('');
+  $('portalInviteCreated').classList.add('hidden');
+  renderPortalAdmin();
+};
+$('portalCompanyBack').onclick=()=>{
+  portalAdminSelectedCompanyId=null;
+  portalCompanyDetailSetNotice('');
+  $('portalInviteCreated').classList.add('hidden');
+  renderPortalAdmin();
+};
+$('portalCompanySave').onclick=savePortalCompany;
+$('portalCompanyAccessSave').onclick=savePortalCompanyAccess;
+$('portalInviteUserCreate').onclick=createPortalUserInvite;
 $('portalInviteCreatedEmail').onclick=()=>{
-  if(latestPortalInvite.url)location.href=portalAdminInviteEmailHref(latestPortalInvite);
+  if(latestPortalInvite.url)location.href=portalInvitationEmailHref(latestPortalInvite);
 };
 $('portalInviteCreatedCopy').onclick=async()=>{
   if(!latestPortalInvite.url)return;
@@ -14426,11 +14697,8 @@ $('portalInviteCreatedCopy').onclick=async()=>{
     await navigator.clipboard.writeText(latestPortalInvite.url);
     alert('Portal invitation link copied.');
   }catch{
-    prompt('Copy this Portal invitation link:',latestPortalInvite.url);
+    prompt('Copy this Portal invitation:',latestPortalInvite.url);
   }
-};
-$('portalInviteCreatedOpen').onclick=()=>{
-  if(latestPortalInvite.url)window.open(latestPortalInvite.url,'_blank','noopener');
 };
 
 $('guestAccessCreate').onclick=createGuestAccess;
@@ -14491,9 +14759,6 @@ $('crewQrPrint').onclick=()=>{
   window.print();
 };
 
-const portalPrefillEmail=new URLSearchParams(location.search).get('email')||'';
-if(portalPrefillEmail&&$('portalLoginEmail'))$('portalLoginEmail').value=portalPrefillEmail;
-
 const crewToken=crewTokenFromUrl();
 if(crewToken){
   await showPublicCrewView(crewToken);
@@ -14506,31 +14771,76 @@ if(guestToken){
   return;
 }
 
-const {data:{session}}=await db.auth.getSession();
-if(session?.user?.id)currentAuthUserId=String(session.user.id||'');
+const portalInviteToken=portalInviteTokenFromUrl();
+const explicitPortalMode=portalModeFromUrl();
+const explicitPortalReset=portalResetFromUrl();
 
-if(await routePortalEntry({session})){
+const {data:{session}}=await db.auth.getSession();
+
+if(portalInviteToken){
+  portalPendingInviteToken=portalInviteToken;
+
+  if(session){
+    currentAuthUserId=String(session.user?.id||'');
+    try{
+      await acceptPendingPortalInvitation();
+      const portal=await bootstrapPortalAccount();
+      if(portal){
+        startBowenBuilderVersionWatch();
+        portalShowApp(portal);
+        return;
+      }
+    }catch(err){
+      await loadPortalInvitationPreview(portalInviteToken);
+      showPortalAuthNotice(err?.message||'Sign in with the invited email address to continue.',true);
+      return;
+    }
+  }
+
+  await loadPortalInvitationPreview(portalInviteToken);
   return;
 }
 
-if(session){
-  // Internal BowenBuilder accounts have a profiles row. Portal-only accounts
-  // do not, so route those users into Bowen Builder Portal automatically.
-  const {data:employeeProfile}=await db
-    .from('profiles')
-    .select('id')
-    .eq('id',session.user.id)
-    .maybeSingle();
+if(explicitPortalReset){
+  if(session){
+    currentAuthUserId=String(session.user?.id||'');
+    showPortalOnly('reset');
+  }else{
+    showPortalOnly('login');
+    showPortalAuthNotice('Open the password reset link from your email again.',true);
+  }
+  return;
+}
 
-  if(!employeeProfile){
+if(explicitPortalMode){
+  if(session){
+    currentAuthUserId=String(session.user?.id||'');
     try{
-      const portalData=await portalBootstrap();
-      if(portalData){
-        await showPortalApp(portalData);
+      const portal=await bootstrapPortalAccount();
+      if(portal){
+        startBowenBuilderVersionWatch();
+        portalShowApp(portal);
         return;
       }
     }catch(_){}
   }
+  showPortalOnly('login');
+  return;
+}
+
+if(session){
+  currentAuthUserId=String(session.user?.id||'');
+
+  // Vendor Portal users are kept completely out of the internal BowenBuilder
+  // scheduling/admin interface even if they arrive at the root URL.
+  try{
+    const portal=await bootstrapPortalAccount();
+    if(portal){
+      startBowenBuilderVersionWatch();
+      portalShowApp(portal);
+      return;
+    }
+  }catch(_){}
 
   appOn();
   await loadCurrentProfile();
