@@ -3282,6 +3282,17 @@ button.teams-file-row:hover{border-color:#bdccdd}
   .portal-file-actions{grid-column:2}
 }
 
+
+/* Compact previews are limited to Portal file rows and automatic lot folders. */
+.portal-preview{width:64px;height:64px;flex:0 0 64px;display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:9px;background:#eef4fb;color:#244f7e;font-size:13px;font-weight:850}
+.portal-preview img,.portal-preview canvas{display:block;max-width:100%;max-height:100%;object-fit:contain}
+.portal-file-row,.guest-portal-file,.subdivision-file-row{grid-template-columns:64px minmax(0,1fr) auto}
+.portal-file-row>div,.guest-portal-file>div{min-width:0}
+.portal-lot-card{display:flex;align-items:center;gap:12px}
+.portal-lot-copy{min-width:0;flex:1;overflow-wrap:anywhere}
+.portal-lot-card .portal-project-arrow{order:3;float:none}
+@media(max-width:700px){.portal-file-row,.guest-portal-file,.subdivision-file-row{grid-template-columns:64px minmax(0,1fr)}.portal-file-actions,.guest-portal-file-actions,.subdivision-file-actions{grid-column:2;justify-content:flex-start}}
+
 </style>
 </head>
 <body>
@@ -4321,6 +4332,90 @@ button.teams-file-row:hover{border-color:#bdccdd}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+/* Display-only previews. URL resolvers retain the Portal's existing authorization. */
+(() => {
+  let nextId = 0, active = 0, pdfModule;
+  const pending = new Map(), queue = [];
+  const escape = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const kind = file => {
+    const mime = String(file?.mime_type || '').toLowerCase();
+    const name = String(file?.file_name || '').split(/[?#]/)[0];
+    if (mime === 'application/pdf' || /\.pdf$/i.test(name)) return 'pdf';
+    if (mime.startsWith('image/') || /\.(png|jpe?g|webp|gif|avif|bmp|svg)$/i.test(name)) return 'image';
+    return '';
+  };
+  const observer = typeof IntersectionObserver === 'function' ? new IntersectionObserver(entries => {
+    for (const entry of entries) if (entry.isIntersecting) {
+      observer.unobserve(entry.target);
+      enqueue(entry.target);
+    }
+  }, {rootMargin:'128px'}) : null;
+  function enqueue(element) {
+    const task = pending.get(element.dataset.portalPreview);
+    pending.delete(element.dataset.portalPreview);
+    if (task) queue.push({element, ...task});
+    drain();
+  }
+  function drain() {
+    while (active < 4 && queue.length) {
+      const task = queue.shift();
+      if (!task.element.isConnected) continue;
+      active++;
+      render(task).catch(() => {}).finally(() => { active--; drain(); });
+    }
+  }
+  async function render({element, type, resolve}) {
+    const url = await resolve();
+    if (!url || !element.isConnected) return;
+    const parsed = new URL(url, location.href);
+    if (!['https:', 'http:', 'blob:'].includes(parsed.protocol) && !/^data:image\//i.test(url)) return;
+    if (type === 'image') {
+      const image = new Image();
+      image.alt = ''; image.decoding = 'async'; image.referrerPolicy = 'no-referrer';
+      image.src = url;
+      await image.decode();
+      if (element.isConnected) element.replaceChildren(image);
+      return;
+    }
+    pdfModule ||= import('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.6.82/pdf.min.mjs').catch(error => {pdfModule = null; throw error;});
+    const pdfjs = await pdfModule;
+    pdfjs.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.6.82/pdf.worker.min.mjs';
+    const loading = pdfjs.getDocument({url, isEvalSupported:false});
+    try {
+      const pdf = await loading.promise;
+      if (!element.isConnected) return;
+      const page = await pdf.getPage(1);
+      const original = page.getViewport({scale:1});
+      const viewport = page.getViewport({scale:128 / Math.max(original.width, original.height)});
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.ceil(viewport.width); canvas.height = Math.ceil(viewport.height);
+      await page.render({canvasContext:canvas.getContext('2d'), viewport}).promise;
+      if (element.isConnected) element.replaceChildren(canvas);
+    } finally { await loading.destroy(); }
+  }
+  window.portalPreviewMarkup = (file, resolve, fallback = 'FILE') => {
+    const type = kind(file);
+    if (!type) return `<span class="portal-preview" aria-hidden="true">${escape(fallback)}</span>`;
+    const id = String(++nextId);
+    pending.set(id, {type, resolve});
+    queueMicrotask(() => {
+      const element = document.querySelector(`[data-portal-preview="${id}"]`);
+      if (!element) { pending.delete(id); return; }
+      if (observer) observer.observe(element); else enqueue(element);
+      // Discard tasks belonging to folders that were replaced during navigation.
+      for (const key of pending.keys()) if (!document.querySelector(`[data-portal-preview="${key}"]`)) pending.delete(key);
+    });
+    return `<span class="portal-preview" data-portal-preview="${id}" aria-hidden="true">${escape(fallback)}</span>`;
+  };
+  window.portalLotPreviewMarkup = lot => {
+    const url = lot?.color_rendering_url;
+    if (!url) return '<span class="portal-preview" aria-hidden="true">📁</span>';
+    return window.portalPreviewMarkup({file_name:url, mime_type:/\.pdf(?:[?#]|$)/i.test(url) ? 'application/pdf':'image/unknown'}, () => url, '📁');
+  };
+})();
+
+</script>
 
 
 <dialog id="crewQrDialog">
@@ -4969,10 +5064,11 @@ function renderPortalApp(){
             <small>Subdivision folder</small>
           </button>`).join('')}
         ${subLots.map(lot=>`
-          <button class="portal-project-card" type="button" data-portal-lot="${esc(lot.id)}">
+          <button class="portal-project-card portal-lot-card" type="button" data-portal-lot="${esc(lot.id)}">
             <span class="portal-project-arrow">›</span>
-            <strong>📁 ${esc(lot.lot_name||'Lot')}</strong>
-            <small>${esc(lot.address||lot.plan_name||'Lot files')}</small>
+            ${portalLotPreviewMarkup(lot)}
+            <span class="portal-lot-copy"><strong>${esc(lot.lot_name||'Lot')}</strong>
+            <small>${esc(lot.address||lot.plan_name||'Lot files')}</small></span>
           </button>`).join('')}
         ${(!sharedFolders.length&&!subLots.length)?'<div class="portal-empty">No folders are available in this subdivision yet.</div>':''}
       </div>`;
@@ -5063,7 +5159,7 @@ function renderPortalApp(){
 
       ${currentFiles.map(file=>`
         <div class="portal-file-row">
-          <div class="portal-file-icon">${esc(subdivisionFileIcon(file))}</div>
+          ${portalPreviewMarkup(file,()=>signedSubdivisionFileUrl(file),subdivisionFileIcon(file))}
           <div>
             <div class="portal-file-name">${esc(file.file_name||'File')}</div>
             <div class="portal-file-meta">${esc([portalFileSize(file.size_bytes),portalDateTime(file.created_at)].filter(Boolean).join(' · '))}</div>
@@ -5776,7 +5872,7 @@ function renderGuestFilePortal(){
           ${lotRows.map(lot=>{
             const fileCount=guestFiles.filter(f=>String(f.lot_id)===String(lot.id)).length;
             return `<button class="guest-portal-folder" type="button" data-guest-lot="${esc(lot.id)}">
-              <span class="guest-portal-folder-icon">📁</span>
+              ${portalLotPreviewMarkup(lot)}
               <span class="guest-portal-folder-copy">
                 <strong>${esc(lot.lot_name||'Lot')}</strong>
                 <small>${esc(lot.address||lot.plan_name||'Lot files')} · ${fileCount} file${fileCount===1?'':'s'}</small>
@@ -5875,7 +5971,7 @@ function renderGuestFilePortal(){
 
         ${files.map(file=>`
           <div class="guest-portal-file">
-            <div class="guest-portal-file-icon">${esc(guestPortalFileIcon(file))}</div>
+            ${portalPreviewMarkup(file,()=>guestFileFunctionUrl(file.id),guestPortalFileIcon(file))}
             <div>
               <div class="guest-portal-file-name">${esc(file.file_name||'File')}</div>
               <div class="guest-portal-file-meta">${esc([guestPortalFileSize(file.size_bytes),guestPortalDate(file.created_at)].filter(Boolean).join(' · '))}</div>
@@ -8140,7 +8236,7 @@ function renderSubdivisionFiles(){
       const folderCount=subdivisionFileFolders.filter(f=>String(f.lot_id)===String(l.id)).length;
       const total=fileCount+folderCount;
       return `<button class="subdivision-file-folder" type="button" data-subdivision-file-lot="${esc(l.id)}">
-        <span class="subdivision-file-folder-icon">📁</span>
+        ${portalLotPreviewMarkup(l)}
         <span class="subdivision-file-folder-copy">
           <span class="subdivision-file-folder-name">${esc(l.lot_name||'Lot')}</span>
           <span class="subdivision-file-folder-meta">${esc(l.address||l.plan_name||'Lot files')}</span>
@@ -8275,7 +8371,7 @@ function renderSubdivisionFiles(){
       : '';
     const meta=[subdivisionFileSize(file.size_bytes),date].filter(Boolean).join(' · ');
     return `<div class="subdivision-file-row" data-subdivision-file-row="${esc(file.id)}">
-      <div class="subdivision-file-icon">${esc(subdivisionFileIcon(file))}</div>
+      ${portalPreviewMarkup(file,()=>signedSubdivisionFileUrl(file),subdivisionFileIcon(file))}
       <div class="subdivision-file-copy">
         <div class="subdivision-file-name">${esc(file.file_name||'File')}</div>
         <div class="subdivision-file-meta">${esc(meta||'BowenBuilder file')}</div>
