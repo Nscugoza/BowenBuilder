@@ -3293,6 +3293,26 @@ button.teams-file-row:hover{border-color:#bdccdd}
 .portal-lot-card .portal-project-arrow{order:3;float:none}
 @media(max-width:700px){.portal-file-row,.guest-portal-file,.subdivision-file-row{grid-template-columns:64px minmax(0,1fr)}.portal-file-actions,.guest-portal-file-actions,.subdivision-file-actions{grid-column:2;justify-content:flex-start}}
 
+
+/* Company schedule alerts */
+.schedule-alert-rules,.schedule-alert-inbox{display:grid;gap:10px;margin:12px 0}
+.schedule-alert-rule,.schedule-alert-update{border:1px solid #dbe3ee;border-radius:12px;padding:14px;background:#fff}
+.schedule-alert-rule,.schedule-alert-update-head,.schedule-alert-update-footer{display:flex;gap:10px;justify-content:space-between;align-items:center;flex-wrap:wrap}
+.schedule-alert-rule>div:first-child{min-width:0;flex:1;overflow-wrap:anywhere}
+.schedule-alert-rule small,.schedule-alert-email small,.schedule-alert-check small{display:block;color:#667085;margin-top:4px}
+.schedule-alert-buttons{display:flex;gap:8px;flex-wrap:wrap}
+.schedule-alert-editor{margin:14px 0;padding:14px;background:#f4f7fa;border-radius:12px}
+.schedule-alert-editor input:not([type=checkbox]){width:100%}
+.schedule-alert-editor fieldset{border:1px solid #dbe3ee;border-radius:8px;margin:12px 0}
+.schedule-alert-check{display:flex;gap:10px;align-items:flex-start;margin:10px 0}
+.schedule-alert-check input{width:19px;height:19px;flex:0 0 19px;margin-top:2px}
+.schedule-alert-history{margin-top:16px}.schedule-alert-history summary{cursor:pointer;font-weight:800}
+.schedule-alert-email{padding:12px 0;border-bottom:1px solid #e5e7eb;overflow-wrap:anywhere}
+.schedule-alert-update{display:grid;gap:8px;overflow-wrap:anywhere}.schedule-alert-update.unread{border-left:4px solid #245b90}
+.schedule-alert-kind{font-size:12px;padding:4px 8px;border-radius:20px;background:#eaf2fb;color:#174f86}
+.schedule-alert-kind.canceled{background:#fef3f2;color:#b42318}.schedule-alert-kind.rescheduled{background:#fff6dd;color:#7a4c00}
+.schedule-alert-update-footer small{color:#667085}.portal-topbar-actions{flex-wrap:wrap}
+@media(max-width:640px){.portal-topbar{flex-wrap:wrap}.portal-topbar-actions{gap:6px}.schedule-alert-editor{padding:10px}.schedule-alert-rule{align-items:flex-start}}
 </style>
 </head>
 <body>
@@ -3396,6 +3416,8 @@ button.teams-file-row:hover{border-color:#bdccdd}
     </div>
     <div class="portal-topbar-actions">
       <span id="portalUserName" class="portal-user-name"></span>
+      <button id="portalFilesButton" class="secondary" type="button" aria-pressed="true">Files</button>
+      <button id="portalUpdatesButton" class="secondary" type="button" aria-pressed="false">Updates</button>
       <button id="portalLogout" class="secondary" type="button">Sign Out</button>
     </div>
   </header>
@@ -3403,11 +3425,13 @@ button.teams-file-row:hover{border-color:#bdccdd}
   <main class="portal-shell">
     <div id="portalAppNotice" class="notice hidden"></div>
     <div id="portalAppContent"></div>
+    <section id="portalScheduleInbox" class="hidden" aria-label="Schedule updates"></section>
     <input id="portalFileInput" type="file" multiple hidden>
   </main>
 </section>
 
 <section id="app" class="app hidden">
+<div id="scheduleAlertsDeliveryNotice" class="notice hidden" role="status" style="margin:12px"></div>
   <header class="topbar">
     <div><h1>BowenBuilder</h1><small>Bowen & Bowen Homebuilders</small></div>
     <div class="top-actions"><button id="logout" type="button">Sign out</button></div>
@@ -3799,6 +3823,8 @@ button.teams-file-row:hover{border-color:#bdccdd}
         </div>
         <div id="portalCompanyAccessGrid" class="portal-company-access-grid"></div>
       </div>
+
+      <div id="portalCompanyAlertsSection" class="card portal-company-section hidden"><h3>Schedule Alerts</h3><div id="portalCompanyAlertsBody"></div></div>
 
       <div id="portalCompanyUsersSection" class="card portal-company-section hidden">
         <div class="portal-company-section-head">
@@ -4574,6 +4600,216 @@ async function portalLog(action,{label='',subdivisionId=null,lotId=null,fileId=n
   }catch(_){}
 }
 
+// BEGIN PORTAL SCHEDULE ALERTS
+// Embedded into index.html for the single-file BowenBuilder release.
+const scheduleAlertState={company:null,adminRequest:0,adminData:null,inbox:[],unread:0,more:false,user:null,loading:false,dispatching:false,completions:[],inboxOpen:false};
+async function scheduleAlertsRpc(action,payload={}){
+ const {data,error}=await db.rpc('bowenbuilder_schedule_alerts',{p_action:action,p_payload:payload});
+ if(error)throw new Error(error.message||'Could not load schedule alerts.');
+ return typeof data==='string'?JSON.parse(data):data;
+}
+function scheduleAlertDate(value){
+ if(!value)return 'Not scheduled';
+ const date=new Date(value);
+ if(Number.isNaN(date.getTime()))return 'Not scheduled';
+ // Calendar dates are stored at noon UTC; preserve the selected calendar day.
+ return date.toLocaleDateString(undefined,{timeZone:'UTC',month:'short',day:'numeric',year:'numeric'});
+}
+function scheduleAlertRange(start,end){
+ const a=scheduleAlertDate(start),b=scheduleAlertDate(end);
+ return !end||a===b?a:`${a} – ${b}`;
+}
+function scheduleAlertLabel(kind){return ({scheduled:'Scheduled',rescheduled:'Rescheduled',canceled:'Canceled'})[kind]||'Updated';}
+function scheduleAlertEmailMessage(notification){
+ const d=notification.details||{},label=scheduleAlertLabel(notification.kind);
+ const lines=[`${label}: ${d.work||'Scheduled work'}`,'',`Subdivision: ${d.subdivision||''}`,`Lot: ${d.lot||''}`,`Address: ${d.address||'Not added'}`];
+ if(notification.kind==='rescheduled')lines.push(`Previous schedule date: ${scheduleAlertRange(d.previous_start,d.previous_end)}`);
+ lines.push(`${notification.kind==='canceled'?'Canceled schedule date':'Requested schedule date'}: ${scheduleAlertRange(d.start,d.end)}`);
+ lines.push('','View schedule updates in Bowen Builder Portal:','https://bowen-builder.vercel.app/?portal=1');
+ return {subject:`${d.lot||'Lot'} — ${d.work||'Scheduled work'} — ${label}`,body:lines.join('\n')};
+}
+function scheduleAlertsNotice(message){
+ const box=$('scheduleAlertsDeliveryNotice');
+ if(box){box.textContent=message;box.classList.toggle('hidden',!message);}
+}
+function scheduleAlertsProductionHost(){
+ return ['bowen-builder.vercel.app','bowen-builder-nick-9965.vercel.app','bowen-builder-git-main-nick-9965.vercel.app'].includes(location.hostname);
+}
+async function scheduleAlertsDispatch(){
+ if(scheduleAlertState.dispatching||document.hidden||!scheduleAlertsProductionHost()||!currentAuthUserId||!$('app')||$('app').classList.contains('hidden'))return;
+ scheduleAlertState.dispatching=true;
+ try{
+  // Complete existing claims before taking another one. Never re-send after an uncertain response.
+  while(scheduleAlertState.completions.length){
+   if(scheduleAlertState.completions[0].actor!==currentAuthUserId){scheduleAlertState.completions.shift();continue;}
+   try{await scheduleAlertsRpc('finish_email',scheduleAlertState.completions[0]);}
+   catch(e){if(!e.message.includes('Email claim no longer valid'))throw e;}
+   scheduleAlertState.completions.shift();
+  }
+  const actor=currentAuthUserId;
+  const token=await microsoftProviderToken();
+  if(!token){scheduleAlertsNotice('Automatic schedule emails need a Microsoft sign-in with email permission. Portal updates still appear immediately.');return;}
+  for(let i=0;i<15;i++){
+   if(currentAuthUserId!==actor||$('app').classList.contains('hidden'))break;
+   const notification=await scheduleAlertsRpc('claim_email');
+   if(!notification)break;
+   const message=scheduleAlertEmailMessage(notification);
+   let state='uncertain',error='Connection interrupted. Check Sent Items before retrying.';
+   const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),20000);
+   try{
+    const response=await fetch('https://graph.microsoft.com/v1.0/me/sendMail',{
+     method:'POST',signal:controller.signal,headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},
+     body:JSON.stringify({message:{subject:message.subject,body:{contentType:'Text',content:message.body},toRecipients:[{emailAddress:{address:notification.email}}]},saveToSentItems:true})
+    });
+    if(response.status===202){state='accepted';error=null;}
+    else if(response.status>=400&&response.status<500){
+     state='failed';
+     error=response.status===401||response.status===403?'Microsoft email permission expired. Sign in again, then retry in Admin → Portal Companies.':`Microsoft rejected the email (${response.status}). Retry from the company’s Schedule Alerts section.`;
+    }
+   }catch(_){}finally{clearTimeout(timeout);}
+   const completion={actor,id:notification.id,attempt:notification.attempt,state,error};
+   scheduleAlertState.completions.push(completion);
+   await scheduleAlertsRpc('finish_email',completion);
+   scheduleAlertState.completions.shift();
+   if(state!=='accepted'){scheduleAlertsNotice(error);break;}
+   scheduleAlertsNotice('');
+  }
+ }catch(_){scheduleAlertsNotice('Schedule alerts are saved. Email processing needs attention; check Admin → Portal Companies → Schedule Alerts.');}
+ finally{scheduleAlertState.dispatching=false;}
+}
+function scheduleAlertsKick(){setTimeout(scheduleAlertsDispatch,150);}
+
+async function scheduleAlertsAdminOpen(company){
+ const box=$('portalCompanyAlertsSection');
+ if(!box)return;
+ box.classList.toggle('hidden',!company);
+ const request=++scheduleAlertState.adminRequest;
+ scheduleAlertState.company=company?.id||null;
+ if(!company)return;
+ $('portalCompanyAlertsBody').textContent='Loading schedule alerts…';
+ try{
+  const data=await scheduleAlertsRpc('admin_get',{company_id:company.id});
+  if(request!==scheduleAlertState.adminRequest||scheduleAlertState.company!==company.id)return;
+  scheduleAlertState.adminData=data;scheduleAlertsRenderAdmin();
+ }catch(error){if(request===scheduleAlertState.adminRequest)$('portalCompanyAlertsBody').textContent=error.message;}
+}
+function scheduleAlertsRenderAdmin(){
+ const root=$('portalCompanyAlertsBody'),cid=scheduleAlertState.company,data=scheduleAlertState.adminData;
+ if(!root||!cid||!data)return;
+ const users=portalAdminUsers.filter(u=>u.company_id===cid);
+ const status={pending:'Queued',sending:'Sending',accepted:'Accepted by Microsoft',failed:'Needs retry',uncertain:'Check Sent Items',skipped:'Skipped',off:'Portal only'};
+ root.innerHTML=`<p class="muted">Notify selected company users when matching work is scheduled, moved, or canceled. Alerts only cover subdivisions this company can view. New rules apply to future calendar changes.</p>
+ <div class="schedule-alert-rules">${data.rules.map(rule=>`<div class="schedule-alert-rule"><div><strong>${esc(rule.schedule_name)}</strong><small>${rule.enabled?'Enabled':'Paused'} · Portal${rule.email_enabled?' + email':''} · ${rule.recipients.length} recipient${rule.recipients.length===1?'':'s'}</small></div><div class="schedule-alert-buttons"><button type="button" class="secondary" data-alert-edit="${esc(rule.id)}">Edit</button><button type="button" class="secondary" data-alert-delete="${esc(rule.id)}">Remove</button></div></div>`).join('')||'<div class="muted">No schedule alerts yet. Example: Cabinet Install → countertop company.</div>'}</div>
+ <button type="button" class="primary" id="scheduleAlertAdd">+ Add Schedule Alert</button><div id="scheduleAlertEditor"></div>
+ <details class="schedule-alert-history"><summary>Email activity</summary><p class="muted">Emails send from an employee’s Microsoft account while BowenBuilder is open. If a session ends before sending, queued emails resume when an authorized employee opens the app. “Accepted” means Microsoft accepted the message, not confirmed delivery.</p>
+ ${!scheduleAlertsProductionHost()?'<p class="notice">Preview: automatic email sending is paused.</p>':''}
+ <button class="secondary" type="button" id="scheduleAlertRefresh">Refresh activity</button>
+ ${data.emails.map(n=>`<div class="schedule-alert-email"><strong>${esc(n.details.lot)} · ${esc(n.details.work)} · ${esc(scheduleAlertLabel(n.kind))}</strong><small>${esc(n.full_name||n.email)} · ${esc(status[n.email_state]||n.email_state)}</small>${n.email_error?`<small>${esc(n.email_error)}</small>`:''}${['failed','uncertain'].includes(n.email_state)?`<button type="button" class="secondary" data-alert-retry="${esc(n.id)}">Retry email</button>`:''}</div>`).join('')||'<p class="muted">No email activity yet.</p>'}</details>`;
+ $('scheduleAlertAdd').onclick=()=>scheduleAlertsEditRule(null);
+ $('scheduleAlertRefresh').onclick=()=>scheduleAlertsAdminOpen(portalAdminCompanies.find(c=>c.id===cid));
+ root.querySelectorAll('[data-alert-edit]').forEach(b=>b.onclick=()=>scheduleAlertsEditRule(data.rules.find(r=>r.id===b.dataset.alertEdit)));
+ root.querySelectorAll('[data-alert-delete]').forEach(b=>b.onclick=async()=>{
+  if(!confirm('Remove this schedule alert? Existing Portal updates remain available.'))return;
+  b.disabled=true;
+  try{const result=await scheduleAlertsRpc('delete_rule',{company_id:cid,id:b.dataset.alertDelete});if(scheduleAlertState.company===cid){scheduleAlertState.adminData=result;scheduleAlertsRenderAdmin();}}
+  catch(e){alert(e.message);b.disabled=false;}
+ });
+ root.querySelectorAll('[data-alert-retry]').forEach(b=>b.onclick=async()=>{
+  const n=data.emails.find(x=>x.id===b.dataset.alertRetry);
+  if(n?.email_state==='uncertain'&&!confirm('This email may already be in Sent Items. Retry only after checking. Send again?'))return;
+  b.disabled=true;
+  try{const result=await scheduleAlertsRpc('retry_email',{company_id:cid,id:b.dataset.alertRetry});if(scheduleAlertState.company===cid){scheduleAlertState.adminData=result;scheduleAlertsRenderAdmin();}scheduleAlertsKick();}
+  catch(e){alert(e.message);b.disabled=false;}
+ });
+}
+function scheduleAlertsEditRule(rule){
+ const cid=scheduleAlertState.company;
+ const users=portalAdminUsers.filter(u=>u.company_id===cid&&u.active);
+ const names=[...new Set([...$('scheduleName').options].map(o=>o.value).filter(n=>n&&n!=='__custom__'))];
+ $('scheduleAlertEditor').innerHTML=`<div class="schedule-alert-editor"><h3>${rule?'Edit':'Add'} Schedule Alert</h3>
+ <label>When this work changes<input id="scheduleAlertName" list="scheduleAlertNames" maxlength="160" value="${esc(rule?.schedule_name||'')}" placeholder="e.g. Cabinet Install"><datalist id="scheduleAlertNames">${names.map(n=>`<option value="${esc(n)}"></option>`).join('')}</datalist></label>
+ <p class="muted">Choose a calendar item, or enter its exact custom name.</p><fieldset><legend>Notify these company users</legend>
+ ${users.map(u=>`<label class="schedule-alert-check"><input type="checkbox" data-alert-recipient="${esc(u.id)}" ${rule?.recipients.includes(u.id)?'checked':''}><span>${esc(u.full_name||u.email)}<small>${esc(u.email)}${u.user_id?'':' · Invited'}</small></span></label>`).join('')||'<p class="muted">Add company users above before creating an alert.</p>'}</fieldset>
+ <label class="schedule-alert-check"><input id="scheduleAlertEmail" type="checkbox" ${rule?.email_enabled===false?'':'checked'}> Also send email</label>
+ <label class="schedule-alert-check"><input id="scheduleAlertEnabled" type="checkbox" ${rule?.enabled===false?'':'checked'}> Alert enabled</label>
+ <div id="scheduleAlertEditorNotice" role="status"></div><div class="schedule-alert-buttons"><button id="scheduleAlertSave" type="button" class="primary">Save Alert</button><button id="scheduleAlertCancel" type="button" class="secondary">Cancel</button></div></div>`;
+ $('scheduleAlertCancel').onclick=()=>{$('scheduleAlertEditor').innerHTML='';};
+ $('scheduleAlertSave').onclick=async()=>{
+  const button=$('scheduleAlertSave'),notice=$('scheduleAlertEditorNotice');
+  const recipients=[...document.querySelectorAll('[data-alert-recipient]:checked')].map(x=>x.dataset.alertRecipient);
+  const name=$('scheduleAlertName').value.trim();
+  if(!name||!recipients.length){notice.textContent='Choose a schedule item and at least one company user.';return;}
+  button.disabled=true;notice.textContent='Saving…';
+  try{
+   const data=await scheduleAlertsRpc('save_rule',{company_id:cid,id:rule?.id||null,schedule_name:name,recipients,email_enabled:$('scheduleAlertEmail').checked,enabled:$('scheduleAlertEnabled').checked});
+   if(scheduleAlertState.company!==cid)return;
+   scheduleAlertState.adminData=data;scheduleAlertsRenderAdmin();
+  }catch(e){notice.textContent=e.message.includes('duplicate key')?'An alert for that schedule item already exists. Edit the existing alert.':e.message;button.disabled=false;}
+ };
+ $('scheduleAlertName').focus({preventScroll:true});
+}
+
+function scheduleAlertsResetPortal(){
+ scheduleAlertState.user=portalBootstrapData?.portal_user?.id||null;
+ scheduleAlertState.inbox=[];scheduleAlertState.unread=0;scheduleAlertState.inboxOpen=false;
+ $('portalScheduleInbox')?.classList.add('hidden');$('portalAppContent')?.classList.remove('hidden');
+ scheduleAlertsRefreshInbox();
+}
+function scheduleAlertsShowInbox(open){
+ scheduleAlertState.inboxOpen=open;
+ $('portalAppContent').classList.toggle('hidden',open);$('portalScheduleInbox').classList.toggle('hidden',!open);
+ $('portalUpdatesButton').setAttribute('aria-pressed',String(open));
+ $('portalFilesButton').setAttribute('aria-pressed',String(!open));
+ if(open){scheduleAlertsRenderInbox();scheduleAlertsRefreshInbox();}
+}
+async function scheduleAlertsRefreshInbox(older=false){
+ const user=portalBootstrapData?.portal_user?.id;
+ if(!user||scheduleAlertState.loading||$('portalAppView').classList.contains('hidden'))return;
+ scheduleAlertState.loading=true;
+ try{
+  const last=older?scheduleAlertState.inbox.at(-1):null;
+  const data=await scheduleAlertsRpc('inbox',last?{before_date:last.created_at,before_id:last.id}:{});
+  if(user!==portalBootstrapData?.portal_user?.id)return;
+  const previous=scheduleAlertState.inbox;
+  // Refresh the first page; retain older pages only while reading the same user's inbox.
+  if(older){scheduleAlertState.inbox=[...previous,...data.notifications.filter(n=>!previous.some(x=>x.id===n.id))];}
+  else{scheduleAlertState.inbox=data.notifications;}
+  scheduleAlertState.more=data.notifications.length===50;
+  scheduleAlertState.unread=data.unread;
+  $('portalUpdatesButton').textContent=`Updates${data.unread?` (${data.unread})`:''}`;
+  if(scheduleAlertState.inboxOpen)scheduleAlertsRenderInbox();
+ }catch(e){if(scheduleAlertState.inboxOpen)$('portalScheduleInbox').innerHTML=`<div class="portal-empty">${esc(e.message)}<br><button class="secondary" type="button" id="scheduleInboxRetry">Retry</button></div>`;$('scheduleInboxRetry')?.addEventListener('click',()=>scheduleAlertsRefreshInbox());}
+ finally{scheduleAlertState.loading=false;}
+}
+function scheduleAlertsRenderInbox(){
+ const root=$('portalScheduleInbox');if(!root)return;
+ root.innerHTML=`<div class="portal-page-head"><div><h2>Schedule Updates</h2><div class="muted">Work changes for your company’s projects</div></div><div class="schedule-alert-buttons"><button id="scheduleInboxRefresh" class="secondary" type="button">Refresh</button><button id="scheduleInboxReadAll" class="secondary" type="button" ${scheduleAlertState.unread?'':'disabled'}>Mark all read</button></div></div>
+ <div class="schedule-alert-inbox">${scheduleAlertState.inbox.map(n=>{
+  const d=n.details||{};
+  return `<article class="schedule-alert-update ${n.read_at?'':'unread'}"><div class="schedule-alert-update-head"><strong>${esc(d.work)}</strong><span class="schedule-alert-kind ${esc(n.kind)}">${esc(scheduleAlertLabel(n.kind))}</span></div><div>${esc(d.subdivision)} · ${esc(d.lot)}</div><div class="muted">${esc(d.address)}</div>${n.kind==='rescheduled'?`<div class="muted">Previous: ${esc(scheduleAlertRange(d.previous_start,d.previous_end))}</div>`:''}<div><strong>${n.kind==='canceled'?'Canceled date':'Requested date'}:</strong> ${esc(scheduleAlertRange(d.start,d.end))}</div><div class="schedule-alert-update-footer"><small>${esc(new Date(n.created_at).toLocaleString())}</small>${!n.read_at?`<button class="secondary" type="button" data-alert-read="${esc(n.id)}">Mark read</button>`:'<small>Read</small>'}</div></article>`;
+ }).join('')||'<div class="portal-empty">No schedule updates yet. Updates will appear here when work your company follows is scheduled, moved, or canceled.</div>'}</div>
+ ${scheduleAlertState.more?'<button id="scheduleInboxMore" class="secondary" type="button">Load older updates</button>':''}`;
+ $('scheduleInboxRefresh').onclick=()=>scheduleAlertsRefreshInbox();
+ $('scheduleInboxReadAll').onclick=()=>scheduleAlertsRead({all:true});
+ $('scheduleInboxMore')?.addEventListener('click',()=>scheduleAlertsRefreshInbox(true));
+ root.querySelectorAll('[data-alert-read]').forEach(b=>b.onclick=()=>scheduleAlertsRead({id:b.dataset.alertRead}));
+}
+async function scheduleAlertsRead(payload){
+ try{await scheduleAlertsRpc('mark_read',payload);await scheduleAlertsRefreshInbox();}catch(e){alert(e.message);}
+}
+$('portalUpdatesButton').onclick=()=>scheduleAlertsShowInbox(true);
+$('portalFilesButton').onclick=()=>scheduleAlertsShowInbox(false);
+setInterval(()=>{
+ if(document.hidden)return;
+ if(!$('portalAppView').classList.contains('hidden')){
+  // While reading older pages, use explicit Refresh so polling does not jump the list.
+  if(scheduleAlertState.inbox.length<=50)scheduleAlertsRefreshInbox();
+ }else scheduleAlertsDispatch();
+},30000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)scheduleAlertsKick();});
+
+// END PORTAL SCHEDULE ALERTS
+
 function portalShowApp(data){
   portalBootstrapData=typeof data==='string'?JSON.parse(data):data;
   portalCurrentSubdivisionId=null;
@@ -4589,6 +4825,7 @@ function portalShowApp(data){
 
   $('portalCompanyName').textContent=portalBootstrapData?.company?.name||'Vendor Portal';
   $('portalUserName').textContent=portalBootstrapData?.portal_user?.full_name||portalBootstrapData?.portal_user?.email||'';
+  scheduleAlertsResetPortal();
   renderPortalApp();
 }
 
@@ -5385,6 +5622,7 @@ function renderPortalCompanyDetail(){
 
   $('portalCompanyAccessSection').classList.toggle('hidden',isNew);
   $('portalCompanyUsersSection').classList.toggle('hidden',isNew);
+  scheduleAlertsAdminOpen(company);
 
   if(isNew)return;
 
@@ -6627,6 +6865,7 @@ function handleLotsRealtime(payload){
 }
 
 function handleScheduleItemsRealtime(payload){
+  scheduleAlertsKick();
   const changedLot=payload?.new?.lot_id||payload?.old?.lot_id||null;
   const screen=currentScreen();
 
@@ -7351,7 +7590,7 @@ async function load(){
  if(se||le||ie||pe||ppe||pre||mpe||pcle){alert((se||le||ie||pe||ppe||pre||mpe||pcle).message);return}
  subdivisions=s||[];lots=l||[];items=i||[];punchouts=p||[];punchoutPhotos=pp||[];profiles=pr||[];currentMembershipPermissions=mp||[];planCrewLinks=pcl||[];showSubs();
 }
-function appOn(){ $('login').classList.add('hidden');$('app').classList.remove('hidden');}
+function appOn(){ $('login').classList.add('hidden');$('app').classList.remove('hidden');scheduleAlertsKick();}
 
 function bowenActivitySessionId(){
   if(activitySessionId)return activitySessionId;
@@ -14047,6 +14286,7 @@ function renderSelectedScheduleDay(){
      return;
    }
 
+   scheduleAlertsKick();
    await cleanupCalendarMarksForDeletedItem(item);
    await refreshPreservingCalendar();
 
@@ -14146,6 +14386,7 @@ async function deleteScheduleItemLive(){
    return;
  }
 
+ scheduleAlertsKick();
  logBowenActivity('schedule_deleted',{label:`Deleted ${item?.name||'schedule item'}`,entityType:'schedule_item',entityId:id,subdivisionId:subdivisionForLot(item?.lot_id),lotId:item?.lot_id||null,force:true});
  $('scheduleDialog').close();
  await cleanupCalendarMarksForDeletedItem(item);
@@ -14226,6 +14467,7 @@ async function saveSchedule(e){
      return;
    }
 
+   scheduleAlertsKick();
    logBowenActivity(id?'schedule_updated':'schedule_created',{label:`${id?'Updated':'Added'} ${payload.name}`,entityType:'schedule_item',entityId:result.data?.id||id||'',subdivisionId:subdivisionForLot(payload.lot_id),lotId:payload.lot_id,force:true,metadata:{status:payload.status,start_date:startDate,end_date:endDate}});
    $('scheduleDialog').close();
    const returnToSchedule=scheduleContext==='schedule';
