@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="2.1">
+<meta name="bowenbuilder-version" content="2.2">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -3313,6 +3313,192 @@ button.teams-file-row:hover{border-color:#bdccdd}
 .schedule-alert-kind.canceled{background:#fef3f2;color:#b42318}.schedule-alert-kind.rescheduled{background:#fff6dd;color:#7a4c00}
 .schedule-alert-update-footer small{color:#667085}.portal-topbar-actions{flex-wrap:wrap}
 @media(max-width:640px){.portal-topbar{flex-wrap:wrap}.portal-topbar-actions{gap:6px}.schedule-alert-editor{padding:10px}.schedule-alert-rule{align-items:flex-start}}
+
+.punchout-company-field{
+  margin:4px 0 15px;
+  padding:13px;
+  border:1px solid #dbe3ee;
+  border-radius:14px;
+  background:#f8fbff;
+}
+.punchout-company-field-head{
+  display:flex;
+  justify-content:space-between;
+  gap:10px;
+  align-items:flex-start;
+  flex-wrap:wrap;
+  margin-bottom:9px;
+}
+.punchout-company-field-head strong{color:#173f6c}
+.punchout-company-choices{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(210px,1fr));
+  gap:8px;
+}
+.punchout-company-option{
+  display:flex;
+  align-items:flex-start;
+  gap:9px;
+  margin:0;
+  padding:10px 11px;
+  border:1px solid #d8e2ee;
+  border-radius:12px;
+  background:#fff;
+  cursor:pointer;
+}
+.punchout-company-option input{
+  width:19px;
+  height:19px;
+  margin:1px 0 0;
+  flex:0 0 auto;
+}
+.punchout-company-option span{min-width:0}
+.punchout-company-option strong{
+  display:block;
+  color:#344054;
+  font-size:13px;
+}
+.punchout-company-option small{
+  display:block;
+  margin-top:2px;
+  color:#667085;
+  font-size:11px;
+}
+.punchout-company-option:has(input:checked){
+  border-color:#85b4df;
+  background:#eef7ff;
+}
+.punchout-assigned-companies{
+  display:flex;
+  gap:6px;
+  flex-wrap:wrap;
+  margin:7px 0 0;
+}
+.punchout-company-badge{
+  display:inline-flex;
+  align-items:center;
+  border-radius:999px;
+  padding:5px 8px;
+  background:#eef4ff;
+  border:1px solid #cfe0f4;
+  color:#245d92;
+  font-size:11px;
+  font-weight:850;
+}
+.punchout-company-badge.unassigned{
+  background:#f2f4f7;
+  border-color:#e4e7ec;
+  color:#667085;
+}
+.portal-punchout-summary{
+  display:flex;
+  gap:8px;
+  align-items:center;
+  flex-wrap:wrap;
+  margin-top:6px;
+}
+.portal-punchout-count{
+  display:inline-flex;
+  align-items:center;
+  border-radius:999px;
+  padding:5px 9px;
+  background:#fff4e5;
+  color:#8a5712;
+  border:1px solid #f0dfc4;
+  font-size:12px;
+  font-weight:850;
+}
+.portal-punchout-groups{display:grid;gap:16px}
+.portal-punchout-subdivision{
+  display:grid;
+  gap:10px;
+}
+.portal-punchout-subdivision-title{
+  font-size:18px;
+  font-weight:900;
+  color:var(--navy);
+  margin-top:4px;
+}
+.portal-punchout-lot{
+  border:1px solid #dbe3ee;
+  border-radius:16px;
+  background:#fff;
+  overflow:hidden;
+  box-shadow:0 7px 22px rgba(24,50,82,.045);
+}
+.portal-punchout-lot-head{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:10px;
+  padding:13px 14px;
+  background:#f8fbff;
+  border-bottom:1px solid #e6edf5;
+}
+.portal-punchout-lot-name{font-weight:900;color:#173f6c;font-size:16px}
+.portal-punchout-lot-address{font-size:12px;color:#667085;margin-top:3px}
+.portal-punchout-items{display:grid;gap:0}
+.portal-punchout-item{
+  padding:14px;
+  border-top:1px solid #edf1f6;
+}
+.portal-punchout-item:first-child{border-top:0}
+.portal-punchout-item-head{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:10px;
+  flex-wrap:wrap;
+}
+.portal-punchout-description{
+  font-weight:800;
+  color:#26384f;
+  line-height:1.45;
+  white-space:pre-wrap;
+}
+.portal-punchout-meta{
+  margin-top:6px;
+  color:#667085;
+  font-size:12px;
+}
+.portal-punchout-gallery{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(110px,150px));
+  gap:8px;
+  margin-top:10px;
+}
+.portal-punchout-photo{
+  display:block;
+  width:100%;
+  height:112px;
+  object-fit:cover;
+  border-radius:11px;
+  border:1px solid #dfe7f0;
+  cursor:zoom-in;
+  background:#eef3f8;
+}
+.portal-punchout-trade{
+  display:inline-flex;
+  align-items:center;
+  border-radius:999px;
+  padding:5px 8px;
+  background:#eef4fb;
+  color:#285b91;
+  font-size:11px;
+  font-weight:850;
+  margin-bottom:6px;
+}
+.portal-topbar-actions button[aria-pressed="true"]{
+  background:#eaf2fb;
+  border-color:#c7d7ea;
+  color:#173f6c;
+}
+@media(max-width:640px){
+  .punchout-company-choices{grid-template-columns:1fr}
+  .portal-punchout-gallery{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .portal-punchout-photo{height:120px}
+}
+
 </style>
 </head>
 <body>
@@ -3417,6 +3603,7 @@ button.teams-file-row:hover{border-color:#bdccdd}
     <div class="portal-topbar-actions">
       <span id="portalUserName" class="portal-user-name"></span>
       <button id="portalFilesButton" class="secondary" type="button" aria-pressed="true">Files</button>
+      <button id="portalPunchoutButton" class="secondary" type="button" aria-pressed="false">Punchout</button>
       <button id="portalUpdatesButton" class="secondary" type="button" aria-pressed="false">Updates</button>
       <button id="portalLogout" class="secondary" type="button">Sign Out</button>
     </div>
@@ -3425,6 +3612,7 @@ button.teams-file-row:hover{border-color:#bdccdd}
   <main class="portal-shell">
     <div id="portalAppNotice" class="notice hidden"></div>
     <div id="portalAppContent"></div>
+    <section id="portalPunchoutView" class="hidden" aria-label="Open Punchout"></section>
     <section id="portalScheduleInbox" class="hidden" aria-label="Schedule updates"></section>
     <input id="portalFileInput" type="file" multiple hidden>
   </main>
@@ -4239,6 +4427,15 @@ button.teams-file-row:hover{border-color:#bdccdd}
     <label id="punchoutCustomTradeWrap" class="hidden">Custom Trade
       <input id="punchoutCustomTrade" type="text" maxlength="80" placeholder="Enter trade name">
     </label>
+    <div class="punchout-company-field">
+      <div class="punchout-company-field-head">
+        <strong>Assigned Vendor Company</strong>
+        <span class="muted">Optional · Portal companies only</span>
+      </div>
+      <div id="punchoutCompanyChoices" class="punchout-company-choices">
+        <div class="muted">Loading Portal companies…</div>
+      </div>
+    </div>
     <label>Punchout Item
       <textarea id="punchoutText" rows="5" required placeholder="Describe the item that needs attention..."></textarea>
     </label>
@@ -4251,6 +4448,31 @@ button.teams-file-row:hover{border-color:#bdccdd}
       <button id="punchoutSave" class="primary" type="submit">Save Punchout Item</button>
     </div>
   </form>
+</dialog>
+
+
+<dialog id="punchoutVendorDialog">
+  <div class="sheet">
+    <div class="dialog-head">
+      <div>
+        <h2 style="margin:0">Assign Vendor Company</h2>
+        <div id="punchoutVendorDialogMeta" class="muted" style="margin-top:4px"></div>
+      </div>
+      <button id="punchoutVendorX" class="xbtn" type="button">×</button>
+    </div>
+
+    <div class="notice" style="margin-bottom:12px">
+      Only companies with Bowen Builder Portal access to this subdivision are shown.
+    </div>
+
+    <div id="punchoutVendorChoices" class="punchout-company-choices"></div>
+    <div id="punchoutVendorNotice" class="notice hidden" style="margin-top:12px"></div>
+
+    <div class="actions">
+      <button id="punchoutVendorCancel" class="secondary" type="button">Cancel</button>
+      <button id="punchoutVendorSave" class="primary" type="button">Save Assignment</button>
+    </div>
+  </div>
 </dialog>
 
 <div id="punchoutMarkupOverlay" class="hidden" aria-hidden="true">
@@ -4487,7 +4709,7 @@ button.teams-file-row:hover{border-color:#bdccdd}
 <script>
 (async()=>{
 const $=id=>document.getElementById(id);
-const BOWENBUILDER_VERSION='2.1';
+const BOWENBUILDER_VERSION='2.2';
 const SB_URL='https://oztefiymckpyxiewgxtc.supabase.co';
 const SB_KEY='sb_publishable__ItoYGeHKEGTBFiE7JM74w_1F-qERVe';
 const db=window.supabase.createClient(SB_URL,SB_KEY);
@@ -4506,6 +4728,10 @@ let portalCurrentLotId=null;
 let portalCurrentFolderId=null;
 let portalPendingInviteToken='';
 let portalPendingInvitePreview=null;
+let portalPunchoutData={items:[],photos:[]};
+let portalPunchoutLoading=false;
+let portalPunchoutOpen=false;
+let portalPunchoutRenderToken=0;
 
 let portalAdminMode='companies';
 let portalAdminCompanies=[];
@@ -4598,6 +4824,204 @@ async function portalLog(action,{label='',subdivisionId=null,lotId=null,fileId=n
       p_metadata:(metadata&&typeof metadata==='object')?metadata:{}
     });
   }catch(_){}
+}
+
+
+function portalPunchoutItems(){
+  return Array.isArray(portalPunchoutData?.items)?portalPunchoutData.items:[];
+}
+function portalPunchoutPhotos(){
+  return Array.isArray(portalPunchoutData?.photos)?portalPunchoutData.photos:[];
+}
+function portalUpdatePunchoutButton(){
+  const button=$('portalPunchoutButton');
+  if(!button)return;
+  const count=portalPunchoutItems().length;
+  button.textContent=`Punchout${count?` (${count})`:''}`;
+}
+async function portalRefreshPunchout({render=false,quiet=false}={}){
+  if(!portalBootstrapData?.portal_user?.id || portalPunchoutLoading)return;
+  portalPunchoutLoading=true;
+  try{
+    const {data,error}=await db.rpc('bowenbuilder_portal_punchout');
+    if(error)throw error;
+    portalPunchoutData=typeof data==='string'?JSON.parse(data):data||{items:[],photos:[]};
+    portalUpdatePunchoutButton();
+    if(render && portalPunchoutOpen)await portalRenderPunchout();
+  }catch(err){
+    if(!quiet && portalPunchoutOpen){
+      const root=$('portalPunchoutView');
+      if(root)root.innerHTML=`<div class="portal-empty">${esc(err?.message||'Could not load Punchout.')}</div>`;
+    }
+  }finally{
+    portalPunchoutLoading=false;
+  }
+}
+async function portalPunchoutPhotoUrl(path){
+  if(!path)return '';
+  const {data,error}=await db.storage.from('punchout-photos').createSignedUrl(path,3600);
+  if(error)return '';
+  return data?.signedUrl||'';
+}
+async function portalRenderPunchout(){
+  const root=$('portalPunchoutView');
+  if(!root || !portalPunchoutOpen)return;
+
+  const token=++portalPunchoutRenderToken;
+  const items=portalPunchoutItems();
+  const photos=portalPunchoutPhotos();
+  const subs=Array.isArray(portalBootstrapData?.subdivisions)?portalBootstrapData.subdivisions:[];
+  const lotsData=Array.isArray(portalBootstrapData?.lots)?portalBootstrapData.lots:[];
+
+  root.innerHTML=`<div class="portal-page-head">
+    <div>
+      <h2>Open Punchout</h2>
+      <div class="portal-punchout-summary">
+        <span class="muted">Items assigned to ${esc(portalBootstrapData?.company?.name||'your company')}</span>
+        <span class="portal-punchout-count">${items.length} open</span>
+      </div>
+    </div>
+    <button id="portalPunchoutRefresh" class="secondary" type="button">↻ Refresh</button>
+  </div>
+  <div class="portal-empty">Loading assigned Punchout…</div>`;
+
+  $('portalPunchoutRefresh')?.addEventListener('click',async()=>{
+    await portalRefreshPunchout({render:false});
+    await portalRenderPunchout();
+  });
+
+  if(!items.length){
+    root.innerHTML=`<div class="portal-page-head">
+      <div>
+        <h2>Open Punchout</h2>
+        <div class="muted">Items assigned to ${esc(portalBootstrapData?.company?.name||'your company')}</div>
+      </div>
+      <button id="portalPunchoutRefresh" class="secondary" type="button">↻ Refresh</button>
+    </div>
+    <div class="portal-empty">No open Punchout items are currently assigned to your company.</div>`;
+    $('portalPunchoutRefresh')?.addEventListener('click',async()=>{
+      await portalRefreshPunchout({render:false});
+      await portalRenderPunchout();
+    });
+    return;
+  }
+
+  const photoUrlMap=new Map();
+  await Promise.all(photos.map(async ph=>{
+    photoUrlMap.set(String(ph.id),await portalPunchoutPhotoUrl(ph.storage_path));
+  }));
+
+  if(token!==portalPunchoutRenderToken || !portalPunchoutOpen)return;
+
+  const groups=new Map();
+  items.forEach(item=>{
+    const sub=subs.find(s=>String(s.id)===String(item.subdivision_id));
+    const lot=lotsData.find(l=>String(l.id)===String(item.lot_id));
+    const subKey=String(item.subdivision_id||'');
+    if(!groups.has(subKey))groups.set(subKey,{sub, lots:new Map()});
+    const group=groups.get(subKey);
+    const lotKey=String(item.lot_id||'');
+    if(!group.lots.has(lotKey))group.lots.set(lotKey,{lot,items:[]});
+    group.lots.get(lotKey).items.push(item);
+  });
+
+  const ordered=[...groups.values()].sort((a,b)=>
+    String(a.sub?.name||'').localeCompare(String(b.sub?.name||''))
+  );
+
+  const body=ordered.map(group=>{
+    const lotGroups=[...group.lots.values()].sort((a,b)=>
+      String(a.lot?.lot_name||'').localeCompare(String(b.lot?.lot_name||''),undefined,{numeric:true})
+    );
+
+    return `<section class="portal-punchout-subdivision">
+      <div class="portal-punchout-subdivision-title">${esc(group.sub?.name||'Subdivision')}</div>
+      ${lotGroups.map(({lot,items:lotItems})=>`
+        <div class="portal-punchout-lot">
+          <div class="portal-punchout-lot-head">
+            <div>
+              <div class="portal-punchout-lot-name">${esc(lot?.lot_name||'Lot')}</div>
+              ${lot?.address?`<div class="portal-punchout-lot-address">${esc(lot.address)}</div>`:''}
+            </div>
+            <span class="portal-punchout-count">${lotItems.length} open</span>
+          </div>
+          <div class="portal-punchout-items">
+            ${lotItems
+              .slice()
+              .sort((a,b)=>new Date(b.created_at||0)-new Date(a.created_at||0))
+              .map(item=>{
+                const itemPhotos=photos.filter(ph=>String(ph.punchout_item_id)===String(item.id));
+                return `<article class="portal-punchout-item">
+                  <div class="portal-punchout-item-head">
+                    <div style="min-width:0;flex:1">
+                      ${item.trade_category?`<div class="portal-punchout-trade">${esc(item.trade_category)}</div>`:''}
+                      <div class="portal-punchout-description">${esc(item.description||'Punchout item')}</div>
+                      <div class="portal-punchout-meta">Added ${esc(item.created_at?new Date(item.created_at).toLocaleDateString():'')}</div>
+                    </div>
+                    <span class="punchout-status">Open</span>
+                  </div>
+                  ${itemPhotos.length?`<div class="portal-punchout-gallery">
+                    ${itemPhotos.map(ph=>{
+                      const url=photoUrlMap.get(String(ph.id))||'';
+                      return url?`<img class="portal-punchout-photo" src="${esc(url)}" alt="Punchout photo" data-portal-punchout-photo="${esc(url)}">`:'';
+                    }).join('')}
+                  </div>`:''}
+                </article>`;
+              }).join('')}
+          </div>
+        </div>
+      `).join('')}
+    </section>`;
+  }).join('');
+
+  root.innerHTML=`<div class="portal-page-head">
+    <div>
+      <h2>Open Punchout</h2>
+      <div class="portal-punchout-summary">
+        <span class="muted">Items assigned to ${esc(portalBootstrapData?.company?.name||'your company')}</span>
+        <span class="portal-punchout-count">${items.length} open</span>
+      </div>
+    </div>
+    <button id="portalPunchoutRefresh" class="secondary" type="button">↻ Refresh</button>
+  </div>
+  <div class="portal-punchout-groups">${body}</div>`;
+
+  $('portalPunchoutRefresh')?.addEventListener('click',async()=>{
+    await portalRefreshPunchout({render:false});
+    await portalRenderPunchout();
+  });
+  root.querySelectorAll('[data-portal-punchout-photo]').forEach(img=>{
+    img.onclick=()=>{
+      window.open(img.dataset.portalPunchoutPhoto,'_blank','noopener');
+    };
+  });
+}
+async function portalShowPunchout(){
+  scheduleAlertState.inboxOpen=false;
+  portalPunchoutOpen=true;
+  $('portalAppContent')?.classList.add('hidden');
+  $('portalScheduleInbox')?.classList.add('hidden');
+  $('portalPunchoutView')?.classList.remove('hidden');
+  $('portalFilesButton')?.setAttribute('aria-pressed','false');
+  $('portalUpdatesButton')?.setAttribute('aria-pressed','false');
+  $('portalPunchoutButton')?.setAttribute('aria-pressed','true');
+
+  await portalLog('portal_view_punchout',{
+    label:'Viewed open Punchout',
+    metadata:{open_count:portalPunchoutItems().length}
+  });
+  await portalRefreshPunchout({render:false,quiet:true});
+  await portalRenderPunchout();
+}
+function portalShowFiles(){
+  portalPunchoutOpen=false;
+  scheduleAlertState.inboxOpen=false;
+  $('portalAppContent')?.classList.remove('hidden');
+  $('portalScheduleInbox')?.classList.add('hidden');
+  $('portalPunchoutView')?.classList.add('hidden');
+  $('portalFilesButton')?.setAttribute('aria-pressed','true');
+  $('portalUpdatesButton')?.setAttribute('aria-pressed','false');
+  $('portalPunchoutButton')?.setAttribute('aria-pressed','false');
 }
 
 // BEGIN PORTAL SCHEDULE ALERTS
@@ -4752,14 +5176,24 @@ function scheduleAlertsEditRule(rule){
 function scheduleAlertsResetPortal(){
  scheduleAlertState.user=portalBootstrapData?.portal_user?.id||null;
  scheduleAlertState.inbox=[];scheduleAlertState.unread=0;scheduleAlertState.inboxOpen=false;
- $('portalScheduleInbox')?.classList.add('hidden');$('portalAppContent')?.classList.remove('hidden');
+ portalPunchoutOpen=false;
+ $('portalScheduleInbox')?.classList.add('hidden');
+ $('portalPunchoutView')?.classList.add('hidden');
+ $('portalAppContent')?.classList.remove('hidden');
+ $('portalFilesButton')?.setAttribute('aria-pressed','true');
+ $('portalUpdatesButton')?.setAttribute('aria-pressed','false');
+ $('portalPunchoutButton')?.setAttribute('aria-pressed','false');
  scheduleAlertsRefreshInbox();
 }
 function scheduleAlertsShowInbox(open){
  scheduleAlertState.inboxOpen=open;
- $('portalAppContent').classList.toggle('hidden',open);$('portalScheduleInbox').classList.toggle('hidden',!open);
+ portalPunchoutOpen=false;
+ $('portalAppContent').classList.toggle('hidden',open);
+ $('portalScheduleInbox').classList.toggle('hidden',!open);
+ $('portalPunchoutView')?.classList.add('hidden');
  $('portalUpdatesButton').setAttribute('aria-pressed',String(open));
  $('portalFilesButton').setAttribute('aria-pressed',String(!open));
+ $('portalPunchoutButton')?.setAttribute('aria-pressed','false');
  if(open){scheduleAlertsRenderInbox();scheduleAlertsRefreshInbox();}
 }
 async function scheduleAlertsRefreshInbox(older=false){
@@ -4798,12 +5232,17 @@ async function scheduleAlertsRead(payload){
  try{await scheduleAlertsRpc('mark_read',payload);await scheduleAlertsRefreshInbox();}catch(e){alert(e.message);}
 }
 $('portalUpdatesButton').onclick=()=>scheduleAlertsShowInbox(true);
-$('portalFilesButton').onclick=()=>scheduleAlertsShowInbox(false);
+$('portalFilesButton').onclick=()=>portalShowFiles();
+$('portalPunchoutButton').onclick=()=>portalShowPunchout();
 setInterval(()=>{
  if(document.hidden)return;
  if(!$('portalAppView').classList.contains('hidden')){
-  // While reading older pages, use explicit Refresh so polling does not jump the list.
-  if(scheduleAlertState.inbox.length<=50)scheduleAlertsRefreshInbox();
+  if(portalPunchoutOpen){
+    portalRefreshPunchout({render:true,quiet:true});
+  }else{
+    // While reading older pages, use explicit Refresh so polling does not jump the list.
+    if(scheduleAlertState.inbox.length<=50)scheduleAlertsRefreshInbox();
+  }
  }else scheduleAlertsDispatch();
 },30000);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)scheduleAlertsKick();});
@@ -4826,7 +5265,10 @@ function portalShowApp(data){
   $('portalCompanyName').textContent=portalBootstrapData?.company?.name||'Vendor Portal';
   $('portalUserName').textContent=portalBootstrapData?.portal_user?.full_name||portalBootstrapData?.portal_user?.email||'';
   scheduleAlertsResetPortal();
+  portalPunchoutData={items:[],photos:[]};
+  portalUpdatePunchoutButton();
   renderPortalApp();
+  portalRefreshPunchout({render:false,quiet:true});
 }
 
 async function bootstrapPortalAccount(){
@@ -6539,7 +6981,9 @@ async function resetCrewQr(){
   await openCrewQrDialog();
 }
 
-let subdivisions=[],lots=[],items=[],punchouts=[],punchoutPhotos=[],profiles=[],planCrewLinks=[],selectedPunchouts=new Set(),currentSubdivision=null,currentLot=null;
+let subdivisions=[],lots=[],items=[],punchouts=[],punchoutPhotos=[],punchoutCompanyAssignments=[],profiles=[],planCrewLinks=[],selectedPunchouts=new Set(),currentSubdivision=null,currentLot=null;
+const punchoutVendorOptionsCache=new Map();
+let punchoutVendorEditItemId=null;
 let crewPlanAutoFilledValue='';
 let subdivisionViewMode='lots';
 let subdivisionFiles=[];
@@ -7141,21 +7585,23 @@ function scheduleRealtimeReload(){
         : null;
     const keepScheduleViewMode=scheduleViewMode;
 
-    const [{data:s,error:se},{data:l,error:le},{data:i,error:ie},{data:p,error:pe},{data:pp,error:ppe},{data:pr,error:pre}]=await Promise.all([
+    const [{data:s,error:se},{data:l,error:le},{data:i,error:ie},{data:p,error:pe},{data:pp,error:ppe},{data:pa,error:pae},{data:pr,error:pre}]=await Promise.all([
       db.from('subdivisions').select('*').order('name'),
       db.from('lots').select('*').eq('active',true).order('lot_name'),
       db.from('schedule_items').select('*').order('starts_at'),
       db.from('punchout_items').select('*').order('created_at',{ascending:false}),
       db.from('punchout_photos').select('*').order('created_at'),
+      db.rpc('bowenbuilder_internal_punchout_assignments'),
       db.from('profiles').select('id,full_name')
     ]);
-    if(se||le||ie||pe||ppe||pre) return;
+    if(se||le||ie||pe||ppe||pae||pre) return;
 
     subdivisions=s||[];
     lots=l||[];
     items=i||[];
     punchouts=p||[];
     punchoutPhotos=pp||[];
+    punchoutCompanyAssignments=parsePunchoutAssignmentData(pa);
     profiles=pr||[];
     currentSubdivision=keepSub;
     currentLot=keepLot;
@@ -7190,6 +7636,7 @@ function startRealtimeUpdates(){
     .on('postgres_changes',{event:'*',schema:'public',table:'lot_calendar_marks'},handleCalendarMarksRealtime)
     .on('postgres_changes',{event:'*',schema:'public',table:'punchout_items'},handlePunchoutRealtime)
     .on('postgres_changes',{event:'*',schema:'public',table:'punchout_photos'},handlePunchoutPhotosRealtime)
+    .on('postgres_changes',{event:'*',schema:'public',table:'punchout_vendor_companies'},scheduleRealtimeReload)
     .subscribe();
 }
 
@@ -7577,18 +8024,19 @@ async function refreshPreservingCalendar(){
 }
 
 async function load(){
- const [{data:s,error:se},{data:l,error:le},{data:i,error:ie},{data:p,error:pe},{data:pp,error:ppe},{data:pr,error:pre},{data:mp,error:mpe},{data:pcl,error:pcle}]=await Promise.all([
+ const [{data:s,error:se},{data:l,error:le},{data:i,error:ie},{data:p,error:pe},{data:pp,error:ppe},{data:pa,error:pae},{data:pr,error:pre},{data:mp,error:mpe},{data:pcl,error:pcle}]=await Promise.all([
   db.from('subdivisions').select('*').order('name'),
   db.from('lots').select('*').eq('active',true).order('lot_name'),
   db.from('schedule_items').select('*').order('starts_at'),
   db.from('punchout_items').select('*').order('created_at',{ascending:false}),
   db.from('punchout_photos').select('*').order('created_at'),
+  db.rpc('bowenbuilder_internal_punchout_assignments'),
   db.from('profiles').select('id,full_name'),
   db.from('subdivision_members').select('subdivision_id,can_edit,can_delete,can_punchout_add,can_punchout_edit,can_punchout_delete').eq('user_id',currentAuthUserId),
   db.from('plan_crew_links').select('id,plan_name,plan_key,crew_plan_link,crew_plan_link_label,updated_at').order('plan_name')
  ]);
- if(se||le||ie||pe||ppe||pre||mpe||pcle){alert((se||le||ie||pe||ppe||pre||mpe||pcle).message);return}
- subdivisions=s||[];lots=l||[];items=i||[];punchouts=p||[];punchoutPhotos=pp||[];profiles=pr||[];currentMembershipPermissions=mp||[];planCrewLinks=pcl||[];showSubs();
+ if(se||le||ie||pe||ppe||pae||pre||mpe||pcle){alert((se||le||ie||pe||ppe||pae||pre||mpe||pcle).message);return}
+ subdivisions=s||[];lots=l||[];items=i||[];punchouts=p||[];punchoutPhotos=pp||[];punchoutCompanyAssignments=parsePunchoutAssignmentData(pa);profiles=pr||[];currentMembershipPermissions=mp||[];planCrewLinks=pcl||[];showSubs();
 }
 function appOn(){ $('login').classList.add('hidden');$('app').classList.remove('hidden');scheduleAlertsKick();}
 
@@ -8032,6 +8480,7 @@ function renderSubdivisionPunchout(){
      return `<div class="subdivision-punchout-item">
        ${p.trade_category?`<div class="punchout-trade-badge">${esc(p.trade_category)}</div>`:''}
        <div class="subdivision-punchout-description">${esc(p.description||'Punchout item')}</div>
+       ${punchoutCompanyBadgesMarkup(p.id)}
        <div class="subdivision-punchout-item-meta">
          ${addedBy?`<span>Added by ${esc(addedBy)}</span>`:''}
          ${addedDate?`<span>${esc(addedDate)}</span>`:''}
@@ -9341,6 +9790,166 @@ function profileName(userId){
   return p?.full_name||'Unknown user';
 }
 
+
+function parsePunchoutAssignmentData(value){
+  if(Array.isArray(value))return value;
+  if(typeof value==='string'){
+    try{
+      const parsed=JSON.parse(value);
+      return Array.isArray(parsed)?parsed:[];
+    }catch(_){return []}
+  }
+  return [];
+}
+function punchoutAssignmentsFor(itemId){
+  return punchoutCompanyAssignments.filter(
+    row=>String(row.punchout_item_id)===String(itemId)
+  );
+}
+function replacePunchoutAssignments(itemId,rows){
+  punchoutCompanyAssignments=punchoutCompanyAssignments.filter(
+    row=>String(row.punchout_item_id)!==String(itemId)
+  );
+  punchoutCompanyAssignments.push(...parsePunchoutAssignmentData(rows));
+}
+function punchoutCompanyBadgesMarkup(itemId,{showUnassigned=false}={}){
+  const rows=punchoutAssignmentsFor(itemId);
+  if(!rows.length){
+    return showUnassigned
+      ? '<div class="punchout-assigned-companies"><span class="punchout-company-badge unassigned">Not assigned to a Portal company</span></div>'
+      : '';
+  }
+  return `<div class="punchout-assigned-companies">${rows.map(row=>
+    `<span class="punchout-company-badge">Assigned: ${esc(row.company_name||'Vendor Company')}</span>`
+  ).join('')}</div>`;
+}
+async function loadPunchoutVendorOptions(subdivisionId,{force=false}={}){
+  const key=String(subdivisionId||'');
+  if(!key)return [];
+  if(!force && punchoutVendorOptionsCache.has(key)){
+    return punchoutVendorOptionsCache.get(key);
+  }
+
+  const {data,error}=await db.rpc('bowenbuilder_punchout_company_options',{
+    p_subdivision_id:subdivisionId
+  });
+  if(error)throw error;
+
+  const rows=Array.isArray(data)?data:(typeof data==='string'?JSON.parse(data||'[]'):[]);
+  punchoutVendorOptionsCache.set(key,rows);
+  return rows;
+}
+function renderPunchoutCompanyChoices(rootId,options,selectedIds=[]){
+  const root=$(rootId);
+  if(!root)return;
+
+  const selected=new Set((selectedIds||[]).map(String));
+  if(!options?.length){
+    root.innerHTML='<div class="muted">No vendor companies currently have Portal access to this subdivision. Add the company under Admin → Portal Access first.</div>';
+    return;
+  }
+
+  root.innerHTML=options.map(company=>`
+    <label class="punchout-company-option">
+      <input type="checkbox" data-punchout-company="${esc(company.id)}" ${selected.has(String(company.id))?'checked':''}>
+      <span>
+        <strong>${esc(company.name||'Vendor Company')}</strong>
+        <small>${esc([
+          company.trade_category||'',
+          Number(company.portal_users||0)?`${company.portal_users} Portal user${Number(company.portal_users)===1?'':'s'}`:'No active Portal users'
+        ].filter(Boolean).join(' · '))}</small>
+      </span>
+    </label>
+  `).join('');
+}
+function selectedPunchoutCompanyIds(rootId){
+  const root=$(rootId);
+  if(!root)return [];
+  return [...root.querySelectorAll('[data-punchout-company]:checked')]
+    .map(input=>input.dataset.punchoutCompany)
+    .filter(Boolean);
+}
+function punchoutVendorSetNotice(message='',error=false){
+  const box=$('punchoutVendorNotice');
+  if(!box)return;
+  box.textContent=message||'';
+  box.classList.toggle('hidden',!message);
+  box.style.color=error?'#b42318':'';
+}
+async function openPunchoutVendorDialog(itemId){
+  const item=punchouts.find(p=>String(p.id)===String(itemId));
+  if(!item)return;
+
+  const subdivisionId=subdivisionForLot(item.lot_id);
+  if(!requirePunchoutEditPermission(subdivisionId))return;
+
+  punchoutVendorEditItemId=item.id;
+  punchoutVendorSetNotice('');
+  $('punchoutVendorDialogMeta').textContent=[
+    lots.find(l=>String(l.id)===String(item.lot_id))?.lot_name||'Lot',
+    item.trade_category||'',
+    item.description||''
+  ].filter(Boolean).join(' · ');
+
+  $('punchoutVendorChoices').innerHTML='<div class="muted">Loading Portal companies…</div>';
+  $('punchoutVendorDialog').showModal();
+
+  try{
+    const options=await loadPunchoutVendorOptions(subdivisionId,{force:true});
+    const selected=punchoutAssignmentsFor(item.id).map(row=>row.company_id);
+    renderPunchoutCompanyChoices('punchoutVendorChoices',options,selected);
+  }catch(err){
+    punchoutVendorSetNotice(err?.message||'Could not load vendor companies.',true);
+    $('punchoutVendorChoices').innerHTML='';
+  }
+}
+function closePunchoutVendorDialog(){
+  punchoutVendorEditItemId=null;
+  punchoutVendorSetNotice('');
+  try{$('punchoutVendorDialog').close();}catch(_){}
+}
+async function savePunchoutVendorAssignments(){
+  const item=punchouts.find(p=>String(p.id)===String(punchoutVendorEditItemId));
+  if(!item)return closePunchoutVendorDialog();
+
+  const button=$('punchoutVendorSave');
+  const companyIds=selectedPunchoutCompanyIds('punchoutVendorChoices');
+  button.disabled=true;
+  button.textContent='Saving…';
+  punchoutVendorSetNotice('');
+
+  try{
+    const {data,error}=await db.rpc('bowenbuilder_set_punchout_companies',{
+      p_punchout_item_id:item.id,
+      p_company_ids:companyIds
+    });
+    if(error)throw error;
+
+    replacePunchoutAssignments(item.id,data);
+
+    logBowenActivity('punchout_vendor_assignment_updated',{
+      label:`Updated vendor assignment: ${item.description||'Punchout item'}`,
+      entityType:'punchout_item',
+      entityId:item.id,
+      subdivisionId:subdivisionForLot(item.lot_id),
+      lotId:item.lot_id,
+      force:true,
+      metadata:{company_ids:companyIds}
+    });
+
+    closePunchoutVendorDialog();
+    await renderPunchout(item.lot_id);
+    if(currentSubdivision && subdivisionViewMode==='punchout'){
+      renderSubdivisionPunchout();
+    }
+  }catch(err){
+    punchoutVendorSetNotice(err?.message||'Could not save vendor assignment.',true);
+  }finally{
+    button.disabled=false;
+    button.textContent='Save Assignment';
+  }
+}
+
 async function signedPunchoutUrl(path){
   if(!path) return '';
   const {data,error}=await db.storage.from('punchout-photos').createSignedUrl(path,3600);
@@ -9375,15 +9984,18 @@ async function renderPunchout(lotId){
     })));
     const created=p.created_at?new Date(p.created_at).toLocaleDateString():'';
     const status=p.completed?'Completed':'Open';
+    const canAssign=canPunchoutEdit(subdivisionForLot(p.lot_id));
+    const assignmentRows=punchoutAssignmentsFor(p.id);
 
     return `<div class="punchout-card ${p.completed?'completed':''}" data-punchout="${p.id}">
       <div class="punchout-topline">
         ${p.completed?'':`<input class="punchout-select" type="checkbox" data-select-punchout="${p.id}" ${selectedPunchouts.has(p.id)?'checked':''} aria-label="Select punchout item">`}
         <div class="punchout-topline-main">
           <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap">
-            <div>
+            <div style="min-width:0;flex:1">
               ${p.trade_category?`<div class="punchout-trade-badge">${esc(p.trade_category)}</div>`:''}
               <div class="punchout-text">${esc(p.description)}</div>
+              ${punchoutCompanyBadgesMarkup(p.id,{showUnassigned:true})}
             </div>
             <span class="punchout-status ${p.completed?'completed':''}">${status}</span>
           </div>
@@ -9410,6 +10022,7 @@ async function renderPunchout(lotId){
         <div class="punchout-actions">
           <button class="share-btn" type="button" data-text-punchout="${p.id}">Text</button>
           <button class="share-btn" type="button" data-email-punchout="${p.id}">Email</button>
+          ${canAssign?`<button class="secondary" type="button" data-assign-punchout="${p.id}">${assignmentRows.length?'Edit Vendor':'Assign Vendor'}</button>`:''}
           ${canPunchoutEdit(subdivisionForLot(p.lot_id))?`<button class="${p.completed?'reopen-btn':'complete-btn'}" type="button" data-toggle-punchout="${p.id}">${p.completed?'Reopen':'Complete + Photo'}</button>`:''}
           ${canPunchoutDelete(subdivisionForLot(p.lot_id))?`<button class="secondary danger" type="button" data-delete-punchout="${p.id}">Delete</button>`:''}
         </div>
@@ -9437,6 +10050,9 @@ async function renderPunchout(lotId){
   });
   root.querySelectorAll('[data-email-punchout]').forEach(btn=>{
     btn.onclick=()=>sharePunchouts([btn.dataset.emailPunchout],'email');
+  });
+  root.querySelectorAll('[data-assign-punchout]').forEach(btn=>{
+    btn.onclick=()=>openPunchoutVendorDialog(btn.dataset.assignPunchout);
   });
   root.querySelectorAll('[data-toggle-punchout]').forEach(btn=>{
     btn.onclick=()=>togglePunchoutComplete(btn.dataset.togglePunchout,btn);
@@ -10056,7 +10672,15 @@ function openPunchoutDialog(){
   $('punchoutForm').reset();
   $('punchoutCustomTradeWrap').classList.add('hidden');
   $('punchoutCustomTrade').required=false;
+  $('punchoutCompanyChoices').innerHTML='<div class="muted">Loading Portal companies…</div>';
   $('punchoutDialog').showModal();
+
+  const subdivisionId=subdivisionForLot(currentLot);
+  loadPunchoutVendorOptions(subdivisionId,{force:true})
+    .then(options=>renderPunchoutCompanyChoices('punchoutCompanyChoices',options,[]))
+    .catch(err=>{
+      $('punchoutCompanyChoices').innerHTML=`<div class="muted">${esc(err?.message||'Could not load Portal companies.')}</div>`;
+    });
 }
 
 async function savePunchout(e){
@@ -10066,6 +10690,7 @@ async function savePunchout(e){
   if(trade==='__custom__')trade=$('punchoutCustomTrade').value.trim();
   const description=$('punchoutText').value.trim();
   const photos=[...($('punchoutPhoto').files||[])];
+  const companyIds=selectedPunchoutCompanyIds('punchoutCompanyChoices');
 
   if(!trade){alert('Please select a trade or enter a custom trade.');return}
   if(!description){alert('Please enter a punchout item.');return}
@@ -10095,6 +10720,20 @@ async function savePunchout(e){
     $('punchoutSave').textContent='Save Punchout Item';
     alert(itemError.message);
     return;
+  }
+
+  let assignmentWarning='';
+  if(companyIds.length){
+    const {data:assignmentRows,error:assignmentError}=await db.rpc('bowenbuilder_set_punchout_companies',{
+      p_punchout_item_id:item.id,
+      p_company_ids:companyIds
+    });
+
+    if(assignmentError){
+      assignmentWarning=assignmentError.message||'Vendor assignment could not be saved.';
+    }else{
+      replacePunchoutAssignments(item.id,assignmentRows);
+    }
   }
 
   const uploadedPaths=[];
@@ -10139,8 +10778,11 @@ async function savePunchout(e){
 
   $('punchoutSave').disabled=false;
   $('punchoutSave').textContent='Save Punchout Item';
-  logBowenActivity('punchout_created',{label:`Added ${trade} punchout: ${description}`,entityType:'punchout_item',entityId:item.id,subdivisionId:subdivisionForLot(currentLot),lotId:currentLot,force:true,metadata:{trade_category:trade,photo_count:uploadedPaths.length}});
+  logBowenActivity('punchout_created',{label:`Added ${trade} punchout: ${description}`,entityType:'punchout_item',entityId:item.id,subdivisionId:subdivisionForLot(currentLot),lotId:currentLot,force:true,metadata:{trade_category:trade,photo_count:uploadedPaths.length,company_ids:companyIds,assignment_warning:assignmentWarning||null}});
   $('punchoutDialog').close();
+  if(assignmentWarning){
+    alert(`Punchout item was saved, but its vendor assignment needs attention. ${assignmentWarning}\n\nUse Assign Vendor on the Punchout item to try again.`);
+  }
   scheduleRealtimeReload();
 }
 
@@ -15217,6 +15859,13 @@ $('punchoutTrade').onchange=()=>{
 $('punchoutForm').onsubmit=savePunchout;
 $('punchoutX').onclick=()=>$('punchoutDialog').close();
 $('punchoutCancel').onclick=()=>$('punchoutDialog').close();
+
+$('punchoutVendorSave').onclick=savePunchoutVendorAssignments;
+$('punchoutVendorX').onclick=closePunchoutVendorDialog;
+$('punchoutVendorCancel').onclick=closePunchoutVendorDialog;
+$('punchoutVendorDialog').addEventListener('click',e=>{
+  if(e.target===e.currentTarget)closePunchoutVendorDialog();
+});
 $('punchoutDialog').addEventListener('click',e=>{
   if(e.target===e.currentTarget) $('punchoutDialog').close();
 });
@@ -15709,7 +16358,7 @@ try{
 </script>
 
 <div id="bbBuildVersion" style="text-align:center;color:#8a96a8;font-size:10px;padding:10px 8px 18px">
-  BowenBuilder 2.1</div>
+  BowenBuilder 2.2</div>
 
 
 
