@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="2.3">
+<meta name="bowenbuilder-version" content="2.4">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -3607,6 +3607,20 @@ button.teams-file-row:hover{border-color:#bdccdd}
   .schedule-email-template-buttons button{flex:1 1 100%}
 }
 
+
+.schedule-email-template-quick{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  flex-wrap:wrap;
+  margin:-2px 0 12px;
+}
+.schedule-email-template-quick button{
+  padding:7px 10px;
+  font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;
+  font-size:12px;
+}
+
 </style>
 </head>
 <body>
@@ -4009,10 +4023,11 @@ button.teams-file-row:hover{border-color:#bdccdd}
 
           <div class="schedule-email-token-help">
             <strong>Available placeholders</strong>
-            <div class="muted">Use these anywhere in the subject or message:</div>
+            <div class="muted">Use these anywhere in the subject or message. <strong>{options}</strong> expands to the lot&apos;s included options and always states whether a Farm Sink is included.</div>
             <div class="schedule-email-token-list">
               <code>{status}</code><code>{work}</code><code>{company}</code><code>{recipient_name}</code>
               <code>{subdivision}</code><code>{lot}</code><code>{address}</code><code>{date}</code>
+              <code>{options}</code><code>{farm_sink}</code>
               <code>{previous_date}</code><code>{date_label}</code><code>{previous_date_line}</code><code>{portal_link}</code>
             </div>
           </div>
@@ -4853,7 +4868,7 @@ button.teams-file-row:hover{border-color:#bdccdd}
 <script>
 (async()=>{
 const $=id=>document.getElementById(id);
-const BOWENBUILDER_VERSION='2.3';
+const BOWENBUILDER_VERSION='2.4';
 const SB_URL='https://oztefiymckpyxiewgxtc.supabase.co';
 const SB_KEY='sb_publishable__ItoYGeHKEGTBFiE7JM74w_1F-qERVe';
 const db=window.supabase.createClient(SB_URL,SB_KEY);
@@ -5213,6 +5228,21 @@ function scheduleAlertTemplateValues(notification){
  const hasPrevious=notification?.kind==='rescheduled' && d.previous_start;
  const dateLabel=notification?.kind==='canceled'?'Canceled schedule date':'Requested schedule date';
 
+ const lotRecord=lots.find(l=>String(l.id)===String(d.lot_id));
+ const rawIncludedOptions=(d.included_options!==undefined && d.included_options!==null)
+   ? d.included_options
+   : (lotRecord?.included_options||'');
+
+ const included=includedOptionsList(rawIncludedOptions);
+ const farmOption=included.find(option=>/farm\s*sink/i.test(String(option||'')));
+ const farmSink=farmOption?`Yes (${farmOption})`:'No';
+ const optionLines=[
+   `- Farm Sink: ${farmSink}`,
+   ...included
+     .filter(option=>!/farm\s*sink/i.test(String(option||'')))
+     .map(option=>`- ${option}`)
+ ];
+
  return {
   status:label,
   work:d.work||'Scheduled work',
@@ -5222,6 +5252,8 @@ function scheduleAlertTemplateValues(notification){
   lot:d.lot||'Lot',
   address:d.address||'Not added',
   date:scheduleAlertRange(d.start,d.end),
+  options:optionLines.join('\n'),
+  farm_sink:farmSink,
   previous_date:hasPrevious?previousDate:'',
   date_label:dateLabel,
   previous_date_line:hasPrevious?`Previous schedule date: ${previousDate}\n`:'',
@@ -5353,6 +5385,7 @@ function scheduleEmailTemplateSampleNotification(rule,kind='scheduled'){
    subdivision:'Example Subdivision',
    lot:'Lot 80',
    address:'123 Example Street',
+   included_options:'White Farm Sink\nBuilt-ins',
    start:start.toISOString(),
    end:start.toISOString(),
    previous_start:previous.toISOString(),
@@ -5439,6 +5472,12 @@ function scheduleEmailTemplateOpenEditor(ruleId){
      <textarea id="scheduleEmailTemplateBody" rows="12" maxlength="12000">${esc(body)}</textarea>
    </label>
 
+   <div class="schedule-email-template-quick">
+     <span class="muted">Quick insert:</span>
+     <button id="scheduleEmailTemplateInsertOptions" class="secondary" type="button">{options}</button>
+     <button id="scheduleEmailTemplateInsertFarmSink" class="secondary" type="button">{farm_sink}</button>
+   </div>
+
    <div class="schedule-email-template-head" style="align-items:end">
      <label style="margin:0;max-width:260px">Preview Event
        <select id="scheduleEmailTemplatePreviewKind">
@@ -5467,6 +5506,19 @@ function scheduleEmailTemplateOpenEditor(ruleId){
  const subjectInput=$('scheduleEmailTemplateSubject');
  const bodyInput=$('scheduleEmailTemplateBody');
  const kindInput=$('scheduleEmailTemplatePreviewKind');
+
+ const insertToken=(token)=>{
+  const start=bodyInput.selectionStart??bodyInput.value.length;
+  const end=bodyInput.selectionEnd??start;
+  bodyInput.value=bodyInput.value.slice(0,start)+token+bodyInput.value.slice(end);
+  const next=start+token.length;
+  bodyInput.focus({preventScroll:true});
+  bodyInput.setSelectionRange(next,next);
+  scheduleEmailTemplateRenderPreview();
+ };
+
+ $('scheduleEmailTemplateInsertOptions').onclick=()=>insertToken('{options}');
+ $('scheduleEmailTemplateInsertFarmSink').onclick=()=>insertToken('{farm_sink}');
 
  subjectInput.oninput=scheduleEmailTemplateRenderPreview;
  bodyInput.oninput=scheduleEmailTemplateRenderPreview;
@@ -16885,7 +16937,7 @@ try{
 </script>
 
 <div id="bbBuildVersion" style="text-align:center;color:#8a96a8;font-size:10px;padding:10px 8px 18px">
-  BowenBuilder 2.3</div>
+  BowenBuilder 2.4</div>
 
 
 
