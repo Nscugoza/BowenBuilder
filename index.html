@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="2.2">
+<meta name="bowenbuilder-version" content="2.3">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -3499,6 +3499,114 @@ button.teams-file-row:hover{border-color:#bdccdd}
   .portal-punchout-photo{height:120px}
 }
 
+
+.schedule-email-template-shell{display:grid;gap:14px}
+.schedule-email-template-head{
+  display:flex;
+  gap:10px;
+  align-items:end;
+  flex-wrap:wrap;
+}
+.schedule-email-token-help{
+  padding:12px 13px;
+  border:1px solid #dbe3ee;
+  border-radius:14px;
+  background:#f8fbff;
+}
+.schedule-email-token-list{
+  display:flex;
+  gap:7px;
+  flex-wrap:wrap;
+  margin-top:9px;
+}
+.schedule-email-token-list code{
+  display:inline-flex;
+  align-items:center;
+  border:1px solid #cfdbe8;
+  background:#fff;
+  color:#214f7a;
+  border-radius:999px;
+  padding:5px 8px;
+  font-size:11px;
+  font-weight:800;
+}
+.schedule-email-template-list{display:grid;gap:9px}
+.schedule-email-template-row{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:12px;
+  border:1px solid #e1e7ef;
+  border-radius:14px;
+  background:#fff;
+  padding:12px 13px;
+}
+.schedule-email-template-row-main{min-width:0;flex:1}
+.schedule-email-template-row-title{
+  font-weight:850;
+  color:#173f6c;
+}
+.schedule-email-template-row-meta{
+  font-size:12px;
+  color:#667085;
+  margin-top:3px;
+}
+.schedule-email-template-status{
+  display:inline-flex;
+  align-items:center;
+  border-radius:999px;
+  padding:4px 8px;
+  font-size:10px;
+  font-weight:850;
+  margin-top:7px;
+  border:1px solid #d0d5dd;
+  background:#f2f4f7;
+  color:#475467;
+}
+.schedule-email-template-status.custom{
+  background:#edf9f2;
+  border-color:#cfe8d9;
+  color:#1f704b;
+}
+.schedule-email-template-editor{
+  border:1px solid #cfdbe8;
+  border-radius:16px;
+  background:#fbfdff;
+  padding:14px;
+}
+.schedule-email-template-editor h3{margin:0 0 4px}
+.schedule-email-template-preview{
+  border:1px solid #dbe3ee;
+  border-radius:14px;
+  background:#fff;
+  padding:13px;
+  margin-top:12px;
+}
+.schedule-email-template-preview-subject{
+  font-weight:850;
+  color:#173f6c;
+  margin-bottom:9px;
+  overflow-wrap:anywhere;
+}
+.schedule-email-template-preview-body{
+  white-space:pre-wrap;
+  color:#344054;
+  line-height:1.5;
+  font-size:13px;
+}
+.schedule-email-template-buttons{
+  display:flex;
+  justify-content:flex-end;
+  gap:8px;
+  flex-wrap:wrap;
+  margin-top:14px;
+}
+@media(max-width:640px){
+  .schedule-email-template-row{flex-direction:column}
+  .schedule-email-template-row>button{width:100%}
+  .schedule-email-template-buttons button{flex:1 1 100%}
+}
+
 </style>
 </head>
 <body>
@@ -3860,6 +3968,7 @@ button.teams-file-row:hover{border-color:#bdccdd}
 
       <div class="admin-inner-tabs">
         <button id="adminContactsTab" class="admin-inner-tab active" type="button">Schedule Contacts</button>
+        <button id="adminScheduleEmailTemplatesTab" class="admin-inner-tab" type="button">Email Templates</button>
         <button id="adminPowerTab" class="admin-inner-tab" type="button">Power Companies</button>
         <button id="adminPermissionsTab" class="admin-inner-tab" type="button">User Permissions</button>
         <button id="adminOnlineTab" class="admin-inner-tab" type="button">Online Now</button>
@@ -3877,6 +3986,41 @@ button.teams-file-row:hover{border-color:#bdccdd}
         </label>
         <div id="adminContactNotice" class="notice hidden" style="margin:12px 0"></div>
         <div id="adminContactList" class="admin-contact-list"></div>
+      </div>
+
+      <div id="adminScheduleEmailTemplatesPanel" class="hidden">
+        <div class="card admin-note">
+          <strong>Automatic Email Templates</strong>
+          <div class="muted" style="margin-top:5px">
+            Customize the automatic schedule-alert email for each vendor company and schedule item.
+            These templates are used for emails sent from BowenBuilder through Microsoft.
+          </div>
+        </div>
+
+        <div class="card schedule-email-template-shell">
+          <div class="schedule-email-template-head">
+            <label style="margin:0;flex:1 1 280px">Vendor Company
+              <select id="scheduleEmailTemplateCompany">
+                <option value="">Loading companies…</option>
+              </select>
+            </label>
+            <button id="scheduleEmailTemplateRefresh" class="secondary" type="button">↻ Refresh</button>
+          </div>
+
+          <div class="schedule-email-token-help">
+            <strong>Available placeholders</strong>
+            <div class="muted">Use these anywhere in the subject or message:</div>
+            <div class="schedule-email-token-list">
+              <code>{status}</code><code>{work}</code><code>{company}</code><code>{recipient_name}</code>
+              <code>{subdivision}</code><code>{lot}</code><code>{address}</code><code>{date}</code>
+              <code>{previous_date}</code><code>{date_label}</code><code>{previous_date_line}</code><code>{portal_link}</code>
+            </div>
+          </div>
+
+          <div id="scheduleEmailTemplateNotice" class="notice hidden" style="margin-top:12px"></div>
+          <div id="scheduleEmailTemplateList" class="schedule-email-template-list"></div>
+          <div id="scheduleEmailTemplateEditor"></div>
+        </div>
       </div>
 
 
@@ -4709,7 +4853,7 @@ button.teams-file-row:hover{border-color:#bdccdd}
 <script>
 (async()=>{
 const $=id=>document.getElementById(id);
-const BOWENBUILDER_VERSION='2.2';
+const BOWENBUILDER_VERSION='2.3';
 const SB_URL='https://oztefiymckpyxiewgxtc.supabase.co';
 const SB_KEY='sb_publishable__ItoYGeHKEGTBFiE7JM74w_1F-qERVe';
 const db=window.supabase.createClient(SB_URL,SB_KEY);
@@ -5027,6 +5171,10 @@ function portalShowFiles(){
 // BEGIN PORTAL SCHEDULE ALERTS
 // Embedded into index.html for the single-file BowenBuilder release.
 const scheduleAlertState={company:null,adminRequest:0,adminData:null,inbox:[],unread:0,more:false,user:null,loading:false,dispatching:false,completions:[],inboxOpen:false};
+let scheduleEmailTemplateCompanies=[];
+let scheduleEmailTemplateCompanyId=null;
+let scheduleEmailTemplateData=null;
+let scheduleEmailTemplateEditingRuleId=null;
 async function scheduleAlertsRpc(action,payload={}){
  const {data,error}=await db.rpc('bowenbuilder_schedule_alerts',{p_action:action,p_payload:payload});
  if(error)throw new Error(error.message||'Could not load schedule alerts.');
@@ -5044,13 +5192,87 @@ function scheduleAlertRange(start,end){
  return !end||a===b?a:`${a} – ${b}`;
 }
 function scheduleAlertLabel(kind){return ({scheduled:'Scheduled',rescheduled:'Rescheduled',canceled:'Canceled'})[kind]||'Updated';}
+function scheduleAlertDefaultSubjectTemplate(){
+ return '{lot} — {work} — {status}';
+}
+function scheduleAlertDefaultBodyTemplate(){
+ return `{status}: {work}
+
+Subdivision: {subdivision}
+Lot: {lot}
+Address: {address}
+{previous_date_line}{date_label}: {date}
+
+View schedule updates in Bowen Builder Portal:
+{portal_link}`;
+}
+function scheduleAlertTemplateValues(notification){
+ const d=notification?.details||{};
+ const label=scheduleAlertLabel(notification?.kind);
+ const previousDate=scheduleAlertRange(d.previous_start,d.previous_end);
+ const hasPrevious=notification?.kind==='rescheduled' && d.previous_start;
+ const dateLabel=notification?.kind==='canceled'?'Canceled schedule date':'Requested schedule date';
+
+ return {
+  status:label,
+  work:d.work||'Scheduled work',
+  company:notification?.company_name||'Vendor Company',
+  recipient_name:notification?.recipient_name||'Vendor Contact',
+  subdivision:d.subdivision||'',
+  lot:d.lot||'Lot',
+  address:d.address||'Not added',
+  date:scheduleAlertRange(d.start,d.end),
+  previous_date:hasPrevious?previousDate:'',
+  date_label:dateLabel,
+  previous_date_line:hasPrevious?`Previous schedule date: ${previousDate}\n`:'',
+  portal_link:'https://bowen-builder.vercel.app/?portal=1'
+ };
+}
+function scheduleAlertApplyTemplate(template,notification){
+ const values=scheduleAlertTemplateValues(notification);
+ return String(template||'').replace(/\{([a-z_]+)\}/gi,(match,key)=>{
+  const normalized=String(key||'').toLowerCase();
+  return Object.prototype.hasOwnProperty.call(values,normalized)
+   ? String(values[normalized]??'')
+   : match;
+ });
+}
 function scheduleAlertEmailMessage(notification){
  const d=notification.details||{},label=scheduleAlertLabel(notification.kind);
- const lines=[`${label}: ${d.work||'Scheduled work'}`,'',`Subdivision: ${d.subdivision||''}`,`Lot: ${d.lot||''}`,`Address: ${d.address||'Not added'}`];
- if(notification.kind==='rescheduled')lines.push(`Previous schedule date: ${scheduleAlertRange(d.previous_start,d.previous_end)}`);
- lines.push(`${notification.kind==='canceled'?'Canceled schedule date':'Requested schedule date'}: ${scheduleAlertRange(d.start,d.end)}`);
- lines.push('','View schedule updates in Bowen Builder Portal:','https://bowen-builder.vercel.app/?portal=1');
- return {subject:`${d.lot||'Lot'} — ${d.work||'Scheduled work'} — ${label}`,body:lines.join('\n')};
+
+ const defaultLines=[
+  `${label}: ${d.work||'Scheduled work'}`,
+  '',
+  `Subdivision: ${d.subdivision||''}`,
+  `Lot: ${d.lot||''}`,
+  `Address: ${d.address||'Not added'}`
+ ];
+ if(notification.kind==='rescheduled'){
+  defaultLines.push(`Previous schedule date: ${scheduleAlertRange(d.previous_start,d.previous_end)}`);
+ }
+ defaultLines.push(
+  `${notification.kind==='canceled'?'Canceled schedule date':'Requested schedule date'}: ${scheduleAlertRange(d.start,d.end)}`
+ );
+ defaultLines.push(
+  '',
+  'View schedule updates in Bowen Builder Portal:',
+  'https://bowen-builder.vercel.app/?portal=1'
+ );
+
+ const defaultSubject=`${d.lot||'Lot'} — ${d.work||'Scheduled work'} — ${label}`;
+ const defaultBody=defaultLines.join('\n');
+
+ const subjectTemplate=String(notification.email_subject_template||'').trim();
+ const bodyTemplate=String(notification.email_body_template||'');
+
+ return {
+  subject:subjectTemplate
+   ? scheduleAlertApplyTemplate(subjectTemplate,notification)
+   : defaultSubject,
+  body:bodyTemplate
+   ? scheduleAlertApplyTemplate(bodyTemplate,notification)
+   : defaultBody
+ };
 }
 function scheduleAlertsNotice(message){
  const box=$('scheduleAlertsDeliveryNotice');
@@ -5102,6 +5324,301 @@ async function scheduleAlertsDispatch(){
  finally{scheduleAlertState.dispatching=false;}
 }
 function scheduleAlertsKick(){setTimeout(scheduleAlertsDispatch,150);}
+
+
+function scheduleEmailTemplateSetNotice(message='',error=false){
+ const box=$('scheduleEmailTemplateNotice');
+ if(!box)return;
+ box.textContent=message||'';
+ box.classList.toggle('hidden',!message);
+ box.style.color=error?'#b42318':'';
+}
+function scheduleEmailTemplateCurrentCompany(){
+ return scheduleEmailTemplateCompanies.find(c=>String(c.id)===String(scheduleEmailTemplateCompanyId))||null;
+}
+function scheduleEmailTemplateSampleNotification(rule,kind='scheduled'){
+ const now=new Date();
+ const start=new Date(now.getFullYear(),now.getMonth(),now.getDate()+7,12,0,0);
+ const previous=new Date(start);
+ previous.setDate(previous.getDate()-2);
+
+ return {
+  kind,
+  company_name:scheduleEmailTemplateCurrentCompany()?.name||'Vendor Company',
+  recipient_name:'Vendor Contact',
+  email_subject_template:rule?.email_subject_template||'',
+  email_body_template:rule?.email_body_template||'',
+  details:{
+   work:rule?.schedule_name||'Scheduled Work',
+   subdivision:'Example Subdivision',
+   lot:'Lot 80',
+   address:'123 Example Street',
+   start:start.toISOString(),
+   end:start.toISOString(),
+   previous_start:previous.toISOString(),
+   previous_end:previous.toISOString()
+  }
+ };
+}
+function scheduleEmailTemplateRenderPreview(){
+ const rule=(scheduleEmailTemplateData?.rules||[]).find(
+  r=>String(r.id)===String(scheduleEmailTemplateEditingRuleId)
+ );
+ if(!rule)return;
+
+ const subjectInput=$('scheduleEmailTemplateSubject');
+ const bodyInput=$('scheduleEmailTemplateBody');
+ const kind=$('scheduleEmailTemplatePreviewKind')?.value||'scheduled';
+
+ const sample=scheduleEmailTemplateSampleNotification({
+  ...rule,
+  email_subject_template:subjectInput?.value||scheduleAlertDefaultSubjectTemplate(),
+  email_body_template:bodyInput?.value||scheduleAlertDefaultBodyTemplate()
+ },kind);
+
+ const message=scheduleAlertEmailMessage(sample);
+ if($('scheduleEmailTemplatePreviewSubject'))$('scheduleEmailTemplatePreviewSubject').textContent=message.subject;
+ if($('scheduleEmailTemplatePreviewBody'))$('scheduleEmailTemplatePreviewBody').textContent=message.body;
+}
+function scheduleEmailTemplateRenderList(){
+ const root=$('scheduleEmailTemplateList');
+ const editor=$('scheduleEmailTemplateEditor');
+ if(!root||!editor)return;
+
+ const rules=scheduleEmailTemplateData?.rules||[];
+ const company=scheduleEmailTemplateCurrentCompany();
+
+ if(!company){
+  root.innerHTML='<div class="muted">Choose a vendor company.</div>';
+  editor.innerHTML='';
+  return;
+ }
+
+ if(!rules.length){
+  root.innerHTML=`<div class="muted">No automatic schedule alerts are set up for ${esc(company.name)}. Create a Schedule Alert under Admin → Portal Access → ${esc(company.name)} first.</div>`;
+  editor.innerHTML='';
+  return;
+ }
+
+ root.innerHTML=rules.map(rule=>{
+  const custom=!!String(rule.email_subject_template||'').trim() || !!String(rule.email_body_template||'');
+  return `<div class="schedule-email-template-row">
+    <div class="schedule-email-template-row-main">
+      <div class="schedule-email-template-row-title">${esc(rule.schedule_name)}</div>
+      <div class="schedule-email-template-row-meta">
+        ${rule.enabled?'Alert enabled':'Alert paused'} · ${rule.email_enabled?'Automatic email on':'Portal only'}
+      </div>
+      <span class="schedule-email-template-status ${custom?'custom':''}">${custom?'Custom email':'System default'}</span>
+    </div>
+    <button class="secondary" type="button" data-email-template-edit="${esc(rule.id)}">Edit Email</button>
+  </div>`;
+ }).join('');
+
+ root.querySelectorAll('[data-email-template-edit]').forEach(button=>{
+  button.onclick=()=>scheduleEmailTemplateOpenEditor(button.dataset.emailTemplateEdit);
+ });
+}
+function scheduleEmailTemplateOpenEditor(ruleId){
+ const rule=(scheduleEmailTemplateData?.rules||[]).find(r=>String(r.id)===String(ruleId));
+ if(!rule)return;
+
+ scheduleEmailTemplateEditingRuleId=rule.id;
+
+ const subject=String(rule.email_subject_template||'').trim() || scheduleAlertDefaultSubjectTemplate();
+ const body=String(rule.email_body_template||'') || scheduleAlertDefaultBodyTemplate();
+
+ $('scheduleEmailTemplateEditor').innerHTML=`<div class="schedule-email-template-editor">
+   <h3>${esc(rule.schedule_name)}</h3>
+   <div class="muted" style="margin-bottom:12px">${esc(scheduleEmailTemplateCurrentCompany()?.name||'Vendor Company')} · automatic schedule-alert email</div>
+
+   <label>Email Subject
+     <input id="scheduleEmailTemplateSubject" type="text" maxlength="250" value="${esc(subject)}">
+   </label>
+
+   <label>Email Message
+     <textarea id="scheduleEmailTemplateBody" rows="12" maxlength="12000">${esc(body)}</textarea>
+   </label>
+
+   <div class="schedule-email-template-head" style="align-items:end">
+     <label style="margin:0;max-width:260px">Preview Event
+       <select id="scheduleEmailTemplatePreviewKind">
+         <option value="scheduled">Scheduled</option>
+         <option value="rescheduled">Rescheduled</option>
+         <option value="canceled">Canceled</option>
+       </select>
+     </label>
+   </div>
+
+   <div class="schedule-email-template-preview">
+     <div class="muted" style="font-size:11px;font-weight:850;text-transform:uppercase;letter-spacing:.04em">Preview</div>
+     <div id="scheduleEmailTemplatePreviewSubject" class="schedule-email-template-preview-subject"></div>
+     <div id="scheduleEmailTemplatePreviewBody" class="schedule-email-template-preview-body"></div>
+   </div>
+
+   <div id="scheduleEmailTemplateEditorNotice" class="notice hidden" style="margin-top:12px"></div>
+
+   <div class="schedule-email-template-buttons">
+     <button id="scheduleEmailTemplateDefault" class="secondary" type="button">Use System Default</button>
+     <button id="scheduleEmailTemplateCancel" class="secondary" type="button">Cancel</button>
+     <button id="scheduleEmailTemplateSave" class="primary" type="button">Save Email Template</button>
+   </div>
+ </div>`;
+
+ const subjectInput=$('scheduleEmailTemplateSubject');
+ const bodyInput=$('scheduleEmailTemplateBody');
+ const kindInput=$('scheduleEmailTemplatePreviewKind');
+
+ subjectInput.oninput=scheduleEmailTemplateRenderPreview;
+ bodyInput.oninput=scheduleEmailTemplateRenderPreview;
+ kindInput.onchange=scheduleEmailTemplateRenderPreview;
+
+ $('scheduleEmailTemplateCancel').onclick=()=>{
+  scheduleEmailTemplateEditingRuleId=null;
+  $('scheduleEmailTemplateEditor').innerHTML='';
+ };
+
+ $('scheduleEmailTemplateDefault').onclick=async()=>{
+  if(!confirm('Use the BowenBuilder system-default email for this company and schedule item?'))return;
+  const button=$('scheduleEmailTemplateDefault');
+  button.disabled=true;
+
+  try{
+   const data=await scheduleAlertsRpc('save_template',{
+    company_id:scheduleEmailTemplateCompanyId,
+    id:rule.id,
+    email_subject_template:'',
+    email_body_template:''
+   });
+   scheduleEmailTemplateData=data;
+   scheduleEmailTemplateEditingRuleId=null;
+   $('scheduleEmailTemplateEditor').innerHTML='';
+   scheduleEmailTemplateSetNotice(`System default restored for ${rule.schedule_name}.`);
+   logBowenActivity('schedule_email_template_reset',{
+    label:`Reset automatic email template: ${scheduleEmailTemplateCurrentCompany()?.name||'Vendor'} · ${rule.schedule_name}`,
+    entityType:'schedule_alert_rule',
+    entityId:rule.id,
+    screen:'Admin',
+    force:true
+   });
+   scheduleEmailTemplateRenderList();
+  }catch(err){
+   const box=$('scheduleEmailTemplateEditorNotice');
+   if(box){
+    box.textContent=err?.message||'Could not reset the email template.';
+    box.classList.remove('hidden');
+   }
+   button.disabled=false;
+  }
+ };
+
+ $('scheduleEmailTemplateSave').onclick=async()=>{
+  const button=$('scheduleEmailTemplateSave');
+  const notice=$('scheduleEmailTemplateEditorNotice');
+  const subjectValue=subjectInput.value.trim();
+  const bodyValue=bodyInput.value;
+
+  if(!subjectValue || !bodyValue.trim()){
+   notice.textContent='Enter both an email subject and message.';
+   notice.classList.remove('hidden');
+   return;
+  }
+
+  button.disabled=true;
+  button.textContent='Saving…';
+  notice.classList.add('hidden');
+
+  try{
+   const data=await scheduleAlertsRpc('save_template',{
+    company_id:scheduleEmailTemplateCompanyId,
+    id:rule.id,
+    email_subject_template:subjectValue,
+    email_body_template:bodyValue
+   });
+   scheduleEmailTemplateData=data;
+   scheduleEmailTemplateEditingRuleId=null;
+   $('scheduleEmailTemplateEditor').innerHTML='';
+   scheduleEmailTemplateSetNotice(`Email template saved for ${rule.schedule_name}.`);
+   logBowenActivity('schedule_email_template_saved',{
+    label:`Updated automatic email template: ${scheduleEmailTemplateCurrentCompany()?.name||'Vendor'} · ${rule.schedule_name}`,
+    entityType:'schedule_alert_rule',
+    entityId:rule.id,
+    screen:'Admin',
+    force:true
+   });
+   scheduleEmailTemplateRenderList();
+  }catch(err){
+   notice.textContent=err?.message||'Could not save the email template.';
+   notice.classList.remove('hidden');
+   button.disabled=false;
+   button.textContent='Save Email Template';
+  }
+ };
+
+ scheduleEmailTemplateRenderPreview();
+ requestAnimationFrame(()=>subjectInput.focus({preventScroll:true}));
+}
+async function scheduleEmailTemplateLoadCompany(companyId){
+ scheduleEmailTemplateCompanyId=companyId||null;
+ scheduleEmailTemplateEditingRuleId=null;
+ scheduleEmailTemplateData=null;
+ $('scheduleEmailTemplateEditor').innerHTML='';
+
+ if(!scheduleEmailTemplateCompanyId){
+  $('scheduleEmailTemplateList').innerHTML='<div class="muted">Choose a vendor company.</div>';
+  return;
+ }
+
+ $('scheduleEmailTemplateList').innerHTML='<div class="muted">Loading email templates…</div>';
+ scheduleEmailTemplateSetNotice('');
+
+ try{
+  scheduleEmailTemplateData=await scheduleAlertsRpc('admin_get',{
+   company_id:scheduleEmailTemplateCompanyId
+  });
+  scheduleEmailTemplateRenderList();
+ }catch(err){
+  scheduleEmailTemplateSetNotice(err?.message||'Could not load email templates.',true);
+  $('scheduleEmailTemplateList').innerHTML='';
+ }
+}
+async function loadScheduleEmailTemplates(){
+ if(!isBowenBuilderAdmin())return;
+
+ const select=$('scheduleEmailTemplateCompany');
+ if(!select)return;
+
+ scheduleEmailTemplateSetNotice('');
+ select.disabled=true;
+
+ const {data,error}=await db.from('vendor_companies')
+  .select('id,name,trade_category,active')
+  .order('name');
+
+ if(error){
+  select.innerHTML='<option value="">Could not load companies</option>';
+  select.disabled=false;
+  scheduleEmailTemplateSetNotice(error.message,true);
+  return;
+ }
+
+ scheduleEmailTemplateCompanies=(data||[]).filter(c=>c.active!==false);
+
+ if(!scheduleEmailTemplateCompanyId ||
+    !scheduleEmailTemplateCompanies.some(c=>String(c.id)===String(scheduleEmailTemplateCompanyId))){
+  scheduleEmailTemplateCompanyId=scheduleEmailTemplateCompanies[0]?.id||null;
+ }
+
+ select.innerHTML=scheduleEmailTemplateCompanies.length
+  ? scheduleEmailTemplateCompanies.map(c=>`<option value="${esc(c.id)}" ${String(c.id)===String(scheduleEmailTemplateCompanyId)?'selected':''}>${esc(c.name)}${c.trade_category?` — ${esc(c.trade_category)}`:''}</option>`).join('')
+  : '<option value="">No active vendor companies</option>';
+
+ select.disabled=false;
+
+ select.onchange=()=>scheduleEmailTemplateLoadCompany(select.value||null);
+ $('scheduleEmailTemplateRefresh').onclick=()=>loadScheduleEmailTemplates();
+
+ await scheduleEmailTemplateLoadCompany(scheduleEmailTemplateCompanyId);
+}
 
 async function scheduleAlertsAdminOpen(company){
  const box=$('portalCompanyAlertsSection');
@@ -12787,9 +13304,16 @@ async function revokeGuestAccess(inviteId){
 
 function showAdminPanel(panel='contacts'){
  activeAdminPanel=panel;
- const contacts=panel==='contacts',power=panel==='power',permissions=panel==='permissions',online=panel==='online',portalAccess=panel==='guest_files',activity=panel==='activity';
+ const contacts=panel==='contacts',
+       emailTemplates=panel==='email_templates',
+       power=panel==='power',
+       permissions=panel==='permissions',
+       online=panel==='online',
+       portalAccess=panel==='guest_files',
+       activity=panel==='activity';
 
  $('adminContactsPanel').classList.toggle('hidden',!contacts);
+ $('adminScheduleEmailTemplatesPanel').classList.toggle('hidden',!emailTemplates);
  $('adminPowerPanel').classList.toggle('hidden',!power);
  $('adminPermissionsPanel').classList.toggle('hidden',!permissions);
  $('adminOnlinePanel').classList.toggle('hidden',!online);
@@ -12797,6 +13321,7 @@ function showAdminPanel(panel='contacts'){
  $('adminActivityLogPanel').classList.toggle('hidden',!activity);
 
  $('adminContactsTab').classList.toggle('active',contacts);
+ $('adminScheduleEmailTemplatesTab').classList.toggle('active',emailTemplates);
  $('adminPowerTab').classList.toggle('active',power);
  $('adminPermissionsTab').classList.toggle('active',permissions);
  $('adminOnlineTab').classList.toggle('active',online);
@@ -12809,6 +13334,7 @@ function showAdminPanel(panel='contacts'){
  }else{
    stopAdminActivityLogTimer();
    if(contacts)renderAdminContacts();
+   else if(emailTemplates)loadScheduleEmailTemplates();
    else if(power)renderAdminPowerCompanies();
    else if(permissions)renderAdminUserPermissions();
    else if(online){syncAppPresenceState();loadAdminPresenceProfiles().then(()=>renderAdminOnlineUsers());}
@@ -15644,6 +16170,7 @@ document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{
  }
 });
 $('adminContactsTab').onclick=()=>showAdminPanel('contacts');
+$('adminScheduleEmailTemplatesTab').onclick=()=>showAdminPanel('email_templates');
 $('adminPowerTab').onclick=()=>showAdminPanel('power');
 $('adminPermissionsTab').onclick=()=>showAdminPanel('permissions');
 $('adminOnlineTab').onclick=()=>showAdminPanel('online');
@@ -16358,7 +16885,7 @@ try{
 </script>
 
 <div id="bbBuildVersion" style="text-align:center;color:#8a96a8;font-size:10px;padding:10px 8px 18px">
-  BowenBuilder 2.2</div>
+  BowenBuilder 2.3</div>
 
 
 
