@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="3.0">
+<meta name="bowenbuilder-version" content="3.1">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -4589,6 +4589,45 @@ button.teams-file-row:hover{border-color:#bdccdd}
 
 
 
+
+<dialog id="portalUserEditDialog">
+  <div class="sheet">
+    <div class="dialog-head">
+      <div>
+        <h2 style="margin:0">Edit Portal User</h2>
+        <div id="portalUserEditMeta" class="muted" style="margin-top:4px"></div>
+      </div>
+      <button id="portalUserEditX" class="xbtn" type="button">×</button>
+    </div>
+
+    <div class="notice" style="margin-bottom:12px">
+      Correct the user's name, sign-in email, or Portal role. For accepted accounts, changing the email also changes the email they use to sign in.
+    </div>
+
+    <label>Full Name
+      <input id="portalUserEditName" type="text" maxlength="160" autocomplete="off">
+    </label>
+
+    <label>Email
+      <input id="portalUserEditEmail" type="email" autocomplete="off">
+    </label>
+
+    <label>Portal Role
+      <select id="portalUserEditRole">
+        <option value="member">Member</option>
+        <option value="company_admin">Company Admin</option>
+      </select>
+    </label>
+
+    <div id="portalUserEditNotice" class="notice hidden" style="margin-top:12px"></div>
+
+    <div class="actions">
+      <button id="portalUserEditCancel" class="secondary" type="button">Cancel</button>
+      <button id="portalUserEditSave" class="primary" type="button">Save User</button>
+    </div>
+  </div>
+</dialog>
+
 <dialog id="guestAccessEditDialog">
   <div class="sheet">
     <div class="dialog-head">
@@ -5149,7 +5188,7 @@ button.teams-file-row:hover{border-color:#bdccdd}
 <script>
 (async()=>{
 const $=id=>document.getElementById(id);
-const BOWENBUILDER_VERSION='3.0';
+const BOWENBUILDER_VERSION='3.1';
 const SB_URL='https://oztefiymckpyxiewgxtc.supabase.co';
 const SB_KEY='sb_publishable__ItoYGeHKEGTBFiE7JM74w_1F-qERVe';
 const db=window.supabase.createClient(SB_URL,SB_KEY);
@@ -5187,6 +5226,7 @@ let portalAdminScheduleVisibility=[];
 let portalScheduleVisibilityDraft=new Set();
 let portalAdminSelectedCompanyId=null;
 let portalCompanyDetailTab='company';
+let portalUserEditId=null;
 let latestPortalInvite={url:'',email:'',name:'',company:''};
 
 function portalBaseUrl(){
@@ -7417,6 +7457,7 @@ function renderPortalCompanyUsers(company){
         </select>
         ${!user.user_id?`<button class="secondary" type="button" data-portal-user-resend="${esc(user.id)}">Resend Invite</button>`:''}
         ${!user.user_id&&inviteUrl?`<button class="secondary" type="button" data-portal-user-copy="${esc(user.id)}">Copy Invite</button>`:''}
+        <button class="secondary" type="button" data-portal-user-edit="${esc(user.id)}">Edit Info</button>
         <button class="secondary" type="button" data-portal-user-toggle="${esc(user.id)}">${user.active?'Disable':'Enable'}</button>
       </div>
     </div>`;
@@ -7448,6 +7489,10 @@ function renderPortalCompanyUsers(company){
       }
     };
   });
+  root.querySelectorAll('[data-portal-user-edit]').forEach(btn=>{
+    btn.onclick=()=>openPortalUserEditDialog(btn.dataset.portalUserEdit);
+  });
+
   root.querySelectorAll('[data-portal-user-toggle]').forEach(btn=>{
     btn.onclick=()=>togglePortalUserActive(btn.dataset.portalUserToggle);
   });
@@ -7755,6 +7800,133 @@ async function togglePortalUserActive(userId){
   });
 }
 
+
+
+function portalUserEditSetNotice(message='',error=false){
+  const box=$('portalUserEditNotice');
+  if(!box)return;
+  box.textContent=message||'';
+  box.classList.toggle('hidden',!message);
+  box.style.color=error?'#b42318':'';
+}
+
+function openPortalUserEditDialog(userId){
+  const user=portalAdminUsers.find(u=>String(u.id)===String(userId));
+  if(!user)return;
+
+  portalUserEditId=user.id;
+  portalUserEditSetNotice('');
+
+  const company=portalAdminCompanies.find(
+    c=>String(c.id)===String(user.company_id)
+  );
+
+  $('portalUserEditMeta').textContent=[
+    company?.name||'Vendor Company',
+    user.user_id?'Account active':'Invitation pending'
+  ].join(' · ');
+
+  $('portalUserEditName').value=user.full_name||'';
+  $('portalUserEditEmail').value=user.email||'';
+  $('portalUserEditRole').value=user.role==='company_admin'?'company_admin':'member';
+
+  $('portalUserEditDialog').showModal();
+  requestAnimationFrame(()=>$('portalUserEditName')?.focus({preventScroll:true}));
+}
+
+function closePortalUserEditDialog(){
+  portalUserEditId=null;
+  portalUserEditSetNotice('');
+  try{$('portalUserEditDialog').close();}catch(_){}
+}
+
+async function savePortalUserEdit(){
+  const user=portalAdminUsers.find(u=>String(u.id)===String(portalUserEditId));
+  if(!user)return closePortalUserEditDialog();
+
+  const fullName=String($('portalUserEditName').value||'').trim();
+  const email=String($('portalUserEditEmail').value||'').trim().toLowerCase();
+  const role=String($('portalUserEditRole').value||'member');
+
+  if(!fullName){
+    portalUserEditSetNotice('Enter the user name.',true);
+    return;
+  }
+  if(!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){
+    portalUserEditSetNotice('Enter a valid email address.',true);
+    return;
+  }
+
+  const button=$('portalUserEditSave');
+  button.disabled=true;
+  button.textContent='Saving…';
+  portalUserEditSetNotice('');
+
+  try{
+    const {data,error}=await db.functions.invoke('portal-admin-edit-user',{
+      body:{
+        portal_user_id:user.id,
+        full_name:fullName,
+        email,
+        role
+      }
+    });
+
+    if(error){
+      let detail='';
+      try{
+        const context=error.context;
+        if(context && typeof context.json==='function'){
+          const payload=await context.json();
+          detail=payload?.error||payload?.message||'';
+        }
+      }catch(_){}
+      throw new Error(detail||error.message||'Could not update this Portal user.');
+    }
+
+    if(!data?.ok || !data?.user){
+      throw new Error(data?.error||'Could not update this Portal user.');
+    }
+
+    const previousEmail=String(user.email||'').toLowerCase();
+    const idx=portalAdminUsers.findIndex(u=>String(u.id)===String(user.id));
+    if(idx>=0)portalAdminUsers[idx]=data.user;
+
+    logBowenActivity('admin_portal_user_updated',{
+      label:`Updated Portal user ${data.user.full_name||data.user.email}`,
+      entityType:'portal_user',
+      entityId:user.id,
+      screen:'Admin',
+      force:true,
+      metadata:{
+        company_id:user.company_id,
+        previous_email:previousEmail||null,
+        email:data.user.email||null,
+        role:data.user.role||null
+      }
+    });
+
+    const company=portalAdminCompanies.find(
+      c=>String(c.id)===String(portalAdminSelectedCompanyId)
+    );
+
+    closePortalUserEditDialog();
+    if(company)renderPortalCompanyUsers(company);
+
+    if(data.sign_in_email_changed){
+      portalCompanyDetailSetNotice(`Portal user updated. They will now sign in with ${data.user.email}.`);
+    }else if(data.pending_invite_email_changed){
+      portalCompanyDetailSetNotice(`Portal invitation updated to ${data.user.email}. The existing invitation link still works.`);
+    }else{
+      portalCompanyDetailSetNotice('Portal user information updated.');
+    }
+  }catch(err){
+    portalUserEditSetNotice(err?.message||'Could not update this Portal user.',true);
+  }finally{
+    button.disabled=false;
+    button.textContent='Save User';
+  }
+}
 
 async function deletePortalUser(userId){
   const user=portalAdminUsers.find(u=>String(u.id)===String(userId));
@@ -17238,6 +17410,13 @@ $('portalCompanyBack').onclick=()=>{
   $('portalInviteCreated').classList.add('hidden');
   renderPortalAdmin();
 };
+$('portalUserEditSave').onclick=savePortalUserEdit;
+$('portalUserEditX').onclick=closePortalUserEditDialog;
+$('portalUserEditCancel').onclick=closePortalUserEditDialog;
+$('portalUserEditDialog').addEventListener('click',e=>{
+  if(e.target===e.currentTarget)closePortalUserEditDialog();
+});
+
 $('portalCompanySave').onclick=savePortalCompany;
 $('portalCompanyAccessSave').onclick=savePortalCompanyAccess;
 $('portalCompanyScheduleSave').onclick=savePortalCompanyScheduleVisibility;
@@ -17933,7 +18112,7 @@ try{
 </script>
 
 <div id="bbBuildVersion" style="text-align:center;color:#8a96a8;font-size:10px;padding:10px 8px 18px">
-  BowenBuilder 3.0</div>
+  BowenBuilder 3.1</div>
 
 
 
