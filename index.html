@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="2.5">
+<meta name="bowenbuilder-version" content="2.6">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -3621,6 +3621,186 @@ button.teams-file-row:hover{border-color:#bdccdd}
   font-size:12px;
 }
 
+
+.portal-company-schedule-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+  gap:8px;
+}
+.portal-company-schedule-option{
+  display:flex;
+  align-items:center;
+  gap:9px;
+  padding:10px 11px;
+  margin:0;
+  border:1px solid #e1e7ef;
+  border-radius:12px;
+  background:#fff;
+  font-size:13px;
+  font-weight:750;
+  color:#344054;
+  cursor:pointer;
+}
+.portal-company-schedule-option input{
+  width:19px;
+  height:19px;
+  margin:0;
+  flex:0 0 auto;
+}
+.portal-company-schedule-option:has(input:checked){
+  background:#eef7ff;
+  border-color:#91b9df;
+  color:#173f6c;
+}
+.portal-schedule-toolbar{
+  display:flex;
+  gap:8px;
+  align-items:center;
+  justify-content:space-between;
+  flex-wrap:wrap;
+  margin-bottom:14px;
+}
+.portal-schedule-view-toggle{
+  display:flex;
+  gap:7px;
+  flex-wrap:wrap;
+}
+.portal-schedule-view-toggle button[aria-pressed="true"]{
+  background:#eaf2fb;
+  border-color:#c7d7ea;
+  color:#173f6c;
+}
+.portal-schedule-list{display:grid;gap:14px}
+.portal-schedule-date-group{display:grid;gap:8px}
+.portal-schedule-date-title{
+  font-weight:900;
+  color:#173f6c;
+  font-size:15px;
+}
+.portal-schedule-card{
+  border:1px solid #dbe3ee;
+  border-radius:15px;
+  background:#fff;
+  padding:13px 14px;
+  box-shadow:0 7px 20px rgba(24,50,82,.045);
+}
+.portal-schedule-card-head{
+  display:flex;
+  justify-content:space-between;
+  gap:10px;
+  align-items:flex-start;
+  flex-wrap:wrap;
+}
+.portal-schedule-work{font-weight:900;color:#26384f;font-size:16px}
+.portal-schedule-lot{font-weight:800;margin-top:4px}
+.portal-schedule-address,.portal-schedule-subdivision{
+  font-size:12px;
+  color:#667085;
+  margin-top:2px;
+}
+.portal-schedule-status{
+  display:inline-flex;
+  align-items:center;
+  border-radius:999px;
+  padding:5px 9px;
+  font-size:11px;
+  font-weight:850;
+  border:1px solid #d0d5dd;
+  background:#f2f4f7;
+  color:#475467;
+}
+.portal-schedule-status.scheduled{background:#eaf2fb;border-color:#a9c9eb;color:#174f86}
+.portal-schedule-status.in_progress{background:#fff7d6;border-color:#ead071;color:#765b00}
+.portal-schedule-status.delayed{background:#fdeceb;border-color:#efaaa4;color:#a1271d}
+.portal-schedule-status.complete{background:#edf9f2;border-color:#a9d9be;color:#1f704b}
+.portal-schedule-options{
+  margin-top:10px;
+  border-top:1px solid #edf1f6;
+  padding-top:9px;
+}
+.portal-schedule-options summary{
+  cursor:pointer;
+  font-size:12px;
+  font-weight:800;
+  color:#285b91;
+}
+.portal-schedule-options ul{
+  margin:8px 0 0;
+  padding-left:20px;
+  color:#475467;
+  font-size:12px;
+}
+.portal-schedule-calendar-head{
+  display:grid;
+  grid-template-columns:46px minmax(0,1fr) 46px;
+  align-items:center;
+  gap:8px;
+  margin-bottom:10px;
+}
+.portal-schedule-calendar-title{
+  text-align:center;
+  font-size:20px;
+  font-weight:900;
+  color:#173f6c;
+}
+.portal-schedule-weekdays,.portal-schedule-calendar{
+  display:grid;
+  grid-template-columns:repeat(7,minmax(0,1fr));
+}
+.portal-schedule-weekdays div{
+  text-align:center;
+  font-size:11px;
+  font-weight:850;
+  color:#667085;
+  padding:6px 2px;
+}
+.portal-schedule-calendar{
+  border:1px solid #dbe3ee;
+  border-radius:15px;
+  overflow:hidden;
+  background:#fff;
+}
+.portal-schedule-day{
+  min-height:106px;
+  padding:6px;
+  border-right:1px solid #e7edf4;
+  border-bottom:1px solid #e7edf4;
+  background:#fff;
+  overflow:hidden;
+}
+.portal-schedule-day:nth-child(7n){border-right:0}
+.portal-schedule-day.other-month{background:#f8fafc;color:#a1acba}
+.portal-schedule-day.today{box-shadow:inset 0 0 0 2px #174f86}
+.portal-schedule-day-number{
+  font-size:12px;
+  font-weight:850;
+  margin-bottom:5px;
+}
+.portal-schedule-calendar-events{display:grid;gap:3px}
+.portal-schedule-event{
+  display:block;
+  width:100%;
+  border-radius:6px;
+  padding:3px 4px;
+  font-size:9px;
+  font-weight:800;
+  line-height:1.2;
+  overflow:hidden;
+  white-space:nowrap;
+  text-overflow:ellipsis;
+  background:#eaf2fb;
+  color:#174f86;
+}
+.portal-schedule-event.in_progress{background:#fff7d6;color:#765b00}
+.portal-schedule-event.delayed{background:#fdeceb;color:#a1271d}
+.portal-schedule-event.complete{background:#edf9f2;color:#1f704b}
+@media(max-width:640px){
+  .portal-company-schedule-grid{grid-template-columns:1fr}
+  .portal-schedule-day{min-height:82px;padding:4px}
+  .portal-schedule-event{font-size:8px;padding:2px 3px;white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+  .portal-schedule-calendar-title{font-size:17px}
+}
+
 </style>
 </head>
 <body>
@@ -3725,6 +3905,7 @@ button.teams-file-row:hover{border-color:#bdccdd}
     <div class="portal-topbar-actions">
       <span id="portalUserName" class="portal-user-name"></span>
       <button id="portalFilesButton" class="secondary" type="button" aria-pressed="true">Files</button>
+      <button id="portalScheduleButton" class="secondary" type="button" aria-pressed="false">Schedule</button>
       <button id="portalPunchoutButton" class="secondary" type="button" aria-pressed="false">Punchout</button>
       <button id="portalUpdatesButton" class="secondary" type="button" aria-pressed="false">Updates</button>
       <button id="portalLogout" class="secondary" type="button">Sign Out</button>
@@ -3734,6 +3915,7 @@ button.teams-file-row:hover{border-color:#bdccdd}
   <main class="portal-shell">
     <div id="portalAppNotice" class="notice hidden"></div>
     <div id="portalAppContent"></div>
+    <section id="portalScheduleView" class="hidden" aria-label="Company schedule"></section>
     <section id="portalPunchoutView" class="hidden" aria-label="Open Punchout"></section>
     <section id="portalScheduleInbox" class="hidden" aria-label="Schedule updates"></section>
     <input id="portalFileInput" type="file" multiple hidden>
@@ -4169,6 +4351,21 @@ button.teams-file-row:hover{border-color:#bdccdd}
           <button id="portalCompanyAccessSave" class="primary" type="button">Save Access</button>
         </div>
         <div id="portalCompanyAccessGrid" class="portal-company-access-grid"></div>
+      </div>
+
+      <div id="portalCompanyScheduleSection" class="card portal-company-section hidden">
+        <div class="portal-company-section-head">
+          <div>
+            <strong>Schedule Visibility</strong>
+            <div class="muted">Choose which calendar items this company can see in Portal → Schedule. This does <strong>not</strong> send emails or notifications.</div>
+          </div>
+          <button id="portalCompanyScheduleSave" class="primary" type="button">Save Schedule</button>
+        </div>
+        <label class="admin-search" style="margin-top:10px">Find Schedule Item
+          <input id="portalCompanyScheduleSearch" type="search" placeholder="Search schedule items...">
+        </label>
+        <div id="portalCompanyScheduleNotice" class="notice hidden" style="margin:12px 0"></div>
+        <div id="portalCompanyScheduleGrid" class="portal-company-schedule-grid"></div>
       </div>
 
       <div id="portalCompanyAlertsSection" class="card portal-company-section hidden"><h3>Schedule Alerts</h3><div id="portalCompanyAlertsBody"></div></div>
@@ -4872,7 +5069,7 @@ button.teams-file-row:hover{border-color:#bdccdd}
 <script>
 (async()=>{
 const $=id=>document.getElementById(id);
-const BOWENBUILDER_VERSION='2.5';
+const BOWENBUILDER_VERSION='2.6';
 const SB_URL='https://oztefiymckpyxiewgxtc.supabase.co';
 const SB_KEY='sb_publishable__ItoYGeHKEGTBFiE7JM74w_1F-qERVe';
 const db=window.supabase.createClient(SB_URL,SB_KEY);
@@ -4896,10 +5093,18 @@ let portalPunchoutLoading=false;
 let portalPunchoutOpen=false;
 let portalPunchoutRenderToken=0;
 
+let portalScheduleData={items:[],visibility:[]};
+let portalScheduleLoading=false;
+let portalScheduleOpen=false;
+let portalScheduleMode='upcoming';
+let portalScheduleCalendarMonth=new Date(Date.UTC(new Date().getUTCFullYear(),new Date().getUTCMonth(),1));
+
 let portalAdminMode='companies';
 let portalAdminCompanies=[];
 let portalAdminUsers=[];
 let portalAdminAccess=[];
+let portalAdminScheduleVisibility=[];
+let portalScheduleVisibilityDraft=new Set();
 let portalAdminSelectedCompanyId=null;
 let latestPortalInvite={url:'',email:'',name:'',company:''};
 
@@ -4989,6 +5194,212 @@ async function portalLog(action,{label='',subdivisionId=null,lotId=null,fileId=n
   }catch(_){}
 }
 
+
+
+function portalScheduleItems(){
+  return Array.isArray(portalScheduleData?.items)?portalScheduleData.items:[];
+}
+function portalScheduleStatusLabel(status){
+  return ({
+    scheduled:'Scheduled',
+    in_progress:'In Progress',
+    delayed:'Delayed',
+    complete:'Complete'
+  })[String(status||'').toLowerCase()]||String(status||'Scheduled').replace(/_/g,' ');
+}
+function portalScheduleDateKey(value){
+  const d=new Date(value);
+  if(Number.isNaN(d.getTime()))return '';
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`;
+}
+function portalScheduleTodayKey(){
+  const d=new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function portalScheduleOptionList(value){
+  if(Array.isArray(value))return value.map(x=>String(x||'').trim()).filter(Boolean);
+  return String(value||'')
+    .split(/\r?\n|;/)
+    .map(x=>x.replace(/^[\s•\-]+/,'').trim())
+    .filter(Boolean);
+}
+function portalUpdateScheduleButton(){
+  const button=$('portalScheduleButton');
+  if(!button)return;
+  const today=portalScheduleTodayKey();
+  const count=portalScheduleItems().filter(item=>portalScheduleDateKey(item.starts_at)>=today).length;
+  button.textContent=`Schedule${count?` (${count})`:''}`;
+}
+async function portalRefreshSchedule({render=false,quiet=false}={}){
+  if(!portalBootstrapData?.portal_user?.id || portalScheduleLoading)return;
+  portalScheduleLoading=true;
+  try{
+    const {data,error}=await db.rpc('bowenbuilder_portal_schedule');
+    if(error)throw error;
+    portalScheduleData=typeof data==='string'?JSON.parse(data):data||{items:[],visibility:[]};
+    portalUpdateScheduleButton();
+    if(render && portalScheduleOpen)portalRenderSchedule();
+  }catch(err){
+    if(!quiet && portalScheduleOpen){
+      const root=$('portalScheduleView');
+      if(root)root.innerHTML=`<div class="portal-empty">${esc(err?.message||'Could not load the company schedule.')}</div>`;
+    }
+  }finally{
+    portalScheduleLoading=false;
+  }
+}
+function portalScheduleUpcomingMarkup(){
+  const today=portalScheduleTodayKey();
+  const upcoming=portalScheduleItems()
+    .filter(item=>portalScheduleDateKey(item.starts_at)>=today)
+    .slice()
+    .sort((a,b)=>new Date(a.starts_at)-new Date(b.starts_at) || String(a.lot_name||'').localeCompare(String(b.lot_name||''),undefined,{numeric:true}));
+
+  if(!upcoming.length){
+    return '<div class="portal-empty">No upcoming work is currently scheduled for your company.</div>';
+  }
+
+  const groups=new Map();
+  upcoming.forEach(item=>{
+    const key=portalScheduleDateKey(item.starts_at);
+    if(!groups.has(key))groups.set(key,[]);
+    groups.get(key).push(item);
+  });
+
+  return `<div class="portal-schedule-list">${[...groups.entries()].map(([key,group])=>{
+    const first=group[0];
+    const dateTitle=scheduleAlertDate(first.starts_at);
+    return `<section class="portal-schedule-date-group">
+      <div class="portal-schedule-date-title">${esc(dateTitle)}</div>
+      ${group.map(item=>{
+        const status=String(item.status||'scheduled').toLowerCase();
+        const options=portalScheduleOptionList(item.included_options);
+        return `<article class="portal-schedule-card">
+          <div class="portal-schedule-card-head">
+            <div style="min-width:0;flex:1">
+              <div class="portal-schedule-work">${esc(item.name||'Scheduled Work')}</div>
+              <div class="portal-schedule-lot">${esc(item.lot_name||'Lot')}</div>
+              ${item.address?`<div class="portal-schedule-address">${esc(item.address)}</div>`:''}
+              ${item.subdivision_name?`<div class="portal-schedule-subdivision">${esc(item.subdivision_name)}</div>`:''}
+            </div>
+            <span class="portal-schedule-status ${esc(status)}">${esc(portalScheduleStatusLabel(status))}</span>
+          </div>
+          ${options.length?`<details class="portal-schedule-options"><summary>Included Options</summary><ul>${options.map(option=>`<li>${esc(option)}</li>`).join('')}</ul></details>`:''}
+        </article>`;
+      }).join('')}
+    </section>`;
+  }).join('')}</div>`;
+}
+function portalScheduleCalendarMarkup(){
+  const month=new Date(portalScheduleCalendarMonth);
+  const year=month.getUTCFullYear();
+  const monthIndex=month.getUTCMonth();
+  const first=new Date(Date.UTC(year,monthIndex,1));
+  const start=new Date(first);
+  start.setUTCDate(1-first.getUTCDay());
+
+  const items=portalScheduleItems();
+  const today=portalScheduleTodayKey();
+  const cells=[];
+
+  for(let i=0;i<42;i++){
+    const day=new Date(start);
+    day.setUTCDate(start.getUTCDate()+i);
+    const key=`${day.getUTCFullYear()}-${String(day.getUTCMonth()+1).padStart(2,'0')}-${String(day.getUTCDate()).padStart(2,'0')}`;
+    const dayItems=items.filter(item=>portalScheduleDateKey(item.starts_at)===key);
+    const other=day.getUTCMonth()!==monthIndex;
+    cells.push(`<div class="portal-schedule-day${other?' other-month':''}${key===today?' today':''}">
+      <div class="portal-schedule-day-number">${day.getUTCDate()}</div>
+      <div class="portal-schedule-calendar-events">
+        ${dayItems.map(item=>{
+          const status=String(item.status||'scheduled').toLowerCase();
+          return `<span class="portal-schedule-event ${esc(status)}" title="${esc(`${item.name||''} · ${item.lot_name||''}`)}">${esc(item.name||'Work')} · ${esc(item.lot_name||'Lot')}</span>`;
+        }).join('')}
+      </div>
+    </div>`);
+  }
+
+  const title=month.toLocaleDateString(undefined,{timeZone:'UTC',month:'long',year:'numeric'});
+  return `<div class="portal-schedule-calendar-head">
+      <button id="portalSchedulePrevMonth" class="secondary" type="button" aria-label="Previous month">‹</button>
+      <div class="portal-schedule-calendar-title">${esc(title)}</div>
+      <button id="portalScheduleNextMonth" class="secondary" type="button" aria-label="Next month">›</button>
+    </div>
+    <div class="portal-schedule-weekdays"><div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div></div>
+    <div class="portal-schedule-calendar">${cells.join('')}</div>`;
+}
+function portalRenderSchedule(){
+  const root=$('portalScheduleView');
+  if(!root || !portalScheduleOpen)return;
+
+  const visibility=Array.isArray(portalScheduleData?.visibility)?portalScheduleData.visibility:[];
+  root.innerHTML=`<div class="portal-page-head">
+    <div>
+      <h2>Schedule</h2>
+      <div class="muted">Scheduled work your company is allowed to see. This view does not control email notifications.</div>
+    </div>
+    <button id="portalScheduleRefresh" class="secondary" type="button">↻ Refresh</button>
+  </div>
+  <div class="portal-schedule-toolbar">
+    <div class="portal-schedule-view-toggle">
+      <button id="portalScheduleUpcomingButton" class="secondary" type="button" aria-pressed="${portalScheduleMode==='upcoming'}">Upcoming</button>
+      <button id="portalScheduleCalendarButton" class="secondary" type="button" aria-pressed="${portalScheduleMode==='calendar'}">Calendar</button>
+    </div>
+    <div class="muted">${visibility.length?`${visibility.length} schedule item type${visibility.length===1?'':'s'} visible to your company`:'No schedule items have been shared with your company yet'}</div>
+  </div>
+  <div id="portalScheduleBody">${portalScheduleMode==='calendar'?portalScheduleCalendarMarkup():portalScheduleUpcomingMarkup()}</div>`;
+
+  $('portalScheduleRefresh').onclick=async()=>{
+    await portalRefreshSchedule({render:false});
+    portalRenderSchedule();
+  };
+  $('portalScheduleUpcomingButton').onclick=()=>{
+    portalScheduleMode='upcoming';
+    portalRenderSchedule();
+  };
+  $('portalScheduleCalendarButton').onclick=()=>{
+    portalScheduleMode='calendar';
+    portalRenderSchedule();
+  };
+  $('portalSchedulePrevMonth')?.addEventListener('click',()=>{
+    portalScheduleCalendarMonth=new Date(Date.UTC(
+      portalScheduleCalendarMonth.getUTCFullYear(),
+      portalScheduleCalendarMonth.getUTCMonth()-1,
+      1
+    ));
+    portalRenderSchedule();
+  });
+  $('portalScheduleNextMonth')?.addEventListener('click',()=>{
+    portalScheduleCalendarMonth=new Date(Date.UTC(
+      portalScheduleCalendarMonth.getUTCFullYear(),
+      portalScheduleCalendarMonth.getUTCMonth()+1,
+      1
+    ));
+    portalRenderSchedule();
+  });
+}
+async function portalShowSchedule(){
+  scheduleAlertState.inboxOpen=false;
+  portalPunchoutOpen=false;
+  portalScheduleOpen=true;
+  $('portalAppContent')?.classList.add('hidden');
+  $('portalScheduleInbox')?.classList.add('hidden');
+  $('portalPunchoutView')?.classList.add('hidden');
+  $('portalScheduleView')?.classList.remove('hidden');
+
+  $('portalFilesButton')?.setAttribute('aria-pressed','false');
+  $('portalScheduleButton')?.setAttribute('aria-pressed','true');
+  $('portalPunchoutButton')?.setAttribute('aria-pressed','false');
+  $('portalUpdatesButton')?.setAttribute('aria-pressed','false');
+
+  await portalLog('portal_view_schedule',{
+    label:'Viewed company schedule',
+    metadata:{visible_schedule_items:Array.isArray(portalScheduleData?.visibility)?portalScheduleData.visibility.length:0}
+  });
+
+  await portalRefreshSchedule({render:false,quiet:true});
+  portalRenderSchedule();
+}
 
 function portalPunchoutItems(){
   return Array.isArray(portalPunchoutData?.items)?portalPunchoutData.items:[];
@@ -5161,11 +5572,14 @@ async function portalRenderPunchout(){
 }
 async function portalShowPunchout(){
   scheduleAlertState.inboxOpen=false;
+  portalScheduleOpen=false;
   portalPunchoutOpen=true;
   $('portalAppContent')?.classList.add('hidden');
   $('portalScheduleInbox')?.classList.add('hidden');
+  $('portalScheduleView')?.classList.add('hidden');
   $('portalPunchoutView')?.classList.remove('hidden');
   $('portalFilesButton')?.setAttribute('aria-pressed','false');
+  $('portalScheduleButton')?.setAttribute('aria-pressed','false');
   $('portalUpdatesButton')?.setAttribute('aria-pressed','false');
   $('portalPunchoutButton')?.setAttribute('aria-pressed','true');
 
@@ -5177,12 +5591,15 @@ async function portalShowPunchout(){
   await portalRenderPunchout();
 }
 function portalShowFiles(){
+  portalScheduleOpen=false;
   portalPunchoutOpen=false;
   scheduleAlertState.inboxOpen=false;
   $('portalAppContent')?.classList.remove('hidden');
   $('portalScheduleInbox')?.classList.add('hidden');
+  $('portalScheduleView')?.classList.add('hidden');
   $('portalPunchoutView')?.classList.add('hidden');
   $('portalFilesButton')?.setAttribute('aria-pressed','true');
+  $('portalScheduleButton')?.setAttribute('aria-pressed','false');
   $('portalUpdatesButton')?.setAttribute('aria-pressed','false');
   $('portalPunchoutButton')?.setAttribute('aria-pressed','false');
 }
@@ -5749,23 +6166,29 @@ function scheduleAlertsEditRule(rule){
 function scheduleAlertsResetPortal(){
  scheduleAlertState.user=portalBootstrapData?.portal_user?.id||null;
  scheduleAlertState.inbox=[];scheduleAlertState.unread=0;scheduleAlertState.inboxOpen=false;
+ portalScheduleOpen=false;
  portalPunchoutOpen=false;
  $('portalScheduleInbox')?.classList.add('hidden');
+ $('portalScheduleView')?.classList.add('hidden');
  $('portalPunchoutView')?.classList.add('hidden');
  $('portalAppContent')?.classList.remove('hidden');
  $('portalFilesButton')?.setAttribute('aria-pressed','true');
+ $('portalScheduleButton')?.setAttribute('aria-pressed','false');
  $('portalUpdatesButton')?.setAttribute('aria-pressed','false');
  $('portalPunchoutButton')?.setAttribute('aria-pressed','false');
  scheduleAlertsRefreshInbox();
 }
 function scheduleAlertsShowInbox(open){
  scheduleAlertState.inboxOpen=open;
+ portalScheduleOpen=false;
  portalPunchoutOpen=false;
  $('portalAppContent').classList.toggle('hidden',open);
  $('portalScheduleInbox').classList.toggle('hidden',!open);
+ $('portalScheduleView')?.classList.add('hidden');
  $('portalPunchoutView')?.classList.add('hidden');
  $('portalUpdatesButton').setAttribute('aria-pressed',String(open));
  $('portalFilesButton').setAttribute('aria-pressed',String(!open));
+ $('portalScheduleButton')?.setAttribute('aria-pressed','false');
  $('portalPunchoutButton')?.setAttribute('aria-pressed','false');
  if(open){scheduleAlertsRenderInbox();scheduleAlertsRefreshInbox();}
 }
@@ -5806,11 +6229,14 @@ async function scheduleAlertsRead(payload){
 }
 $('portalUpdatesButton').onclick=()=>scheduleAlertsShowInbox(true);
 $('portalFilesButton').onclick=()=>portalShowFiles();
+$('portalScheduleButton').onclick=()=>portalShowSchedule();
 $('portalPunchoutButton').onclick=()=>portalShowPunchout();
 setInterval(()=>{
  if(document.hidden)return;
  if(!$('portalAppView').classList.contains('hidden')){
-  if(portalPunchoutOpen){
+  if(portalScheduleOpen){
+    portalRefreshSchedule({render:true,quiet:true});
+  }else if(portalPunchoutOpen){
     portalRefreshPunchout({render:true,quiet:true});
   }else{
     // While reading older pages, use explicit Refresh so polling does not jump the list.
@@ -5838,9 +6264,12 @@ function portalShowApp(data){
   $('portalCompanyName').textContent=portalBootstrapData?.company?.name||'Vendor Portal';
   $('portalUserName').textContent=portalBootstrapData?.portal_user?.full_name||portalBootstrapData?.portal_user?.email||'';
   scheduleAlertsResetPortal();
+  portalScheduleData={items:[],visibility:[]};
   portalPunchoutData={items:[],photos:[]};
+  portalUpdateScheduleButton();
   portalUpdatePunchoutButton();
   renderPortalApp();
+  portalRefreshSchedule({render:false,quiet:true});
   portalRefreshPunchout({render:false,quiet:true});
 }
 
@@ -6511,20 +6940,22 @@ async function loadAdminPortalAccess(){
   if(!isBowenBuilderAdmin())return;
 
   portalAdminSetNotice('');
-  const [{data:companies,error:ce},{data:users,error:ue},{data:access,error:ae}]=await Promise.all([
+  const [{data:companies,error:ce},{data:users,error:ue},{data:access,error:ae},{data:scheduleVisibility,error:sve}]=await Promise.all([
     db.from('vendor_companies').select('*').order('name'),
     db.from('portal_users').select('*').order('full_name'),
-    db.from('portal_company_subdivision_access').select('*')
+    db.from('portal_company_subdivision_access').select('*'),
+    db.from('portal_company_schedule_visibility').select('*').order('schedule_name')
   ]);
 
-  if(ce||ue||ae){
-    portalAdminSetNotice((ce||ue||ae).message,true);
+  if(ce||ue||ae||sve){
+    portalAdminSetNotice((ce||ue||ae||sve).message,true);
     return;
   }
 
   portalAdminCompanies=companies||[];
   portalAdminUsers=users||[];
   portalAdminAccess=access||[];
+  portalAdminScheduleVisibility=scheduleVisibility||[];
 
   if(portalAdminSelectedCompanyId){
     const exists=portalAdminCompanies.some(c=>String(c.id)===String(portalAdminSelectedCompanyId));
@@ -6612,6 +7043,127 @@ function renderPortalCompanyList(){
   });
 }
 
+
+function portalAdminCompanyScheduleRows(companyId){
+  return portalAdminScheduleVisibility.filter(
+    row=>String(row.company_id)===String(companyId)
+  );
+}
+function portalScheduleVisibilityNames(){
+  const ordered=[...$('scheduleName').options]
+    .map(option=>String(option.value||'').trim())
+    .filter(name=>name && name!=='__custom__');
+
+  const custom=[...new Set(items.map(item=>String(item.name||'').trim()).filter(Boolean))]
+    .filter(name=>!ordered.some(existing=>existing.toLowerCase()===name.toLowerCase()))
+    .sort((a,b)=>a.localeCompare(b));
+
+  return [...ordered,...custom];
+}
+function portalCompanyScheduleSetNotice(message='',error=false){
+  const box=$('portalCompanyScheduleNotice');
+  if(!box)return;
+  box.textContent=message||'';
+  box.classList.toggle('hidden',!message);
+  box.style.color=error?'#b42318':'';
+}
+function renderPortalCompanyScheduleGrid(){
+  const root=$('portalCompanyScheduleGrid');
+  if(!root)return;
+
+  const query=String($('portalCompanyScheduleSearch')?.value||'').trim().toLowerCase();
+  const names=portalScheduleVisibilityNames().filter(name=>
+    !query || name.toLowerCase().includes(query)
+  );
+
+  if(!names.length){
+    root.innerHTML='<div class="muted">No schedule items match this search.</div>';
+    return;
+  }
+
+  root.innerHTML=names.map(name=>`
+    <label class="portal-company-schedule-option">
+      <input type="checkbox" data-portal-schedule-name="${esc(name)}" ${portalScheduleVisibilityDraft.has(name)?'checked':''}>
+      <span>${esc(name)}</span>
+    </label>
+  `).join('');
+
+  root.querySelectorAll('[data-portal-schedule-name]').forEach(cb=>{
+    cb.onchange=()=>{
+      const name=cb.dataset.portalScheduleName;
+      if(cb.checked)portalScheduleVisibilityDraft.add(name);
+      else portalScheduleVisibilityDraft.delete(name);
+    };
+  });
+}
+function renderPortalCompanyScheduleVisibility(company){
+  if(!company)return;
+
+  portalScheduleVisibilityDraft=new Set(
+    portalAdminCompanyScheduleRows(company.id).map(row=>row.schedule_name)
+  );
+
+  if($('portalCompanyScheduleSearch'))$('portalCompanyScheduleSearch').value='';
+  portalCompanyScheduleSetNotice('');
+  renderPortalCompanyScheduleGrid();
+}
+async function savePortalCompanyScheduleVisibility(){
+  const company=portalAdminCompanies.find(
+    c=>String(c.id)===String(portalAdminSelectedCompanyId)
+  );
+  if(!company)return;
+
+  const button=$('portalCompanyScheduleSave');
+  button.disabled=true;
+  button.textContent='Saving…';
+  portalCompanyScheduleSetNotice('');
+
+  try{
+    const selected=[...portalScheduleVisibilityDraft];
+
+    const {error:deleteError}=await db.from('portal_company_schedule_visibility')
+      .delete()
+      .eq('company_id',company.id);
+    if(deleteError)throw deleteError;
+
+    let saved=[];
+    if(selected.length){
+      const rows=selected.map(schedule_name=>({
+        company_id:company.id,
+        schedule_name,
+        updated_at:new Date().toISOString()
+      }));
+      const {data,error}=await db.from('portal_company_schedule_visibility')
+        .insert(rows)
+        .select('*');
+      if(error)throw error;
+      saved=data||[];
+    }
+
+    portalAdminScheduleVisibility=portalAdminScheduleVisibility.filter(
+      row=>String(row.company_id)!==String(company.id)
+    );
+    portalAdminScheduleVisibility.push(...saved);
+
+    portalCompanyScheduleSetNotice('Portal schedule visibility saved. No notifications were changed.');
+    logBowenActivity('admin_portal_schedule_visibility_updated',{
+      label:`Updated Portal schedule visibility for ${company.name}`,
+      entityType:'vendor_company',
+      entityId:company.id,
+      screen:'Admin',
+      force:true,
+      metadata:{
+        schedule_names:selected
+      }
+    });
+  }catch(err){
+    portalCompanyScheduleSetNotice(err?.message||'Could not save schedule visibility.',true);
+  }finally{
+    button.disabled=false;
+    button.textContent='Save Schedule';
+  }
+}
+
 function renderPortalCompanyDetail(){
   const isNew=portalAdminSelectedCompanyId==='__new__';
   const company=isNew?null:portalAdminCompanies.find(c=>String(c.id)===String(portalAdminSelectedCompanyId));
@@ -6636,10 +7188,13 @@ function renderPortalCompanyDetail(){
   $('portalCompanyActive').checked=company?.active!==false;
 
   $('portalCompanyAccessSection').classList.toggle('hidden',isNew);
+  $('portalCompanyScheduleSection').classList.toggle('hidden',isNew);
   $('portalCompanyUsersSection').classList.toggle('hidden',isNew);
   scheduleAlertsAdminOpen(company);
 
   if(isNew)return;
+
+  renderPortalCompanyScheduleVisibility(company);
 
   const accessRows=portalAdminCompanyAccessRows(company.id);
   const accessMap=new Map(accessRows.map(a=>[String(a.subdivision_id),a]));
@@ -16254,6 +16809,8 @@ $('portalCompanyBack').onclick=()=>{
 };
 $('portalCompanySave').onclick=savePortalCompany;
 $('portalCompanyAccessSave').onclick=savePortalCompanyAccess;
+$('portalCompanyScheduleSave').onclick=savePortalCompanyScheduleVisibility;
+$('portalCompanyScheduleSearch').oninput=renderPortalCompanyScheduleGrid;
 $('portalInviteUserCreate').onclick=createPortalUserInvite;
 $('portalInviteCreatedEmail').onclick=()=>{
   if(latestPortalInvite.url)location.href=portalInvitationEmailHref(latestPortalInvite);
@@ -16945,7 +17502,7 @@ try{
 </script>
 
 <div id="bbBuildVersion" style="text-align:center;color:#8a96a8;font-size:10px;padding:10px 8px 18px">
-  BowenBuilder 2.5</div>
+  BowenBuilder 2.6</div>
 
 
 
