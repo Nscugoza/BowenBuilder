@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="3.5">
+<meta name="bowenbuilder-version" content="3.6">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -5200,7 +5200,7 @@ button.teams-file-row:hover{border-color:#bdccdd}
 <script>
 (async()=>{
 const $=id=>document.getElementById(id);
-const BOWENBUILDER_VERSION='3.5';
+const BOWENBUILDER_VERSION='3.6';
 const SB_URL='https://oztefiymckpyxiewgxtc.supabase.co';
 const SB_KEY='sb_publishable__ItoYGeHKEGTBFiE7JM74w_1F-qERVe';
 const db=window.supabase.createClient(SB_URL,SB_KEY);
@@ -6374,11 +6374,16 @@ $('portalUpdatesButton').onclick=()=>scheduleAlertsShowInbox(true);
 // BowenBuilder 3.2 — internal specs and company-filtered Portal specs
 const bbSpecGroups={
  'Windows':['Front Elevation Window Color','Sides & Back Window Color'],
- 'Interior Trim':['Downstairs Baseboard Size','Downstairs Baseboard Areas','Upstairs Baseboard Size','Upstairs Baseboard Areas','Crown Moulding Areas'],
- 'Interior Paint':['Wall Paint Color','Trim Paint Color'],
- 'Exterior Paint':['Siding Paint Color','Shake Paint Color','Board & Batten Paint Color','Exterior Trim Paint Color'],
- 'Masonry':['Brick Color','Mortar Color'],
- 'Exterior Details':['Corbels','Corbels Color','Gable Treatments','Gable Treatments Color','Shutters','Shutters Color','Cedar Wrapped Columns','Cedar Wrapped Columns Color'],
+ 'Baseboards':['Downstairs Baseboard Size','Downstairs Baseboard Areas','Upstairs Baseboard Size','Upstairs Baseboard Areas'],
+ 'Crown Moulding':['Crown Moulding Areas'],
+ 'Interior Paint Colors':['Wall Paint Color','Trim Paint Color'],
+ 'Exterior Paint Colors':['Siding Paint Color','Shake Paint Color','Board & Batten Paint Color','Exterior Trim Paint Color'],
+ 'Brick Colors':['Brick Color'],
+ 'Mortar Colors':['Mortar Color'],
+ 'Corbels':['Corbels','Corbels Color'],
+ 'Gable Treatments':['Gable Treatments','Gable Treatments Color'],
+ 'Shutters':['Shutters','Shutters Color'],
+ 'Cedar Wrapped Columns':['Cedar Wrapped Columns','Cedar Wrapped Columns Color'],
  'Roofing':['Roofing Material Type','Roofing Color'],
  'Custom':[]
 };
@@ -6419,16 +6424,17 @@ async function bbRenderInternalSpecsView(){
   rows.filter(x=>String(x.lot_id)===String(lot.id)).forEach(x=>selected.set(x.spec_key,x));
   const all=[...new Set([...bbAllSpecKeys(),...selected.keys()])];
   const groupEntries=[...Object.entries(bbSpecGroups).filter(([g])=>g!=='Custom'),['Other',all.filter(k=>!bbAllSpecKeys().includes(k))]];
-  root.innerHTML=groupEntries.map(([group,keys])=>{
+  root.innerHTML=`<div style="display:grid;gap:14px">${groupEntries.map(([group,keys])=>{
    if(!keys.length)return '';
-   return `<details class="card" style="margin-bottom:12px" ${group==='Windows'?'open':''}><summary style="font-weight:800;cursor:pointer">${esc(group)}</summary><div style="display:grid;gap:8px;margin-top:12px">${keys.map(key=>{
+   return `<section class="card" style="padding:16px;border-radius:12px"><h3 style="margin:0 0 12px;font-size:17px">${esc(group)}</h3><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px">${keys.map(key=>{
     const row=selected.get(key)||{};
     const value=String(row.spec_value||'').trim();
     const note=String(row.note||'').trim();
     const url=String(row.attachment_url||'');
-    return `<div style="border-bottom:1px solid var(--border);padding:9px 0"><div class="muted" style="font-size:12px">${esc(key)}</div><strong>${esc(value||'Not selected')}</strong>${note?`<div style="white-space:pre-wrap;margin-top:4px">${esc(note)}</div>`:''}${url.startsWith('https://')?`<div><a href="${esc(url)}" target="_blank" rel="noopener noreferrer">View reference ↗</a></div>`:''}</div>`;
-   }).join('')}</div></details>`;
-  }).join('');
+    const notSelected=!value;
+    return `<div style="background:var(--card,#fff);border:1px solid var(--border,#ddd);border-radius:10px;padding:13px;min-width:0"><div class="muted" style="font-size:12px;margin-bottom:5px">${esc(key)}</div><div style="font-weight:700;font-size:16px;overflow-wrap:anywhere;${notSelected?'opacity:.55':''}">${esc(value||'Not selected')}</div>${note?`<div class="muted" style="white-space:pre-wrap;margin-top:7px;font-size:13px">${esc(note)}</div>`:''}${url.startsWith('https://')?`<div style="margin-top:8px"><a href="${esc(url)}" target="_blank" rel="noopener noreferrer">View reference ↗</a></div>`:''}</div>`;
+   }).join('')}</div></section>`;
+  }).join('')}</div>`;
  }catch(e){if(request===bbSpecsViewRequest)root.textContent=e.message}
 }
 
@@ -6519,7 +6525,11 @@ async function bbShowPortalSpecs(){
  const target=$('bbPortalSpecRows');target.textContent='Loading…';
  try{
   const rows=await bbSpecRpc('read_portal',{lot_id:current.id});
-  target.innerHTML=rows.length?rows.map(row=>`<div class="card" style="margin:9px 0"><strong>${esc(row.spec_key)}</strong><div>${esc(row.spec_value||'Not selected')}</div>${row.note?`<p class="muted">${esc(row.note)}</p>`:''}${String(row.attachment_url||'').startsWith('https://')?`<a href="${esc(row.attachment_url)}" target="_blank" rel="noopener noreferrer">View reference ↗</a>`:''}</div>`).join(''):'<p class="muted">No specifications are currently shared with your company for this lot.</p>';
+  const grouped=Object.entries(bbSpecGroups).filter(([name])=>name!=='Custom').map(([name,keys])=>[name,rows.filter(row=>keys.includes(row.spec_key))]);
+  const custom=rows.filter(row=>!bbAllSpecKeys().includes(row.spec_key));
+  if(custom.length)grouped.push(['Other',custom]);
+  target.innerHTML=rows.length?grouped.filter(([,items])=>items.length).map(([name,items])=>`<section class="card" style="margin:12px 0;padding:16px;border-radius:12px"><h3 style="margin:0 0 12px">${esc(name)}</h3><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px">${items.map(row=>`<div style="border:1px solid var(--border,#ddd);border-radius:10px;padding:12px"><div class="muted" style="font-size:12px">${esc(row.spec_key)}</div><strong style="display:block;margin-top:5px">${esc(row.spec_value||'Not selected')}</strong>${row.note?`<p class="muted" style="white-space:pre-wrap">${esc(row.note)}</p>`:''}${String(row.attachment_url||'').startsWith('https://')?`<a href="${esc(row.attachment_url)}" target="_blank" rel="noopener noreferrer">View reference ↗</a>`:''}</div>`).join('')}</div></section>`).join(''):'<p class="muted">No specifications are currently shared with your company for this lot.</p>';
+
  }catch(e){target.textContent=e.message}
 }
 $('portalSpecsButton').onclick=bbShowPortalSpecs;
@@ -18296,7 +18306,7 @@ try{
 </script>
 
 <div id="bbBuildVersion" style="text-align:center;color:#8a96a8;font-size:10px;padding:10px 8px 18px">
-  BowenBuilder 3.5</div>
+  BowenBuilder 3.6</div>
 
 
 
