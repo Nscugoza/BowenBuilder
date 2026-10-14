@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="3.1">
+<meta name="bowenbuilder-version" content="3.2">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -3977,7 +3977,7 @@ button.teams-file-row:hover{border-color:#bdccdd}
     <div class="portal-topbar-actions">
       <span id="portalUserName" class="portal-user-name"></span>
       <button id="portalFilesButton" class="secondary" type="button" aria-pressed="true">Files</button>
-      <button id="portalScheduleButton" class="secondary" type="button" aria-pressed="false">Schedule</button>
+      <button id="portalSpecsButton" class="secondary" type="button" aria-pressed="false">Specs</button><button id="portalScheduleButton" class="secondary" type="button" aria-pressed="false">Schedule</button>
       <button id="portalPunchoutButton" class="secondary" type="button" aria-pressed="false">Punchout</button>
       <button id="portalUpdatesButton" class="secondary" type="button" aria-pressed="false">Updates</button>
       <button id="portalLogout" class="secondary" type="button">Sign Out</button>
@@ -3987,7 +3987,7 @@ button.teams-file-row:hover{border-color:#bdccdd}
   <main class="portal-shell">
     <div id="portalAppNotice" class="notice hidden"></div>
     <div id="portalAppContent"></div>
-    <section id="portalScheduleView" class="hidden" aria-label="Company schedule"></section>
+    <section id="portalSpecsView" class="hidden" aria-label="Lot specifications"></section><section id="portalScheduleView" class="hidden" aria-label="Company schedule"></section>
     <section id="portalPunchoutView" class="hidden" aria-label="Open Punchout"></section>
     <section id="portalScheduleInbox" class="hidden" aria-label="Schedule updates"></section>
     <input id="portalFileInput" type="file" multiple hidden>
@@ -4124,10 +4124,10 @@ button.teams-file-row:hover{border-color:#bdccdd}
       <div class="lot-tabs">
         <button class="lot-tab active" data-lottab="overview" type="button">Overview</button>
         <button class="lot-tab" data-lottab="punchout" type="button">Punchout</button>
-        <button class="lot-tab" data-lottab="files" type="button">Files</button>
+        <button class="lot-tab" data-lottab="files" type="button">Files</button><button class="lot-tab" data-lottab="specs" type="button">Specifications</button>
         <button id="powerCompanyButton" class="power-company-trigger hidden" type="button">Power Company</button>
       </div>
-      <div id="overviewPanel"><div id="lotSchedule" class="schedule-list"></div></div>
+      <div id="specsPanel" class="hidden"><div id="bbLotSpecs"></div></div><div id="overviewPanel"><div id="lotSchedule" class="schedule-list"></div></div>
       <div id="punchoutPanel" class="hidden">
         <div class="toolbar">
           <div><strong>Punchout Items</strong><div class="muted">Track corrections, notes, and jobsite photos. A photo is required when completing an item.</div></div>
@@ -4381,7 +4381,7 @@ button.teams-file-row:hover{border-color:#bdccdd}
         <button class="portal-company-detail-tab" type="button" data-company-detail-tab="access">Subdivision Access</button>
         <button class="portal-company-detail-tab" type="button" data-company-detail-tab="schedule">Schedule Visibility</button>
         <button class="portal-company-detail-tab" type="button" data-company-detail-tab="alerts">Schedule Alerts</button>
-        <button class="portal-company-detail-tab" type="button" data-company-detail-tab="users">Portal Users</button>
+        <button class="portal-company-detail-tab" type="button" data-company-detail-tab="specs">Specs Visibility</button><button class="portal-company-detail-tab" type="button" data-company-detail-tab="users">Portal Users</button>
       </div>
 
       <div id="portalCompanyInfoSection" class="card portal-company-section">
@@ -4448,7 +4448,7 @@ button.teams-file-row:hover{border-color:#bdccdd}
         <div id="portalCompanyScheduleGrid" class="portal-company-schedule-grid"></div>
       </div>
 
-      <div id="portalCompanyAlertsSection" class="card portal-company-section hidden"><h3>Schedule Alerts</h3><div id="portalCompanyAlertsBody"></div></div>
+      <div id="portalCompanySpecsSection" class="card portal-company-section hidden"><h3>Specs Visibility</h3><p class="muted">Only checked specifications are visible to this vendor company. Subdivision access still applies.</p><div id="portalCompanySpecsGrid"></div><button id="portalCompanySpecsSave" class="primary" type="button">Save Specs Visibility</button></div><div id="portalCompanyAlertsSection" class="card portal-company-section hidden"><h3>Schedule Alerts</h3><div id="portalCompanyAlertsBody"></div></div>
 
       <div id="portalCompanyUsersSection" class="card portal-company-section hidden">
         <div class="portal-company-section-head">
@@ -5188,7 +5188,7 @@ button.teams-file-row:hover{border-color:#bdccdd}
 <script>
 (async()=>{
 const $=id=>document.getElementById(id);
-const BOWENBUILDER_VERSION='3.1';
+const BOWENBUILDER_VERSION='3.2';
 const SB_URL='https://oztefiymckpyxiewgxtc.supabase.co';
 const SB_KEY='sb_publishable__ItoYGeHKEGTBFiE7JM74w_1F-qERVe';
 const db=window.supabase.createClient(SB_URL,SB_KEY);
@@ -5504,8 +5504,11 @@ async function portalShowSchedule(){
   portalPunchoutOpen=false;
   portalScheduleOpen=true;
   $('portalAppContent')?.classList.add('hidden');
+  $('portalSpecsView')?.classList.add('hidden');
   $('portalScheduleInbox')?.classList.add('hidden');
   $('portalPunchoutView')?.classList.add('hidden');
+  $('portalSpecsView')?.classList.add('hidden');
+  $('portalSpecsButton')?.setAttribute('aria-pressed','false');
   $('portalScheduleView')?.classList.remove('hidden');
 
   $('portalFilesButton')?.setAttribute('aria-pressed','false');
@@ -5719,6 +5722,8 @@ function portalShowFiles(){
   $('portalScheduleInbox')?.classList.add('hidden');
   $('portalScheduleView')?.classList.add('hidden');
   $('portalPunchoutView')?.classList.add('hidden');
+  $('portalSpecsView')?.classList.add('hidden');
+  $('portalSpecsButton')?.setAttribute('aria-pressed','false');
   $('portalFilesButton')?.setAttribute('aria-pressed','true');
   $('portalScheduleButton')?.setAttribute('aria-pressed','false');
   $('portalUpdatesButton')?.setAttribute('aria-pressed','false');
@@ -6349,6 +6354,105 @@ async function scheduleAlertsRead(payload){
  try{await scheduleAlertsRpc('mark_read',payload);await scheduleAlertsRefreshInbox();}catch(e){alert(e.message);}
 }
 $('portalUpdatesButton').onclick=()=>scheduleAlertsShowInbox(true);
+
+// BowenBuilder 3.2 — internal specs and company-filtered Portal specs
+const bbSpecGroups={
+ 'Windows':['Front Elevation Window Color','Sides & Back Window Color'],
+ 'Interior Trim':['Downstairs Baseboard Size','Downstairs Baseboard Areas','Upstairs Baseboard Size','Upstairs Baseboard Areas','Crown Moulding Areas'],
+ 'Interior Paint':['Wall Paint Color','Trim Paint Color'],
+ 'Exterior Paint':['Siding Paint Color','Shake Paint Color','Board & Batten Paint Color','Exterior Trim Paint Color'],
+ 'Masonry':['Brick Color','Mortar Color'],
+ 'Exterior Details':['Corbels','Corbels Color','Gable Treatments','Gable Treatments Color','Shutters','Shutters Color','Cedar Wrapped Columns','Cedar Wrapped Columns Color'],
+ 'Roofing':['Roofing Material Type','Roofing Color'],
+ 'Custom':[]
+};
+const bbAllSpecKeys=()=>Object.values(bbSpecGroups).flat();
+async function bbSpecRpc(action,payload={}){
+ const {data,error}=await db.rpc('bowenbuilder_specs',{p_action:action,p_payload:payload});
+ if(error)throw new Error(error.message||'Specs request failed');
+ return typeof data==='string'?JSON.parse(data):data;
+}
+function bbSpecField(key,value='',note='',url='',origin=''){
+ const toggle=/^(Corbels|Gable Treatments|Shutters|Cedar Wrapped Columns)$/.test(key);
+ const field=toggle?`<select data-bb-val="${esc(key)}"><option value="">Not Selected</option><option value="Yes" ${value==='Yes'?'selected':''}>Yes</option><option value="No" ${value==='No'?'selected':''}>No</option></select>`:`<input data-bb-val="${esc(key)}" value="${esc(value)}" placeholder="Not selected">`;
+ return `<div class="card" style="padding:12px;margin:8px 0"><strong>${esc(key)}</strong>${origin?` <small class="muted">(${esc(origin)})</small>`:''}<div style="margin-top:7px">${field}</div><label>Areas / Notes<textarea data-bb-note="${esc(key)}" rows="2" placeholder="Optional areas, exceptions or notes">${esc(note)}</textarea></label><label>Reference attachment URL<input data-bb-url="${esc(key)}" value="${esc(url)}" placeholder="Link to uploaded PDF or photo"></label><button class="secondary" type="button" data-bb-save="${esc(key)}">Save</button></div>`;
+}
+let bbInternalSpecs=[];
+let bbSpecDefaultMode=false;
+async function bbRenderInternalSpecs(){
+ const root=$('bbLotSpecs');if(!root||!currentLot)return;
+ const lot=lots.find(x=>String(x.id)===String(currentLot));if(!lot)return;
+ root.innerHTML='<div class="muted">Loading specifications…</div>';
+ try{
+  bbInternalSpecs=await bbSpecRpc('read_internal',{subdivision_id:lot.subdivision_id});
+  const defaults=bbInternalSpecs.filter(x=>!x.lot_id);
+  const overrides=bbInternalSpecs.filter(x=>String(x.lot_id)===String(lot.id));
+  const rows=bbSpecDefaultMode?defaults:overrides;
+  const lookup=new Map(rows.map(x=>[x.spec_key,x]));
+  const defaultMap=new Map(defaults.map(x=>[x.spec_key,x]));
+  const keys=[...new Set([...bbAllSpecKeys(),...defaults.map(x=>x.spec_key),...overrides.map(x=>x.spec_key)])];
+  root.innerHTML=`<div class="card"><h3>Lot Specifications</h3><p class="muted">Subdivision defaults apply to every lot. Lot selections override defaults. Only approved, permitted fields appear in the vendor Portal.</p><label><input id="bbSpecsDefaultsMode" type="checkbox" ${bbSpecDefaultMode?'checked':''}> Edit subdivision defaults (all lots)</label><div style="display:grid;gap:12px">${Object.entries({...bbSpecGroups,Other:[]}).map(([group,known])=>{
+   const members=keys.filter(k=>known.includes(k)||(group==='Other'&&!bbAllSpecKeys().includes(k)));
+   if(!members.length)return '';
+   return `<details ${group==='Windows'?'open':''}><summary style="font-weight:700;padding:12px 0">${esc(group)}</summary>${members.map(key=>{
+    const own=lookup.get(key),fallback=!bbSpecDefaultMode?defaultMap.get(key):null;
+    const row=own||fallback||{};
+    return bbSpecField(key,row.spec_value||'',row.note||'',row.attachment_url||'',own?'':fallback?'Subdivision default':'');
+   }).join('')}</details>`;
+  }).join('')}</div><div class="card"><strong>Custom Specification</strong><input id="bbSpecCustomKey" placeholder="New specification name"><button id="bbSpecCustomAdd" class="secondary" type="button">Add Specification</button></div></div>`;
+  $('bbSpecsDefaultsMode').onchange=e=>{bbSpecDefaultMode=e.target.checked;bbRenderInternalSpecs()};
+  root.querySelectorAll('[data-bb-save]').forEach(btn=>btn.onclick=async()=>{
+   const key=btn.dataset.bbSave;
+   const value=root.querySelectorAll('[data-bb-val]').length;
+   const val=[...root.querySelectorAll('[data-bb-val]')].find(x=>x.dataset.bbVal===key)?.value||'';
+   const note=[...root.querySelectorAll('[data-bb-note]')].find(x=>x.dataset.bbNote===key)?.value||'';
+   const url=[...root.querySelectorAll('[data-bb-url]')].find(x=>x.dataset.bbUrl===key)?.value||'';
+   btn.disabled=true;
+   try{await bbSpecRpc('save',{subdivision_id:lot.subdivision_id,lot_id:bbSpecDefaultMode?null:lot.id,spec_key:key,spec_value:val,note,attachment_url:url});await bbRenderInternalSpecs()}
+   catch(e){alert(e.message)}finally{btn.disabled=false}
+  });
+  $('bbSpecCustomAdd').onclick=async()=>{
+   const key=$('bbSpecCustomKey').value.trim();if(!key)return;
+   if(keys.includes(key)){alert('This specification already exists.');return}
+   try{await bbSpecRpc('save',{subdivision_id:lot.subdivision_id,lot_id:bbSpecDefaultMode?null:lot.id,spec_key:key,spec_value:''});await bbRenderInternalSpecs()}catch(e){alert(e.message)}
+  };
+ }catch(e){root.textContent=e.message}
+}
+async function bbRenderVisibility(companyId){
+ const root=$('portalCompanySpecsGrid');if(!root)return;
+ root.textContent='Loading…';
+ try{
+  const allowed=await bbSpecRpc('read_visibility',{company_id:companyId});
+  const keys=[...new Set([...bbAllSpecKeys(),...((await Promise.all(subdivisions.map(sub=>bbSpecRpc('read_internal',{subdivision_id:sub.id}).catch(()=>[])))).flat().map(x=>x.spec_key))])];
+  root.innerHTML=keys.map(key=>`<label style="display:block;padding:7px;border-bottom:1px solid var(--border,#ddd)"><input type="checkbox" data-bb-visible="${esc(key)}" ${allowed.includes(key)?'checked':''}> ${esc(key)}</label>`).join('');
+ }catch(e){root.textContent=e.message}
+}
+async function bbSaveVisibility(){
+ const companyId=portalAdminSelectedCompanyId;
+ const keys=[...$('portalCompanySpecsGrid').querySelectorAll('[data-bb-visible]:checked')].map(x=>x.dataset.bbVisible);
+ try{await bbSpecRpc('save_visibility',{company_id:companyId,keys});portalCompanyDetailSetNotice('Specs visibility saved. No notifications sent.')}catch(e){alert(e.message)}
+}
+let bbPortalSpecLot=null;
+async function bbShowPortalSpecs(){
+ portalScheduleOpen=false;portalPunchoutOpen=false;scheduleAlertState.inboxOpen=false;
+ ['portalAppContent','portalScheduleInbox','portalScheduleView','portalPunchoutView'].forEach(id=>$(id)?.classList.add('hidden'));
+ $('portalSpecsView').classList.remove('hidden');
+ ['portalFilesButton','portalScheduleButton','portalPunchoutButton','portalUpdatesButton'].forEach(id=>$(id)?.setAttribute('aria-pressed','false'));
+ $('portalSpecsButton').setAttribute('aria-pressed','true');
+ const root=$('portalSpecsView'),subs=portalBootstrapData?.subdivisions||[],ls=portalBootstrapData?.lots||[];
+ const current=bbPortalSpecLot&&ls.find(l=>String(l.id)===String(bbPortalSpecLot));
+ root.innerHTML=`<h2>Specifications</h2><p class="muted">Only specifications your company is authorized to view are shown.</p><label>Choose Lot<select id="bbPortalLotSelect"><option value="">Select a lot</option>${subs.map(sub=>`<optgroup label="${esc(sub.name)}">${ls.filter(l=>String(l.subdivision_id)===String(sub.id)).map(l=>`<option value="${esc(l.id)}" ${current&&String(current.id)===String(l.id)?'selected':''}>${esc(l.lot_name||l.address||'Lot')}</option>`).join('')}</optgroup>`).join('')}</select></label><div id="bbPortalSpecRows"></div>`;
+ $('bbPortalLotSelect').onchange=e=>{bbPortalSpecLot=e.target.value;bbShowPortalSpecs()};
+ if(!current)return;
+ const target=$('bbPortalSpecRows');target.textContent='Loading…';
+ try{
+  const rows=await bbSpecRpc('read_portal',{lot_id:current.id});
+  target.innerHTML=rows.length?rows.map(row=>`<div class="card" style="margin:9px 0"><strong>${esc(row.spec_key)}</strong><div>${esc(row.spec_value||'Not selected')}</div>${row.note?`<p class="muted">${esc(row.note)}</p>`:''}${String(row.attachment_url||'').startsWith('https://')?`<a href="${esc(row.attachment_url)}" target="_blank" rel="noopener noreferrer">View reference ↗</a>`:''}</div>`).join(''):'<p class="muted">No specifications are currently shared with your company for this lot.</p>';
+ }catch(e){target.textContent=e.message}
+}
+$('portalSpecsButton').onclick=bbShowPortalSpecs;
+$('portalCompanySpecsSave').onclick=bbSaveVisibility;
+
 $('portalFilesButton').onclick=()=>portalShowFiles();
 $('portalScheduleButton').onclick=()=>portalShowSchedule();
 $('portalPunchoutButton').onclick=()=>portalShowPunchout();
@@ -7332,7 +7436,7 @@ async function savePortalCompanyScheduleVisibility(){
 
 
 function showPortalCompanyDetailTab(tab='company'){
-  const allowed=new Set(['company','access','schedule','alerts','users']);
+  const allowed=new Set(['company','access','schedule','alerts','specs','users']);
   portalCompanyDetailTab=allowed.has(tab)?tab:'company';
 
   const isNew=portalAdminSelectedCompanyId==='__new__';
@@ -7352,6 +7456,8 @@ function showPortalCompanyDetailTab(tab='company'){
   $('portalCompanyAccessSection')?.classList.toggle('hidden',isNew || portalCompanyDetailTab!=='access');
   $('portalCompanyScheduleSection')?.classList.toggle('hidden',isNew || portalCompanyDetailTab!=='schedule');
   $('portalCompanyAlertsSection')?.classList.toggle('hidden',isNew || portalCompanyDetailTab!=='alerts');
+  $('portalCompanySpecsSection')?.classList.toggle('hidden',isNew || portalCompanyDetailTab!=='specs');
+  if(!isNew && company && portalCompanyDetailTab==='specs')bbRenderVisibility(company.id);
   $('portalCompanyUsersSection')?.classList.toggle('hidden',isNew || portalCompanyDetailTab!=='users');
 
   if(!isNew && company){
@@ -17358,6 +17464,8 @@ document.querySelectorAll('.lot-tab').forEach(b=>b.onclick=()=>{
   $('overviewPanel').classList.toggle('hidden',b.dataset.lottab!=='overview');
   $('punchoutPanel').classList.toggle('hidden',b.dataset.lottab!=='punchout');
   $('filesPanel').classList.toggle('hidden',b.dataset.lottab!=='files');
+  $('specsPanel').classList.toggle('hidden',b.dataset.lottab!=='specs');
+  if(b.dataset.lottab==='specs')bbRenderInternalSpecs();
   if(b.dataset.lottab==='punchout' && currentLot) renderPunchout(currentLot);
   if(b.dataset.lottab==='files'){
     if(!teamsFilesLoaded){
@@ -18112,7 +18220,7 @@ try{
 </script>
 
 <div id="bbBuildVersion" style="text-align:center;color:#8a96a8;font-size:10px;padding:10px 8px 18px">
-  BowenBuilder 3.1</div>
+  BowenBuilder 3.2</div>
 
 
 
