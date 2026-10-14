@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="3.3">
+<meta name="bowenbuilder-version" content="3.5">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -332,8 +332,19 @@ main{max-width:1240px;margin:0 auto;padding:26px}
   display:flex;
   gap:8px;
   margin:20px 0 13px;
+  overflow-x:auto;
+  overflow-y:hidden;
+  flex-wrap:nowrap;
+  max-width:100%;
+  -webkit-overflow-scrolling:touch;
+  overscroll-behavior-x:contain;
+  scrollbar-width:thin;
+  scroll-snap-type:x proximity;
 }
 .lot-tab{
+  flex:0 0 auto;
+  white-space:nowrap;
+  scroll-snap-align:start;
   border:1px solid var(--border);
   background:#fff;
   border-radius:999px;
@@ -4128,7 +4139,7 @@ button.teams-file-row:hover{border-color:#bdccdd}
         <button class="lot-tab" data-lottab="specs" type="button">Specifications</button>
         <button id="powerCompanyButton" class="power-company-trigger hidden" type="button">Power Company</button>
       </div>
-      <div id="specsPanel" class="hidden"><div id="bbLotSpecs"></div></div><div id="overviewPanel"><div id="lotSchedule" class="schedule-list"></div></div>
+      <div id="specsPanel" class="hidden"><div class="card" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px"><div><strong>Lot Specifications</strong><div class="muted">View the current selections or switch to editing.</div></div><div style="display:flex;gap:8px"><button id="bbSpecsViewMode" class="primary" type="button">View</button><button id="bbSpecsEditMode" class="secondary" type="button">Edit</button></div></div><div id="bbLotSpecsReadOnly"></div><div id="bbLotSpecs" class="hidden"></div></div><div id="overviewPanel"><div id="lotSchedule" class="schedule-list"></div></div>
       <div id="punchoutPanel" class="hidden">
         <div class="toolbar">
           <div><strong>Punchout Items</strong><div class="muted">Track corrections, notes, and jobsite photos. A photo is required when completing an item.</div></div>
@@ -5189,7 +5200,7 @@ button.teams-file-row:hover{border-color:#bdccdd}
 <script>
 (async()=>{
 const $=id=>document.getElementById(id);
-const BOWENBUILDER_VERSION='3.3';
+const BOWENBUILDER_VERSION='3.5';
 const SB_URL='https://oztefiymckpyxiewgxtc.supabase.co';
 const SB_KEY='sb_publishable__ItoYGeHKEGTBFiE7JM74w_1F-qERVe';
 const db=window.supabase.createClient(SB_URL,SB_KEY);
@@ -6380,10 +6391,47 @@ async function bbSpecRpc(action,payload={}){
 function bbSpecField(key,value='',note='',url='',origin=''){
  const toggle=/^(Corbels|Gable Treatments|Shutters|Cedar Wrapped Columns)$/.test(key);
  const field=toggle?`<select data-bb-val="${esc(key)}"><option value="">Not Selected</option><option value="Yes" ${value==='Yes'?'selected':''}>Yes</option><option value="No" ${value==='No'?'selected':''}>No</option></select>`:`<input data-bb-val="${esc(key)}" value="${esc(value)}" placeholder="Not selected">`;
- return `<div class="card" style="padding:12px;margin:8px 0"><strong>${esc(key)}</strong>${origin?` <small class="muted">(${esc(origin)})</small>`:''}<div style="margin-top:7px">${field}</div><label>Areas / Notes<textarea data-bb-note="${esc(key)}" rows="2" placeholder="Optional areas, exceptions or notes">${esc(note)}</textarea></label><label>Reference attachment URL<input data-bb-url="${esc(key)}" value="${esc(url)}" placeholder="Link to uploaded PDF or photo"></label><button class="secondary" type="button" data-bb-save="${esc(key)}">Save</button></div>`;
+ return `<div class="card" style="padding:12px;margin:8px 0"><strong>${esc(key)}</strong>${origin?` <small class="muted">(${esc(origin)})</small>`:''}<div style="margin-top:7px">${field}</div><label>Areas / Notes<textarea data-bb-note="${esc(key)}" rows="2" placeholder="Optional areas, exceptions or notes">${esc(note)}</textarea></label><label>Reference attachment URL<input data-bb-url="${esc(key)}" value="${esc(url)}" placeholder="Link to uploaded PDF or photo"></label></div>`;
 }
 let bbInternalSpecs=[];
 let bbSpecDefaultMode=false;
+let bbSpecIsEditing=false;
+let bbSpecsViewRequest=0;
+function bbSetSpecsMode(edit){
+ bbSpecIsEditing=!!edit;
+ $('bbLotSpecs').classList.toggle('hidden',!edit);
+ $('bbLotSpecsReadOnly').classList.toggle('hidden',edit);
+ $('bbSpecsViewMode').className=edit?'secondary':'primary';
+ $('bbSpecsEditMode').className=edit?'primary':'secondary';
+ if(edit)bbRenderInternalSpecs();else bbRenderInternalSpecsView();
+}
+async function bbRenderInternalSpecsView(){
+ const root=$('bbLotSpecsReadOnly');
+ const lot=lots.find(x=>String(x.id)===String(currentLot));
+ if(!root||!lot)return;
+ const request=++bbSpecsViewRequest;
+ root.innerHTML='<div class="muted">Loading specifications…</div>';
+ try{
+  const rows=await bbSpecRpc('read_internal',{subdivision_id:lot.subdivision_id});
+  if(request!==bbSpecsViewRequest||String(currentLot)!==String(lot.id))return;
+  const selected=new Map();
+  rows.filter(x=>!x.lot_id).forEach(x=>selected.set(x.spec_key,x));
+  rows.filter(x=>String(x.lot_id)===String(lot.id)).forEach(x=>selected.set(x.spec_key,x));
+  const all=[...new Set([...bbAllSpecKeys(),...selected.keys()])];
+  const groupEntries=[...Object.entries(bbSpecGroups).filter(([g])=>g!=='Custom'),['Other',all.filter(k=>!bbAllSpecKeys().includes(k))]];
+  root.innerHTML=groupEntries.map(([group,keys])=>{
+   if(!keys.length)return '';
+   return `<details class="card" style="margin-bottom:12px" ${group==='Windows'?'open':''}><summary style="font-weight:800;cursor:pointer">${esc(group)}</summary><div style="display:grid;gap:8px;margin-top:12px">${keys.map(key=>{
+    const row=selected.get(key)||{};
+    const value=String(row.spec_value||'').trim();
+    const note=String(row.note||'').trim();
+    const url=String(row.attachment_url||'');
+    return `<div style="border-bottom:1px solid var(--border);padding:9px 0"><div class="muted" style="font-size:12px">${esc(key)}</div><strong>${esc(value||'Not selected')}</strong>${note?`<div style="white-space:pre-wrap;margin-top:4px">${esc(note)}</div>`:''}${url.startsWith('https://')?`<div><a href="${esc(url)}" target="_blank" rel="noopener noreferrer">View reference ↗</a></div>`:''}</div>`;
+   }).join('')}</div></details>`;
+  }).join('');
+ }catch(e){if(request===bbSpecsViewRequest)root.textContent=e.message}
+}
+
 async function bbRenderInternalSpecs(){
  const root=$('bbLotSpecs');if(!root||!currentLot)return;
  const lot=lots.find(x=>String(x.id)===String(currentLot));if(!lot)return;
@@ -6399,26 +6447,46 @@ async function bbRenderInternalSpecs(){
   root.innerHTML=`<div class="card"><h3>Lot Specifications</h3><p class="muted">Subdivision defaults apply to every lot. Lot selections override defaults. Only approved, permitted fields appear in the vendor Portal.</p><label><input id="bbSpecsDefaultsMode" type="checkbox" ${bbSpecDefaultMode?'checked':''}> Edit subdivision defaults (all lots)</label><div style="display:grid;gap:12px">${Object.entries({...bbSpecGroups,Other:[]}).map(([group,known])=>{
    const members=keys.filter(k=>known.includes(k)||(group==='Other'&&!bbAllSpecKeys().includes(k)));
    if(!members.length)return '';
-   return `<details ${group==='Windows'?'open':''}><summary style="font-weight:700;padding:12px 0">${esc(group)}</summary>${members.map(key=>{
+   return `<details data-bb-spec-group="${esc(group)}" ${group==='Windows'?'open':''}><summary style="font-weight:700;padding:12px 0">${esc(group)}</summary>${members.map(key=>{
     const own=lookup.get(key),fallback=!bbSpecDefaultMode?defaultMap.get(key):null;
     const row=own||fallback||{};
     return bbSpecField(key,row.spec_value||'',row.note||'',row.attachment_url||'',own?'':fallback?'Subdivision default':'');
-   }).join('')}</details>`;
+   }).join('')}<div style="display:flex;align-items:center;gap:10px;margin:12px 0"><button class="primary" type="button" data-bb-save-group="${esc(group)}">Save ${esc(group)}</button><span data-bb-save-status="${esc(group)}" class="muted" aria-live="polite"></span></div></details>`;
   }).join('')}</div><div class="card"><strong>Custom Specification</strong><input id="bbSpecCustomKey" placeholder="New specification name"><button id="bbSpecCustomAdd" class="secondary" type="button">Add Specification</button></div></div>`;
   $('bbSpecsDefaultsMode').onchange=e=>{bbSpecDefaultMode=e.target.checked;bbRenderInternalSpecs()};
-  root.querySelectorAll('[data-bb-save]').forEach(btn=>btn.onclick=async()=>{
-   const key=btn.dataset.bbSave;
-   const val=[...root.querySelectorAll('[data-bb-val]')].find(x=>x.dataset.bbVal===key)?.value||'';
-   const note=[...root.querySelectorAll('[data-bb-note]')].find(x=>x.dataset.bbNote===key)?.value||'';
-   const url=[...root.querySelectorAll('[data-bb-url]')].find(x=>x.dataset.bbUrl===key)?.value||'';
+  root.querySelectorAll('[data-bb-save-group]').forEach(btn=>btn.onclick=async()=>{
+   const group=btn.closest('[data-bb-spec-group]');
+   if(!group)return;
+   const status=group.querySelector('[data-bb-save-status]');
+   const fields=[...group.querySelectorAll('[data-bb-val]')];
+   const updates=fields.map(field=>{
+    const key=field.dataset.bbVal;
+    const note=[...group.querySelectorAll('[data-bb-note]')].find(x=>x.dataset.bbNote===key)?.value||'';
+    const url=[...group.querySelectorAll('[data-bb-url]')].find(x=>x.dataset.bbUrl===key)?.value||'';
+    return {subdivision_id:lot.subdivision_id,lot_id:bbSpecDefaultMode?null:lot.id,spec_key:key,spec_value:field.value||'',note,attachment_url:url};
+   });
    btn.disabled=true;
-   try{await bbSpecRpc('save',{subdivision_id:lot.subdivision_id,lot_id:bbSpecDefaultMode?null:lot.id,spec_key:key,spec_value:val,note,attachment_url:url});await bbRenderInternalSpecs()}
-   catch(e){alert(e.message)}finally{btn.disabled=false}
+   const original=btn.textContent;
+   btn.textContent='Saving…';
+   status.textContent='';
+   try{
+    // Save only this category. Never re-render or change scroll position.
+    const results=await Promise.allSettled(updates.map(payload=>bbSpecRpc('save',payload)));
+    const failures=results.filter(result=>result.status==='rejected');
+    if(failures.length){
+     status.textContent=`${results.length-failures.length} of ${results.length} saved. ${failures[0].reason?.message||'Please retry.'}`;
+     status.style.color='#b42318';
+    }else{
+     status.textContent='✓ Saved';
+     status.style.color='';
+    }
+   }catch(e){status.textContent=e.message;status.style.color='#b42318'}
+   finally{btn.disabled=false;btn.textContent=original}
   });
   $('bbSpecCustomAdd').onclick=async()=>{
    const key=$('bbSpecCustomKey').value.trim();if(!key)return;
    if(keys.includes(key)){alert('This specification already exists.');return}
-   try{await bbSpecRpc('save',{subdivision_id:lot.subdivision_id,lot_id:bbSpecDefaultMode?null:lot.id,spec_key:key,spec_value:''});await bbRenderInternalSpecs()}catch(e){alert(e.message)}
+   try{await bbSpecRpc('save',{subdivision_id:lot.subdivision_id,lot_id:bbSpecDefaultMode?null:lot.id,spec_key:key,spec_value:''});const y=window.scrollY;await bbRenderInternalSpecs();window.scrollTo({top:y,behavior:'instant'});}catch(e){alert(e.message)}
   };
  }catch(e){root.textContent=e.message}
 }
@@ -12883,7 +12951,7 @@ function showLot(preserveScroll=false){
   if(lotViewEl) lotViewEl.classList.remove('hidden');
 
  const l=lots.find(x=>x.id===currentLot);if(!l)return;
- if(document.querySelector('.lot-tab.active')?.dataset.lottab==='specs')bbRenderInternalSpecs();
+ if(document.querySelector('.lot-tab.active')?.dataset.lottab==='specs')bbSetSpecsMode(bbSpecIsEditing);
  logBowenActivity('view_lot',{label:`Opened ${l.lot_name||'lot'}`,entityType:'lot',entityId:l.id,subdivisionId:l.subdivision_id,lotId:l.id});
  configurePowerCompanyButton(l);
  requestAnimationFrame(()=>{
@@ -17464,13 +17532,16 @@ if($('powerCompanyOverlay'))$('powerCompanyOverlay').onclick=e=>{
  if(e.target===e.currentTarget)closePowerCompanyBubble();
 };
 
+$('bbSpecsViewMode').onclick=()=>bbSetSpecsMode(false);
+$('bbSpecsEditMode').onclick=()=>bbSetSpecsMode(true);
 document.querySelectorAll('.lot-tab').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('.lot-tab').forEach(x=>x.classList.toggle('active',x===b));
+  b.scrollIntoView({behavior:'smooth',block:'nearest',inline:'nearest'});
   $('overviewPanel').classList.toggle('hidden',b.dataset.lottab!=='overview');
   $('punchoutPanel').classList.toggle('hidden',b.dataset.lottab!=='punchout');
   $('filesPanel').classList.toggle('hidden',b.dataset.lottab!=='files');
   $('specsPanel').classList.toggle('hidden',b.dataset.lottab!=='specs');
-  if(b.dataset.lottab==='specs')bbRenderInternalSpecs();
+  if(b.dataset.lottab==='specs')bbSetSpecsMode(bbSpecIsEditing);
   if(b.dataset.lottab==='punchout' && currentLot) renderPunchout(currentLot);
   if(b.dataset.lottab==='files'){
     if(!teamsFilesLoaded){
@@ -18225,7 +18296,7 @@ try{
 </script>
 
 <div id="bbBuildVersion" style="text-align:center;color:#8a96a8;font-size:10px;padding:10px 8px 18px">
-  BowenBuilder 3.3</div>
+  BowenBuilder 3.5</div>
 
 
 
