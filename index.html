@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="2.9">
+<meta name="bowenbuilder-version" content="3.0">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -3945,6 +3945,7 @@ button.teams-file-row:hover{border-color:#bdccdd}
         <input id="portalInvitePasswordConfirm" type="password" autocomplete="new-password" minlength="8">
       </label>
       <button id="portalInviteCreateAccount" class="primary" type="button">Create Portal Account</button>
+      <div class="muted" style="margin-top:8px">Your secure Bowen Builder invitation verifies this email. No separate confirmation email is required.</div>
       <button id="portalInviteUseExisting" class="linkish portal-auth-link" type="button">Already have an account? Sign in</button>
     </div>
 
@@ -5148,7 +5149,7 @@ button.teams-file-row:hover{border-color:#bdccdd}
 <script>
 (async()=>{
 const $=id=>document.getElementById(id);
-const BOWENBUILDER_VERSION='2.9';
+const BOWENBUILDER_VERSION='3.0';
 const SB_URL='https://oztefiymckpyxiewgxtc.supabase.co';
 const SB_KEY='sb_publishable__ItoYGeHKEGTBFiE7JM74w_1F-qERVe';
 const db=window.supabase.createClient(SB_URL,SB_KEY);
@@ -6454,6 +6455,10 @@ async function portalCreateAccount(){
     showPortalAuthNotice('Password must be at least 8 characters.',true);
     return;
   }
+  if(password.length>128){
+    showPortalAuthNotice('Password must be 128 characters or less.',true);
+    return;
+  }
   if(password!==confirm){
     showPortalAuthNotice('Passwords do not match.',true);
     return;
@@ -6465,37 +6470,77 @@ async function portalCreateAccount(){
   showPortalAuthNotice('');
 
   try{
-    const {data,error}=await db.auth.signUp({
-      email:preview.email,
-      password,
-      options:{
-        data:{full_name:preview.full_name||''},
-        emailRedirectTo:portalInviteUrl(portalPendingInviteToken)
+    // The secure Bowen Builder invitation verifies the email address.
+    // Create the Auth user server-side as already confirmed so Supabase does
+    // not send a second confirmation email or consume the Auth email rate limit.
+    const {data,error}=await db.functions.invoke('portal-create-account',{
+      body:{
+        token:portalPendingInviteToken,
+        password
       }
     });
 
-    if(error)throw error;
-
-    if(data.session){
-      currentAuthUserId=String(data.user?.id||data.session?.user?.id||'');
-      await acceptPendingPortalInvitation();
-      const portal=await bootstrapPortalAccount();
-      if(!portal)throw new Error('Portal account could not be loaded.');
-      startBowenBuilderVersionWatch();
-      portalShowApp(portal);
-      return;
+    if(error){
+      let detail='';
+      try{
+        const context=error.context;
+        if(context && typeof context.json==='function'){
+          const payload=await context.json();
+          detail=payload?.error||payload?.message||'';
+        }
+      }catch(_){}
+      throw new Error(detail||error.message||'Could not create Portal account.');
     }
 
-    showPortalAuthNotice(
-      `Check ${preview.email} for the confirmation email. After confirming, you'll return to Bowen Builder Portal to finish signing in.`
+    if(!data?.ok){
+      const message=String(data?.error||'Could not create Portal account.');
+      if(data?.code==='account_exists' || /already has an account|already registered|already exists/i.test(message)){
+        $('portalLoginEmail').value=preview.email||'';
+        showPortalOnly('login');
+        showPortalAuthNotice('This email already has an account. Sign in to accept the Portal invitation.');
+        return;
+      }
+      throw new Error(message);
+    }
+
+    const {data:signInData,error:signInError}=await db.auth.signInWithPassword({
+      email:preview.email,
+      password
+    });
+    if(signInError)throw signInError;
+
+    currentAuthUserId=String(
+      signInData.user?.id||
+      signInData.session?.user?.id||
+      ''
     );
-    button.textContent='Confirmation Email Sent';
+
+    const portal=await bootstrapPortalAccount();
+    if(!portal){
+      await db.auth.signOut();
+      throw new Error('Portal account was created, but BowenBuilder could not load the Portal. Sign in again to continue.');
+    }
+
+    portalPendingInviteToken='';
+    portalPendingInvitePreview=null;
+    history.replaceState({},'',`${location.origin}${location.pathname}?portal=1`);
+
+    startBowenBuilderVersionWatch();
+    portalShowApp(portal);
   }catch(err){
     const msg=String(err?.message||'Could not create Portal account.');
-    if(/already registered|already exists/i.test(msg)){
+
+    if(/already has an account|already registered|already exists/i.test(msg)){
       $('portalLoginEmail').value=preview.email||'';
       showPortalOnly('login');
       showPortalAuthNotice('This email already has an account. Sign in to accept the Portal invitation.');
+    }else if(/rate limit/i.test(msg)){
+      // This message should no longer occur for new Portal account creation,
+      // but keep a useful fallback in case an older deployed page is cached.
+      showPortalAuthNotice(
+        'BowenBuilder could not finish creating the account. Reload this page and try the invitation again.',
+        true
+      );
     }else{
       showPortalAuthNotice(msg,true);
     }
@@ -17888,7 +17933,7 @@ try{
 </script>
 
 <div id="bbBuildVersion" style="text-align:center;color:#8a96a8;font-size:10px;padding:10px 8px 18px">
-  BowenBuilder 2.9</div>
+  BowenBuilder 3.0</div>
 
 
 
