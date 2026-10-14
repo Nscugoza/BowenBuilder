@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="2.8">
+<meta name="bowenbuilder-version" content="2.9">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -5148,7 +5148,7 @@ button.teams-file-row:hover{border-color:#bdccdd}
 <script>
 (async()=>{
 const $=id=>document.getElementById(id);
-const BOWENBUILDER_VERSION='2.8';
+const BOWENBUILDER_VERSION='2.9';
 const SB_URL='https://oztefiymckpyxiewgxtc.supabase.co';
 const SB_KEY='sb_publishable__ItoYGeHKEGTBFiE7JM74w_1F-qERVe';
 const db=window.supabase.createClient(SB_URL,SB_KEY);
@@ -10793,6 +10793,101 @@ function openSubdivisionTeamsFilePicker(){
   openLotTeamsDocumentPicker('subdivision_file_import');
 }
 
+
+function subdivisionFileNameKey(name){
+  return String(name||'').trim().toLocaleLowerCase();
+}
+
+function subdivisionFileInCurrentUploadLocation(file){
+  if(!file)return false;
+  return (
+    String(file.subdivision_id||'')===String(currentSubdivision||'') &&
+    String(file.lot_id||'')===String(subdivisionFilesLotId||'') &&
+    String(file.folder_id||'')===String(subdivisionFilesFolderId||'')
+  );
+}
+
+function existingSubdivisionFileByName(fileName){
+  const key=subdivisionFileNameKey(fileName);
+  if(!key)return null;
+
+  return subdivisionFiles.find(file=>
+    subdivisionFileInCurrentUploadLocation(file) &&
+    subdivisionFileNameKey(file.file_name)===key
+  )||null;
+}
+
+async function replaceSubdivisionFile(existing,file,destinationLabel){
+  if(!existing)throw new Error('Existing file could not be found.');
+
+  const versionId=globalThis.crypto?.randomUUID
+    ? globalThis.crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+  const safeName=subdivisionFileSafeName(file.name);
+  const storageScope=subdivisionFilesLotId||'shared';
+  const newPath=`${currentSubdivision}/${storageScope}/${subdivisionFilesFolderId||'root'}/${versionId}/${safeName}`;
+  const oldPath=existing.storage_path;
+
+  const {error:uploadError}=await db.storage
+    .from('bowenbuilder-files')
+    .upload(newPath,file,{
+      contentType:file.type||'application/octet-stream',
+      upsert:false
+    });
+
+  if(uploadError)throw uploadError;
+
+  const {data:row,error:rowError}=await db
+    .from('subdivision_files')
+    .update({
+      file_name:file.name,
+      storage_path:newPath,
+      mime_type:file.type||null,
+      size_bytes:file.size||null,
+      uploaded_by:currentAuthUserId||null,
+      updated_at:new Date().toISOString()
+    })
+    .eq('id',existing.id)
+    .select('id,subdivision_id,lot_id,folder_id,file_name,storage_path,mime_type,size_bytes,uploaded_by,created_at,updated_at')
+    .single();
+
+  if(rowError){
+    await db.storage.from('bowenbuilder-files').remove([newPath]);
+    throw rowError;
+  }
+
+  if(oldPath && oldPath!==newPath){
+    const {error:removeError}=await db.storage
+      .from('bowenbuilder-files')
+      .remove([oldPath]);
+    if(removeError){
+      console.warn('BowenBuilder replaced the file record but could not remove the old storage object:',removeError);
+    }
+  }
+
+  const index=subdivisionFiles.findIndex(f=>String(f.id)===String(existing.id));
+  if(index>=0)subdivisionFiles[index]=row;
+
+  logBowenActivity('subdivision_file_overwritten',{
+    label:`Replaced ${file.name} in ${destinationLabel}`,
+    entityType:'subdivision_file',
+    entityId:existing.id,
+    subdivisionId:currentSubdivision,
+    lotId:subdivisionFilesLotId||null,
+    force:true,
+    metadata:{
+      size_bytes:file.size||0,
+      mime_type:file.type||'',
+      folder_id:subdivisionFilesFolderId||null,
+      previous_storage_path:oldPath||null,
+      replacement_storage_path:newPath
+    }
+  });
+
+  return row;
+}
+
 async function uploadSubdivisionFiles(fileList){
   if(!currentSubdivision)return;
   if(!subdivisionFilesLotId && !subdivisionFilesFolderId)return;
@@ -10814,10 +10909,32 @@ async function uploadSubdivisionFiles(fileList){
 
   subdivisionFilesNotice(`Uploading ${files.length} file${files.length===1?'':'s'}…`);
 
+  let uploadedCount=0;
+  let replacedCount=0;
+  let skippedCount=0;
+
   try{
     for(const file of files){
       if(file.size>50*1024*1024){
         throw new Error(`${file.name} is larger than the 50 MB file limit.`);
+      }
+
+      const duplicate=existingSubdivisionFileByName(file.name);
+
+      if(duplicate){
+        const shouldReplace=confirm(
+          `"${file.name}" already exists in this folder.\n\n`+
+          `Replace the existing file with the new upload?`
+        );
+
+        if(!shouldReplace){
+          skippedCount+=1;
+          continue;
+        }
+
+        await replaceSubdivisionFile(duplicate,file,destinationLabel);
+        replacedCount+=1;
+        continue;
       }
 
       const id=globalThis.crypto?.randomUUID
@@ -10859,6 +10976,7 @@ async function uploadSubdivisionFiles(fileList){
       }
 
       if(row)subdivisionFiles.unshift(row);
+      uploadedCount+=1;
 
       logBowenActivity('subdivision_file_uploaded',{
         label:`Uploaded ${file.name} to ${destinationLabel}`,
@@ -10876,7 +10994,12 @@ async function uploadSubdivisionFiles(fileList){
       });
     }
 
-    subdivisionFilesNotice(`${files.length} file${files.length===1?'':'s'} uploaded.`);
+    const parts=[];
+    if(uploadedCount)parts.push(`${uploadedCount} uploaded`);
+    if(replacedCount)parts.push(`${replacedCount} replaced`);
+    if(skippedCount)parts.push(`${skippedCount} skipped`);
+
+    subdivisionFilesNotice(parts.length?`${parts.join(' · ')}.`:'No files changed.');
     renderSubdivisionFiles();
   }catch(err){
     subdivisionFilesNotice(err?.message||'File upload failed.','error');
@@ -17765,7 +17888,7 @@ try{
 </script>
 
 <div id="bbBuildVersion" style="text-align:center;color:#8a96a8;font-size:10px;padding:10px 8px 18px">
-  BowenBuilder 2.8</div>
+  BowenBuilder 2.9</div>
 
 
 
