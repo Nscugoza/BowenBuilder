@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="2.6">
+<meta name="bowenbuilder-version" content="2.7">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -3801,6 +3801,77 @@ button.teams-file-row:hover{border-color:#bdccdd}
   .portal-schedule-calendar-title{font-size:17px}
 }
 
+
+.portal-company-detail-tabs{
+  display:flex;
+  gap:7px;
+  overflow-x:auto;
+  padding:2px 0 10px;
+  margin-bottom:2px;
+  -webkit-overflow-scrolling:touch;
+  scrollbar-width:none;
+}
+.portal-company-detail-tabs::-webkit-scrollbar{display:none}
+.portal-company-detail-tab{
+  flex:0 0 auto;
+  border:1px solid #d0d9e4;
+  background:#fff;
+  color:#5b6678;
+  border-radius:999px;
+  padding:9px 13px;
+  font-weight:850;
+  font-size:12px;
+  white-space:nowrap;
+}
+.portal-company-detail-tab.active{
+  background:#eaf2fb;
+  color:#173f6c;
+  border-color:#b8cee5;
+}
+.portal-user-swipe-wrap{
+  position:relative;
+  overflow:hidden;
+  border-radius:12px;
+}
+.portal-user-swipe-delete{
+  position:absolute;
+  inset:0 0 0 auto;
+  width:96px;
+  border:0;
+  border-radius:0 12px 12px 0;
+  background:#b42318;
+  color:#fff;
+  font-weight:900;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  z-index:1;
+}
+.portal-user-swipe-content{
+  position:relative;
+  z-index:2;
+  background:#fff;
+  transition:transform .18s ease;
+  touch-action:pan-y;
+  will-change:transform;
+}
+.portal-user-swipe-wrap.revealed .portal-user-swipe-content{
+  transform:translateX(-96px);
+}
+.portal-user-swipe-wrap.deleting{
+  opacity:.55;
+  pointer-events:none;
+}
+.portal-user-disabled-hint{
+  font-size:10px;
+  font-weight:800;
+  color:#b42318;
+  margin-top:4px;
+}
+@media(prefers-reduced-motion:reduce){
+  .portal-user-swipe-content{transition:none}
+}
+
 </style>
 </head>
 <body>
@@ -4304,7 +4375,15 @@ button.teams-file-row:hover{border-color:#bdccdd}
 
       <div id="portalCompanyDetailNotice" class="notice hidden" style="margin-bottom:12px"></div>
 
-      <div class="card portal-company-section">
+      <div id="portalCompanyDetailTabs" class="portal-company-detail-tabs">
+        <button class="portal-company-detail-tab active" type="button" data-company-detail-tab="company">Company</button>
+        <button class="portal-company-detail-tab" type="button" data-company-detail-tab="access">Subdivision Access</button>
+        <button class="portal-company-detail-tab" type="button" data-company-detail-tab="schedule">Schedule Visibility</button>
+        <button class="portal-company-detail-tab" type="button" data-company-detail-tab="alerts">Schedule Alerts</button>
+        <button class="portal-company-detail-tab" type="button" data-company-detail-tab="users">Portal Users</button>
+      </div>
+
+      <div id="portalCompanyInfoSection" class="card portal-company-section">
         <div class="portal-company-section-head">
           <div>
             <strong>Company Information</strong>
@@ -5069,7 +5148,7 @@ button.teams-file-row:hover{border-color:#bdccdd}
 <script>
 (async()=>{
 const $=id=>document.getElementById(id);
-const BOWENBUILDER_VERSION='2.6';
+const BOWENBUILDER_VERSION='2.7';
 const SB_URL='https://oztefiymckpyxiewgxtc.supabase.co';
 const SB_KEY='sb_publishable__ItoYGeHKEGTBFiE7JM74w_1F-qERVe';
 const db=window.supabase.createClient(SB_URL,SB_KEY);
@@ -5106,6 +5185,7 @@ let portalAdminAccess=[];
 let portalAdminScheduleVisibility=[];
 let portalScheduleVisibilityDraft=new Set();
 let portalAdminSelectedCompanyId=null;
+let portalCompanyDetailTab='company';
 let latestPortalInvite={url:'',email:'',name:'',company:''};
 
 function portalBaseUrl(){
@@ -7037,6 +7117,7 @@ function renderPortalCompanyList(){
   root.querySelectorAll('[data-portal-company]').forEach(btn=>{
     btn.onclick=()=>{
       portalAdminSelectedCompanyId=btn.dataset.portalCompany;
+      portalCompanyDetailTab='company';
       $('portalInviteCreated').classList.add('hidden');
       renderPortalAdmin();
     };
@@ -7164,6 +7245,45 @@ async function savePortalCompanyScheduleVisibility(){
   }
 }
 
+
+function showPortalCompanyDetailTab(tab='company'){
+  const allowed=new Set(['company','access','schedule','alerts','users']);
+  portalCompanyDetailTab=allowed.has(tab)?tab:'company';
+
+  const isNew=portalAdminSelectedCompanyId==='__new__';
+  const company=isNew?null:portalAdminCompanies.find(
+    c=>String(c.id)===String(portalAdminSelectedCompanyId)
+  );
+
+  const tabs=$('portalCompanyDetailTabs');
+  if(tabs){
+    tabs.classList.toggle('hidden',isNew);
+    tabs.querySelectorAll('[data-company-detail-tab]').forEach(button=>{
+      button.classList.toggle('active',button.dataset.companyDetailTab===portalCompanyDetailTab);
+    });
+  }
+
+  $('portalCompanyInfoSection')?.classList.toggle('hidden',!isNew && portalCompanyDetailTab!=='company');
+  $('portalCompanyAccessSection')?.classList.toggle('hidden',isNew || portalCompanyDetailTab!=='access');
+  $('portalCompanyScheduleSection')?.classList.toggle('hidden',isNew || portalCompanyDetailTab!=='schedule');
+  $('portalCompanyAlertsSection')?.classList.toggle('hidden',isNew || portalCompanyDetailTab!=='alerts');
+  $('portalCompanyUsersSection')?.classList.toggle('hidden',isNew || portalCompanyDetailTab!=='users');
+
+  if(!isNew && company){
+    if(portalCompanyDetailTab==='schedule'){
+      renderPortalCompanyScheduleVisibility(company);
+    }
+    if(portalCompanyDetailTab==='alerts'){
+      scheduleAlertsAdminOpen(company);
+    }else{
+      $('portalCompanyAlertsSection')?.classList.add('hidden');
+    }
+    if(portalCompanyDetailTab==='users'){
+      renderPortalCompanyUsers(company);
+    }
+  }
+}
+
 function renderPortalCompanyDetail(){
   const isNew=portalAdminSelectedCompanyId==='__new__';
   const company=isNew?null:portalAdminCompanies.find(c=>String(c.id)===String(portalAdminSelectedCompanyId));
@@ -7187,14 +7307,13 @@ function renderPortalCompanyDetail(){
   $('portalCompanyNotes').value=company?.notes||'';
   $('portalCompanyActive').checked=company?.active!==false;
 
-  $('portalCompanyAccessSection').classList.toggle('hidden',isNew);
-  $('portalCompanyScheduleSection').classList.toggle('hidden',isNew);
-  $('portalCompanyUsersSection').classList.toggle('hidden',isNew);
-  scheduleAlertsAdminOpen(company);
+  if(isNew){
+    portalCompanyDetailTab='company';
+    showPortalCompanyDetailTab('company');
+    return;
+  }
 
-  if(isNew)return;
-
-  renderPortalCompanyScheduleVisibility(company);
+  showPortalCompanyDetailTab(portalCompanyDetailTab);
 
   const accessRows=portalAdminCompanyAccessRows(company.id);
   const accessMap=new Map(accessRows.map(a=>[String(a.subdivision_id),a]));
@@ -7220,7 +7339,7 @@ function renderPortalCompanyDetail(){
     };
   });
 
-  renderPortalCompanyUsers(company);
+  if(portalCompanyDetailTab==='users')renderPortalCompanyUsers(company);
 }
 
 function renderPortalCompanyUsers(company){
@@ -7239,11 +7358,12 @@ function renderPortalCompanyUsers(company){
     const last=user.last_login_at?`Last login ${portalDateTime(user.last_login_at)}`:(user.user_id?'No login recorded':'Invitation pending');
     const inviteUrl=portalUserInviteLink(user);
 
-    return `<div class="portal-user-row">
+    const row=`<div class="portal-user-row">
       <div class="portal-user-avatar">${esc(portalInitials(user.full_name))}</div>
       <div>
         <div class="portal-user-row-name">${esc(user.full_name||user.email)}</div>
         <div class="portal-user-row-meta">${esc(user.email||'')} · ${esc(status)} · ${esc(last)}</div>
+        ${user.active?'':'<div class="portal-user-disabled-hint">Disabled · swipe left to delete</div>'}
       </div>
       <div class="portal-user-row-actions">
         <select data-portal-user-role="${esc(user.id)}">
@@ -7254,6 +7374,13 @@ function renderPortalCompanyUsers(company){
         ${!user.user_id&&inviteUrl?`<button class="secondary" type="button" data-portal-user-copy="${esc(user.id)}">Copy Invite</button>`:''}
         <button class="secondary" type="button" data-portal-user-toggle="${esc(user.id)}">${user.active?'Disable':'Enable'}</button>
       </div>
+    </div>`;
+
+    if(user.active)return row;
+
+    return `<div class="portal-user-swipe-wrap" data-portal-user-swipe="${esc(user.id)}">
+      <button class="portal-user-swipe-delete" type="button" data-portal-user-delete="${esc(user.id)}">Delete</button>
+      <div class="portal-user-swipe-content">${row}</div>
     </div>`;
   }).join('');
 
@@ -7278,6 +7405,70 @@ function renderPortalCompanyUsers(company){
   });
   root.querySelectorAll('[data-portal-user-toggle]').forEach(btn=>{
     btn.onclick=()=>togglePortalUserActive(btn.dataset.portalUserToggle);
+  });
+
+  root.querySelectorAll('[data-portal-user-delete]').forEach(btn=>{
+    btn.onclick=()=>deletePortalUser(btn.dataset.portalUserDelete);
+  });
+
+  root.querySelectorAll('[data-portal-user-swipe]').forEach(wrap=>{
+    const content=wrap.querySelector('.portal-user-swipe-content');
+    if(!content)return;
+
+    let startX=0,startY=0,dx=0,tracking=false,horizontal=false;
+
+    content.addEventListener('touchstart',event=>{
+      if(event.touches.length!==1)return;
+      const touch=event.touches[0];
+      startX=touch.clientX;
+      startY=touch.clientY;
+      dx=0;
+      tracking=true;
+      horizontal=false;
+      content.style.transition='none';
+    },{passive:true});
+
+    content.addEventListener('touchmove',event=>{
+      if(!tracking||event.touches.length!==1)return;
+      const touch=event.touches[0];
+      const moveX=touch.clientX-startX;
+      const moveY=touch.clientY-startY;
+
+      if(!horizontal){
+        if(Math.abs(moveY)>Math.abs(moveX) && Math.abs(moveY)>8){
+          tracking=false;
+          content.style.transition='';
+          return;
+        }
+        if(Math.abs(moveX)>8)horizontal=true;
+      }
+
+      if(horizontal){
+        dx=Math.max(-96,Math.min(0,moveX+(wrap.classList.contains('revealed')?-96:0)));
+        content.style.transform=`translateX(${dx}px)`;
+      }
+    },{passive:true});
+
+    content.addEventListener('touchend',()=>{
+      if(!tracking){
+        content.style.transition='';
+        content.style.transform='';
+        return;
+      }
+      content.style.transition='';
+      content.style.transform='';
+      if(horizontal){
+        if(dx<-44)wrap.classList.add('revealed');
+        else wrap.classList.remove('revealed');
+      }
+      tracking=false;
+    },{passive:true});
+
+    content.addEventListener('click',event=>{
+      if(wrap.classList.contains('revealed') && !event.target.closest('button,select,input,a')){
+        wrap.classList.remove('revealed');
+      }
+    });
   });
 }
 
@@ -7517,6 +7708,52 @@ async function togglePortalUserActive(userId){
     screen:'Admin',
     force:true
   });
+}
+
+
+async function deletePortalUser(userId){
+  const user=portalAdminUsers.find(u=>String(u.id)===String(userId));
+  if(!user)return;
+
+  if(user.active){
+    alert('Disable this Portal user before deleting them.');
+    return;
+  }
+
+  const name=user.full_name||user.email||'this user';
+  if(!confirm(`Delete ${name} from Bowen Builder Portal?\n\nThis removes their Portal membership and their company schedule-alert recipient record. This cannot be undone.`))return;
+
+  const wrap=document.querySelector(`[data-portal-user-swipe="${CSS.escape(String(user.id))}"]`);
+  wrap?.classList.add('deleting');
+
+  try{
+    const {data,error}=await db.rpc('bowenbuilder_admin_delete_portal_user',{
+      p_portal_user_id:user.id
+    });
+    if(error)throw error;
+
+    portalAdminUsers=portalAdminUsers.filter(u=>String(u.id)!==String(user.id));
+
+    logBowenActivity('admin_portal_user_deleted',{
+      label:`Deleted disabled Portal user ${name}`,
+      entityType:'portal_user',
+      entityId:user.id,
+      screen:'Admin',
+      force:true,
+      metadata:{
+        company_id:user.company_id,
+        email:user.email||null
+      }
+    });
+
+    const company=portalAdminCompanies.find(
+      c=>String(c.id)===String(portalAdminSelectedCompanyId)
+    );
+    if(company)renderPortalCompanyUsers(company);
+  }catch(err){
+    wrap?.classList.remove('deleting');
+    alert(err?.message||'Could not delete the Portal user.');
+  }
 }
 
 async function updatePortalUserRole(userId,role){
@@ -16795,14 +17032,19 @@ $('adminActivityLogTab').onclick=()=>showAdminPanel('activity');
 $('portalAdminCompaniesBtn').onclick=()=>showPortalAdminMode('companies');
 $('portalAdminGuestLinksBtn').onclick=()=>showPortalAdminMode('guest_links');
 $('portalCompanySearch').oninput=renderPortalCompanyList;
+document.querySelectorAll('[data-company-detail-tab]').forEach(button=>{
+  button.onclick=()=>showPortalCompanyDetailTab(button.dataset.companyDetailTab);
+});
 $('portalCompanyAdd').onclick=()=>{
   portalAdminSelectedCompanyId='__new__';
+  portalCompanyDetailTab='company';
   portalCompanyDetailSetNotice('');
   $('portalInviteCreated').classList.add('hidden');
   renderPortalAdmin();
 };
 $('portalCompanyBack').onclick=()=>{
   portalAdminSelectedCompanyId=null;
+  portalCompanyDetailTab='company';
   portalCompanyDetailSetNotice('');
   $('portalInviteCreated').classList.add('hidden');
   renderPortalAdmin();
@@ -17502,7 +17744,7 @@ try{
 </script>
 
 <div id="bbBuildVersion" style="text-align:center;color:#8a96a8;font-size:10px;padding:10px 8px 18px">
-  BowenBuilder 2.6</div>
+  BowenBuilder 2.7</div>
 
 
 
