@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="3.2">
+<meta name="bowenbuilder-version" content="3.3">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -4124,7 +4124,8 @@ button.teams-file-row:hover{border-color:#bdccdd}
       <div class="lot-tabs">
         <button class="lot-tab active" data-lottab="overview" type="button">Overview</button>
         <button class="lot-tab" data-lottab="punchout" type="button">Punchout</button>
-        <button class="lot-tab" data-lottab="files" type="button">Files</button><button class="lot-tab" data-lottab="specs" type="button">Specifications</button>
+        <button class="lot-tab" data-lottab="files" type="button">Files</button>
+        <button class="lot-tab" data-lottab="specs" type="button">Specifications</button>
         <button id="powerCompanyButton" class="power-company-trigger hidden" type="button">Power Company</button>
       </div>
       <div id="specsPanel" class="hidden"><div id="bbLotSpecs"></div></div><div id="overviewPanel"><div id="lotSchedule" class="schedule-list"></div></div>
@@ -5188,7 +5189,7 @@ button.teams-file-row:hover{border-color:#bdccdd}
 <script>
 (async()=>{
 const $=id=>document.getElementById(id);
-const BOWENBUILDER_VERSION='3.2';
+const BOWENBUILDER_VERSION='3.3';
 const SB_URL='https://oztefiymckpyxiewgxtc.supabase.co';
 const SB_KEY='sb_publishable__ItoYGeHKEGTBFiE7JM74w_1F-qERVe';
 const db=window.supabase.createClient(SB_URL,SB_KEY);
@@ -5702,6 +5703,8 @@ async function portalShowPunchout(){
   $('portalScheduleInbox')?.classList.add('hidden');
   $('portalScheduleView')?.classList.add('hidden');
   $('portalPunchoutView')?.classList.remove('hidden');
+  $('portalSpecsView')?.classList.add('hidden');
+  $('portalSpecsButton')?.setAttribute('aria-pressed','false');
   $('portalFilesButton')?.setAttribute('aria-pressed','false');
   $('portalScheduleButton')?.setAttribute('aria-pressed','false');
   $('portalUpdatesButton')?.setAttribute('aria-pressed','false');
@@ -6312,6 +6315,8 @@ function scheduleAlertsShowInbox(open){
  $('portalScheduleInbox').classList.toggle('hidden',!open);
  $('portalScheduleView')?.classList.add('hidden');
  $('portalPunchoutView')?.classList.add('hidden');
+ $('portalSpecsView')?.classList.add('hidden');
+ $('portalSpecsButton')?.setAttribute('aria-pressed','false');
  $('portalUpdatesButton').setAttribute('aria-pressed',String(open));
  $('portalFilesButton').setAttribute('aria-pressed',String(!open));
  $('portalScheduleButton')?.setAttribute('aria-pressed','false');
@@ -6403,7 +6408,6 @@ async function bbRenderInternalSpecs(){
   $('bbSpecsDefaultsMode').onchange=e=>{bbSpecDefaultMode=e.target.checked;bbRenderInternalSpecs()};
   root.querySelectorAll('[data-bb-save]').forEach(btn=>btn.onclick=async()=>{
    const key=btn.dataset.bbSave;
-   const value=root.querySelectorAll('[data-bb-val]').length;
    const val=[...root.querySelectorAll('[data-bb-val]')].find(x=>x.dataset.bbVal===key)?.value||'';
    const note=[...root.querySelectorAll('[data-bb-note]')].find(x=>x.dataset.bbNote===key)?.value||'';
    const url=[...root.querySelectorAll('[data-bb-url]')].find(x=>x.dataset.bbUrl===key)?.value||'';
@@ -12879,6 +12883,7 @@ function showLot(preserveScroll=false){
   if(lotViewEl) lotViewEl.classList.remove('hidden');
 
  const l=lots.find(x=>x.id===currentLot);if(!l)return;
+ if(document.querySelector('.lot-tab.active')?.dataset.lottab==='specs')bbRenderInternalSpecs();
  logBowenActivity('view_lot',{label:`Opened ${l.lot_name||'lot'}`,entityType:'lot',entityId:l.id,subdivisionId:l.subdivision_id,lotId:l.id});
  configurePowerCompanyButton(l);
  requestAnimationFrame(()=>{
@@ -18220,7 +18225,7 @@ try{
 </script>
 
 <div id="bbBuildVersion" style="text-align:center;color:#8a96a8;font-size:10px;padding:10px 8px 18px">
-  BowenBuilder 3.2</div>
+  BowenBuilder 3.3</div>
 
 
 
