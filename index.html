@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="3.7">
+<meta name="bowenbuilder-version" content="3.8">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -5200,7 +5200,7 @@ button.teams-file-row:hover{border-color:#bdccdd}
 <script>
 (async()=>{
 const $=id=>document.getElementById(id);
-const BOWENBUILDER_VERSION='3.7';
+const BOWENBUILDER_VERSION='3.8';
 const SB_URL='https://oztefiymckpyxiewgxtc.supabase.co';
 const SB_KEY='sb_publishable__ItoYGeHKEGTBFiE7JM74w_1F-qERVe';
 const db=window.supabase.createClient(SB_URL,SB_KEY);
@@ -13435,14 +13435,13 @@ async function moveScheduleItemToDate(id,newStartKey){
  scheduleMoveBusy=true;
  renderScheduleMoveBanner();
  try{
-   const {data,error}=await db.from('schedule_items')
-     .update({
-       starts_at:newStartKey+'T12:00:00Z',
-       ends_at:newEndKey+'T12:00:00Z'
-     })
-     .eq('id',item.id)
-     .select()
-     .single();
+   // Permission-checked server operation returns exactly one updated schedule item.
+   // Avoid PostgREST .single() coercion failures on UPDATE for crew accounts.
+   const {data,error}=await db.rpc('bowenbuilder_move_schedule_item',{
+     p_item_id:item.id,
+     p_start:newStartKey+'T12:00:00Z',
+     p_end:newEndKey+'T12:00:00Z'
+   });
    if(error)throw error;
 
    const idx=items.findIndex(x=>String(x.id)===String(item.id));
@@ -18306,7 +18305,7 @@ try{
 </script>
 
 <div id="bbBuildVersion" style="text-align:center;color:#8a96a8;font-size:10px;padding:10px 8px 18px">
-  BowenBuilder 3.7</div>
+  BowenBuilder 3.8</div>
 
 
 
