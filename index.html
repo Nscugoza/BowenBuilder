@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="4.0">
+<meta name="bowenbuilder-version" content="4.1">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -3884,7 +3884,8 @@ button.teams-file-row:hover{border-color:#bdccdd}
 }
 
 
-/* BowenBuilder 4.0: compact schedule item context actions */
+/* BowenBuilder 4.1: iOS-safe long-press context actions */
+.bb-calendar-event,.bb-calendar-event *, .bb-calendar-selected-item,.bb-calendar-selected-item *{-webkit-user-select:none!important;user-select:none!important;-webkit-touch-callout:none!important;-webkit-tap-highlight-color:transparent}
 .bb-calendar-selected-item{cursor:context-menu;touch-action:pan-y;user-select:none;-webkit-user-select:none}
 .bb-calendar-selected-main{flex:1;min-width:0}
 .bb-calendar-item-more{flex:0 0 auto;min-width:42px;min-height:42px;border-radius:12px;font-size:22px;line-height:1;background:#edf4fc;color:#174f86;border:1px solid #d2e0ef}
@@ -13432,24 +13433,49 @@ function bbOpenCalendarItemMenu(id,x,y){
 function bbBindCalendarItemMenu(target,id){
  if(!target||target.dataset.bbContextBound==='1')return;
  target.dataset.bbContextBound='1';
- let startX=0,startY=0,pressed=false;
- const clear=()=>{clearTimeout(bbCalendarMenuHoldTimer);pressed=false};
- target.addEventListener('pointerdown',e=>{
-  if(e.target.closest('button')&&e.target!==target)return;
-  if(e.pointerType==='mouse'&&e.button!==0)return;
-  clear();pressed=true;startX=e.clientX;startY=e.clientY;
-  if(e.pointerType==='mouse')return;
-  bbCalendarMenuHoldTimer=setTimeout(()=>{
-   if(!pressed)return;
-   bbCalendarMenuSuppressClickUntil=Date.now()+650;
-   bbOpenCalendarItemMenu(id,startX,startY);pressed=false;
-   if(navigator.vibrate)navigator.vibrate(12);
-  },520);
+ let timer=0,startX=0,startY=0,held=false,tracking=false;
+ const cancel=()=>{clearTimeout(timer);timer=0;tracking=false};
+ const open=(x,y)=>{
+  if(!tracking)return;
+  held=true;tracking=false;clearTimeout(timer);timer=0;
+  bbCalendarMenuSuppressClickUntil=Date.now()+1000;
+  bbOpenCalendarItemMenu(id,x,y);
+  if(navigator.vibrate)navigator.vibrate(12);
+ };
+ // iOS Safari may select text and open its native callout before pointer long-press completes.
+ // Use native touch events on touch devices, and pointer events only for pen input.
+ target.addEventListener('touchstart',e=>{
+  if(e.touches.length!==1||e.target.closest('button'))return;
+  cancel();held=false;tracking=true;
+  startX=e.touches[0].clientX;startY=e.touches[0].clientY;
+  timer=setTimeout(()=>open(startX,startY),430);
  },{passive:true});
- target.addEventListener('pointermove',e=>{if(Math.hypot(e.clientX-startX,e.clientY-startY)>10)clear()},{passive:true});
- target.addEventListener('pointerup',clear);
- target.addEventListener('pointercancel',clear);
- target.addEventListener('contextmenu',e=>{e.preventDefault();clear();bbOpenCalendarItemMenu(id,e.clientX,e.clientY)});
+ target.addEventListener('touchmove',e=>{
+  if(!tracking)return;
+  const t=e.touches[0];
+  if(!t||Math.hypot(t.clientX-startX,t.clientY-startY)>9)cancel();
+ },{passive:true});
+ target.addEventListener('touchend',e=>{
+  if(held){e.preventDefault();e.stopPropagation();}
+  cancel();
+ },{passive:false});
+ target.addEventListener('touchcancel',cancel,{passive:true});
+ target.addEventListener('pointerdown',e=>{
+  if(e.pointerType!=='pen'||e.button!==0)return;
+  cancel();held=false;tracking=true;startX=e.clientX;startY=e.clientY;
+  timer=setTimeout(()=>open(startX,startY),430);
+ });
+ target.addEventListener('pointermove',e=>{
+  if(e.pointerType==='pen'&&tracking&&Math.hypot(e.clientX-startX,e.clientY-startY)>9)cancel();
+ });
+ target.addEventListener('pointerup',e=>{if(e.pointerType==='pen')cancel()});
+ target.addEventListener('pointercancel',cancel);
+ target.addEventListener('contextmenu',e=>{
+  e.preventDefault();e.stopPropagation();cancel();
+  if(!held){bbCalendarMenuSuppressClickUntil=Date.now()+1000;bbOpenCalendarItemMenu(id,e.clientX||startX,e.clientY||startY)}
+ });
+ target.addEventListener('selectstart',e=>e.preventDefault());
+ target.addEventListener('dragstart',e=>e.preventDefault());
 }
 document.addEventListener('pointerdown',e=>{const menu=document.getElementById('bbCalendarContextMenu');if(menu&&!menu.hidden&&!menu.contains(e.target))bbCloseCalendarItemMenu()},true);
 document.addEventListener('keydown',e=>{if(e.key==='Escape')bbCloseCalendarItemMenu()});
@@ -18420,7 +18446,7 @@ try{
 </script>
 
 <div id="bbBuildVersion" style="text-align:center;color:#8a96a8;font-size:10px;padding:10px 8px 18px">
-  BowenBuilder 4.0</div>
+  BowenBuilder 4.1</div>
 
 
 
