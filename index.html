@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="3.8">
+<meta name="bowenbuilder-version" content="4.0">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -3883,6 +3883,21 @@ button.teams-file-row:hover{border-color:#bdccdd}
   .portal-user-swipe-content{transition:none}
 }
 
+
+/* BowenBuilder 4.0: compact schedule item context actions */
+.bb-calendar-selected-item{cursor:context-menu;touch-action:pan-y;user-select:none;-webkit-user-select:none}
+.bb-calendar-selected-main{flex:1;min-width:0}
+.bb-calendar-item-more{flex:0 0 auto;min-width:42px;min-height:42px;border-radius:12px;font-size:22px;line-height:1;background:#edf4fc;color:#174f86;border:1px solid #d2e0ef}
+.bb-calendar-event{cursor:context-menu;touch-action:pan-y}
+.bb-context-menu{position:fixed;z-index:99999;width:min(290px,calc(100vw - 24px));padding:7px;border-radius:16px;background:var(--card,#fff);background:#fff;color:#1b293b;box-shadow:0 15px 55px rgba(0,0,0,.25);border:1px solid #d6e0eb}
+.bb-context-menu[hidden]{display:none!important}
+.bb-context-heading{font-size:12px;font-weight:800;color:#5d7088;padding:9px 12px 7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bb-context-menu button{display:flex;align-items:center;width:100%;text-align:left;gap:10px;padding:12px;border:0;border-radius:10px;background:transparent;color:#1b293b;font-weight:650;font-size:15px;min-height:44px}
+.bb-context-menu button:hover,.bb-context-menu button:focus-visible{background:#edf4fc;outline:none}
+.bb-context-menu button.danger{color:#a22b36}
+.bb-context-menu .bb-context-divider{height:1px;background:#e7edf4;margin:5px 8px}
+@media(max-width:640px){.bb-calendar-selected-item{flex-direction:row;align-items:center}.bb-calendar-selected-main{width:auto}}
+
 </style>
 </head>
 <body>
@@ -5200,7 +5215,7 @@ button.teams-file-row:hover{border-color:#bdccdd}
 <script>
 (async()=>{
 const $=id=>document.getElementById(id);
-const BOWENBUILDER_VERSION='3.8';
+const BOWENBUILDER_VERSION='4.0';
 const SB_URL='https://oztefiymckpyxiewgxtc.supabase.co';
 const SB_KEY='sb_publishable__ItoYGeHKEGTBFiE7JM74w_1F-qERVe';
 const db=window.supabase.createClient(SB_URL,SB_KEY);
@@ -9810,9 +9825,23 @@ async function restoreCalendarViewState(state){
   requestAnimationFrame(()=>window.scrollTo({top:state.scrollY||0,left:0,behavior:'auto'}));
 }
 async function refreshPreservingCalendar(){
-  const state=captureCalendarViewState();
-  await load();
-  await restoreCalendarViewState(state);
+  // Refresh schedule data without calling load(), which invokes showSubs()
+  // and temporarily hides the calendar, causing the mobile page to jump.
+  const {data,error}=await db.from('schedule_items').select('*').order('starts_at');
+  if(error){console.warn('Calendar refresh failed:',error.message);return false;}
+  items=data||[];
+  if(currentScreen()==='schedule'){
+    const beforeY=window.scrollY||0;
+    const selected=scheduleSelectedDate;
+    const cursor=scheduleCalendarCursor instanceof Date?scheduleCalendarCursor.getTime():null;
+    if(scheduleViewMode==='calendar')renderScheduleCalendar();
+    else renderScheduleListView();
+    scheduleSelectedDate=selected;
+    if(cursor!==null)scheduleCalendarCursor=new Date(cursor);
+    // Safari may adjust the viewport after a grid rebuild.
+    requestAnimationFrame(()=>window.scrollTo({top:beforeY,left:0,behavior:'instant'}));
+  }
+  return true;
 }
 
 async function load(){
@@ -13349,6 +13378,82 @@ function updateScheduleStatusColor(){
 }
 
 
+let bbCalendarMenuItemId='';
+let bbCalendarMenuHoldTimer=0;
+let bbCalendarMenuSuppressClickUntil=0;
+function bbCloseCalendarItemMenu(){
+ const menu=document.getElementById('bbCalendarContextMenu');
+ if(menu)menu.hidden=true;
+ bbCalendarMenuItemId='';
+}
+function bbOpenCalendarItemMenu(id,x,y){
+ const item=items.find(i=>String(i.id)===String(id));
+ if(!item)return;
+ let menu=document.getElementById('bbCalendarContextMenu');
+ if(!menu){
+  menu=document.createElement('div');menu.id='bbCalendarContextMenu';menu.className='bb-context-menu';menu.hidden=true;
+  menu.setAttribute('role','menu');document.body.appendChild(menu);
+ }
+ bbCalendarMenuItemId=String(id);
+ const called=isCalledInDate(itemStartKey(item));
+ menu.innerHTML=`<div class="bb-context-heading">${esc(scheduleLotName(item))} · ${esc(item.name)}</div>
+  <button type="button" data-bb-menu-action="called" role="menuitem">${called?'✓ Unmark Called In':'✓ Mark Called In'}</button>
+  <button type="button" data-bb-menu-action="email" role="menuitem">✉ Email</button>
+  <button type="button" data-bb-menu-action="text" role="menuitem">💬 Text</button>
+  <div class="bb-context-divider"></div>
+  <button type="button" data-bb-menu-action="edit" role="menuitem">✎ Edit</button>
+  <button type="button" data-bb-menu-action="move" role="menuitem">↔ Move Date</button>
+  <button type="button" data-bb-menu-action="delete" class="danger" role="menuitem">🗑 Delete</button>`;
+ menu.hidden=false;
+ const w=menu.offsetWidth,h=menu.offsetHeight;
+ menu.style.left=Math.max(12,Math.min(x,window.innerWidth-w-12))+'px';
+ menu.style.top=Math.max(12,Math.min(y,window.innerHeight-h-12))+'px';
+ menu.querySelectorAll('[data-bb-menu-action]').forEach(b=>b.onclick=async e=>{
+  e.stopPropagation();const action=b.dataset.bbMenuAction;const targetId=bbCalendarMenuItemId;
+  const target=items.find(i=>String(i.id)===String(targetId));
+  bbCloseCalendarItemMenu();if(!target)return;
+  if(action==='called'){
+   const key=itemStartKey(target);
+   if(key){scheduleSelectedDate=key;await toggleCalledInDate(key)}
+  }else if(action==='email')emailCalendarScheduleItemNow(targetId);
+  else if(action==='text')textCalendarScheduleItemNow(targetId);
+  else if(action==='edit')openScheduleDialogLive(targetId,'schedule');
+  else if(action==='move')beginScheduleMove(targetId);
+  else if(action==='delete'){
+   if(!confirm(`Delete "${target.name||'this schedule item'}"? This cannot be undone.`))return;
+   const {data,error}=await db.from('schedule_items').delete().eq('id',targetId).select('id');
+   if(error){alert(error.message);return}
+   if(!data?.length){alert('The schedule item was not deleted. Check your subdivision permissions.');return}
+   scheduleAlertsKick();await cleanupCalendarMarksForDeletedItem(target);
+   await refreshPreservingCalendar();
+  }
+ });
+}
+function bbBindCalendarItemMenu(target,id){
+ if(!target||target.dataset.bbContextBound==='1')return;
+ target.dataset.bbContextBound='1';
+ let startX=0,startY=0,pressed=false;
+ const clear=()=>{clearTimeout(bbCalendarMenuHoldTimer);pressed=false};
+ target.addEventListener('pointerdown',e=>{
+  if(e.target.closest('button')&&e.target!==target)return;
+  if(e.pointerType==='mouse'&&e.button!==0)return;
+  clear();pressed=true;startX=e.clientX;startY=e.clientY;
+  if(e.pointerType==='mouse')return;
+  bbCalendarMenuHoldTimer=setTimeout(()=>{
+   if(!pressed)return;
+   bbCalendarMenuSuppressClickUntil=Date.now()+650;
+   bbOpenCalendarItemMenu(id,startX,startY);pressed=false;
+   if(navigator.vibrate)navigator.vibrate(12);
+  },520);
+ },{passive:true});
+ target.addEventListener('pointermove',e=>{if(Math.hypot(e.clientX-startX,e.clientY-startY)>10)clear()},{passive:true});
+ target.addEventListener('pointerup',clear);
+ target.addEventListener('pointercancel',clear);
+ target.addEventListener('contextmenu',e=>{e.preventDefault();clear();bbOpenCalendarItemMenu(id,e.clientX,e.clientY)});
+}
+document.addEventListener('pointerdown',e=>{const menu=document.getElementById('bbCalendarContextMenu');if(menu&&!menu.hidden&&!menu.contains(e.target))bbCloseCalendarItemMenu()},true);
+document.addEventListener('keydown',e=>{if(e.key==='Escape')bbCloseCalendarItemMenu()});
+window.addEventListener('scroll',()=>bbCloseCalendarItemMenu(),{passive:true});
 let calendarCalledInMarks=[];
 let calledInTableAvailable=true;
 let scheduleViewMode='calendar';
@@ -13654,6 +13759,7 @@ function calendarDayStatus(dayItems){
 }
 
 function renderScheduleCalendar(){
+ bbCloseCalendarItemMenu();
  const grid=$('calendarGrid'); if(!grid)return;
  renderScheduleMoveBanner();
  const y=scheduleCalendarCursor.getFullYear(),m=scheduleCalendarCursor.getMonth();
@@ -13682,13 +13788,15 @@ function renderScheduleCalendar(){
    const eventHtml=dayItems.slice(0,3).map(x=>{
      const inspection=inspectionStatusDisplay(x.inspection_status);
      const inspectionClass=esc(String(x.inspection_status||'').toLowerCase());
-     return `<span class="bb-calendar-event ${esc(x.status||'scheduled')}" title="${esc(x.name)}${inspection?' · Inspection: '+esc(inspection):''}"><span>${esc(x.name)}</span>${inspection?`<span class="bb-calendar-inspection ${inspectionClass}">Inspection: ${esc(inspection)}</span>`:''}</span>`;
+     return `<span class="bb-calendar-event ${esc(x.status||'scheduled')}" data-bb-event-id="${x.id}" title="${esc(x.name)}${inspection?' · Inspection: '+esc(inspection):''}"><span>${esc(x.name)}</span>${inspection?`<span class="bb-calendar-inspection ${inspectionClass}">Inspection: ${esc(inspection)}</span>`:''}</span>`;
    }).join('');
    const commHtml=(wasEmailedDate(key)||wasTextedDate(key))
      ? `<div class="bb-calendar-comm-marks">${wasEmailedDate(key)?'<span class="bb-calendar-comm-mark email" title="Email opened for this date">E</span>':''}${wasTextedDate(key)?'<span class="bb-calendar-comm-mark text" title="Text opened for this date">T</span>':''}</div>`
      : '';
    btn.innerHTML=`<span class="bb-calendar-number">${d.getDate()}</span>${commHtml}<div class="bb-calendar-events">${eventHtml}</div>${dayItems.length>3?`<div class="bb-calendar-more">+${dayItems.length-3} more</div>`:''}`;
+   btn.querySelectorAll('[data-bb-event-id]').forEach(el=>bbBindCalendarItemMenu(el,el.dataset.bbEventId));
    btn.addEventListener('click',e=>{
+     if(Date.now()<bbCalendarMenuSuppressClickUntil)return;
      if(scheduleMoveItemId){
        moveScheduleItemToDate(scheduleMoveItemId,key);
        return;
@@ -16797,12 +16905,7 @@ function renderSelectedScheduleDay(){
          <div class="bb-calendar-selected-title">${esc(scheduleLotName(i))} · ${esc(i.name)}</div>
          <div class="bb-calendar-selected-meta">${esc(statusDisplay(i.status))}${i.crew?' · '+esc(i.crew):''}${inspectionStatusDisplay(i.inspection_status)?' · Inspection: '+esc(inspectionStatusDisplay(i.inspection_status)):''}</div>
        </div>
-       <div class="calendar-item-actions">
-         <button class="secondary calendar-item-email-btn" type="button" data-calendar-email-item="${i.id}">✉ Email</button>
-         <button class="secondary calendar-item-text-btn" type="button" data-calendar-text-item="${i.id}">💬 Text</button>
-         <button class="calendar-move-btn" type="button" data-calendar-move="${i.id}">Move</button>
-         <button class="secondary" type="button" data-calendar-edit="${i.id}">Edit</button>
-       </div>
+       <button class="bb-calendar-item-more" type="button" data-bb-calendar-more="${i.id}" aria-label="Actions for ${esc(i.name)}" title="Actions (or press and hold)">⋯</button>
      </div>
    </div>`).join(''):'<div class="muted">Nothing scheduled for this day.</div>';
 
@@ -16863,6 +16966,12 @@ function renderSelectedScheduleDay(){
    currentSubdivision=subdivisionBeforeDelete;
  });
 
+ document.querySelectorAll('[data-bb-calendar-more]').forEach(b=>{
+  b.onclick=e=>{e.preventDefault();e.stopPropagation();const r=b.getBoundingClientRect();bbOpenCalendarItemMenu(b.dataset.bbCalendarMore,r.left,r.bottom+4)};
+ });
+ document.querySelectorAll('.bb-calendar-selected-item').forEach(el=>{
+  const row=el.closest('[data-swipe-row]');if(row)bbBindCalendarItemMenu(el,row.dataset.swipeRow);
+ });
  bindCalendarSwipeRows();
 }
 function setScheduleViewMode(mode){
@@ -17043,7 +17152,13 @@ async function saveSchedule(e){
    const returnSubdivision=currentSubdivision;
 
    if(returnToSchedule){
-     // Keep the calendar exactly where the user was.
+     // Update the local item immediately; avoid a full-screen refresh.
+     if(result.data){
+       const index=items.findIndex(x=>String(x.id)===String(result.data.id));
+       if(index>=0)items[index]=result.data;
+       else items.push(result.data);
+       items.sort((a,b)=>String(a.starts_at||'').localeCompare(String(b.starts_at||'')));
+     }
      await refreshPreservingCalendar();
    }else{
      await load();
@@ -18305,7 +18420,7 @@ try{
 </script>
 
 <div id="bbBuildVersion" style="text-align:center;color:#8a96a8;font-size:10px;padding:10px 8px 18px">
-  BowenBuilder 3.8</div>
+  BowenBuilder 4.0</div>
 
 
 
