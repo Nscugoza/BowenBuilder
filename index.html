@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="4.7">
+<meta name="bowenbuilder-version" content="4.8">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -5128,7 +5128,7 @@ button.teams-file-row:hover{border-color:#bdccdd}
     drain();
   }
   function drain() {
-    while (active < 4 && queue.length) {
+    while (active < 2 && queue.length) {
       const task = queue.shift();
       if (!task.element.isConnected) continue;
       active++;
@@ -5136,6 +5136,7 @@ button.teams-file-row:hover{border-color:#bdccdd}
     }
   }
   async function render({element, type, resolve}) {
+    if (!element.isConnected) return;
     const url = await resolve();
     if (!url || !element.isConnected) return;
     const parsed = new URL(url, location.href);
@@ -5151,7 +5152,7 @@ button.teams-file-row:hover{border-color:#bdccdd}
     pdfModule ||= import('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.6.82/pdf.min.mjs').catch(error => {pdfModule = null; throw error;});
     const pdfjs = await pdfModule;
     pdfjs.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.6.82/pdf.worker.min.mjs';
-    const loading = pdfjs.getDocument({url, isEvalSupported:false});
+    const loading = pdfjs.getDocument({url, isEvalSupported:false, disableAutoFetch:true, disableStream:false});
     try {
       const pdf = await loading.promise;
       if (!element.isConnected) return;
@@ -5231,7 +5232,7 @@ button.teams-file-row:hover{border-color:#bdccdd}
 <script>
 (async()=>{
 const $=id=>document.getElementById(id);
-const BOWENBUILDER_VERSION='4.7';
+const BOWENBUILDER_VERSION='4.8';
 const SB_URL='https://oztefiymckpyxiewgxtc.supabase.co';
 const SB_KEY='sb_publishable__ItoYGeHKEGTBFiE7JM74w_1F-qERVe';
 const db=window.supabase.createClient(SB_URL,SB_KEY);
@@ -6894,20 +6895,17 @@ async function portalOpenFile(fileId){
   if(!file)return;
 
   try{
-    const {data,error}=await db.storage
-      .from('bowenbuilder-files')
-      .createSignedUrl(file.storage_path,3600);
+    const url=await signedSubdivisionFileUrl(file,3600);
+    if(!url)throw new Error('Could not create a secure file link.');
 
-    if(error)throw error;
-
-    await portalLog('portal_file_opened',{
+    portalLog('portal_file_opened',{
       label:`Opened ${file.file_name||'file'}`,
       subdivisionId:file.subdivision_id,
       lotId:file.lot_id,
       fileId:file.id
-    });
+    }).catch(()=>{});
 
-    window.open(data?.signedUrl||'','_blank','noopener');
+    window.open(url,'_blank','noopener');
   }catch(err){
     alert(err?.message||'Could not open this file.');
   }
@@ -11032,13 +11030,25 @@ function renderSubdivisionFiles(){
   });
 }
 
+// Share signed URLs across thumbnails, Open and Download within their validity window.
+// In-flight deduplication avoids multiple storage requests for the same PDF.
+const bowenFileUrlCache=new Map();
 async function signedSubdivisionFileUrl(file,expiresIn=3600){
   if(!file?.storage_path)return '';
-  const {data,error}=await db.storage
-    .from('bowenbuilder-files')
-    .createSignedUrl(file.storage_path,expiresIn);
-  if(error)throw error;
-  return data?.signedUrl||'';
+  const path=String(file.storage_path);
+  const now=Date.now();
+  const cached=bowenFileUrlCache.get(path);
+  if(cached && cached.expiresAt>now+60000)return cached.promise;
+  const promise=(async()=>{
+    const {data,error}=await db.storage.from('bowenbuilder-files').createSignedUrl(path,expiresIn);
+    if(error)throw error;
+    return data?.signedUrl||'';
+  })();
+  const entry={promise,expiresAt:now+Math.max(60,expiresIn-120)*1000};
+  bowenFileUrlCache.set(path,entry);
+  promise.catch(()=>{if(bowenFileUrlCache.get(path)===entry)bowenFileUrlCache.delete(path);});
+  if(bowenFileUrlCache.size>350){for(const [key,value] of bowenFileUrlCache){if(value.expiresAt<now)bowenFileUrlCache.delete(key);}}
+  return promise;
 }
 
 async function openSubdivisionFile(fileId){
@@ -18552,7 +18562,7 @@ try{
 </script>
 
 <div id="bbBuildVersion" style="text-align:center;color:#8a96a8;font-size:10px;padding:10px 8px 18px">
-  BowenBuilder 4.7</div>
+  BowenBuilder 4.8</div>
 
 
 
