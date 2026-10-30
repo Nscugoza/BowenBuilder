@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="4.9">
+<meta name="bowenbuilder-version" content="5.0">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -5232,7 +5232,7 @@ button.teams-file-row:hover{border-color:#bdccdd}
 <script>
 (async()=>{
 const $=id=>document.getElementById(id);
-const BOWENBUILDER_VERSION='4.9';
+const BOWENBUILDER_VERSION='5.0';
 const SB_URL='https://oztefiymckpyxiewgxtc.supabase.co';
 const SB_KEY='sb_publishable__ItoYGeHKEGTBFiE7JM74w_1F-qERVe';
 const db=window.supabase.createClient(SB_URL,SB_KEY);
@@ -5438,7 +5438,7 @@ function portalScheduleUpcomingMarkup(){
       <div class="portal-schedule-date-title">${esc(dateTitle)}</div>
       ${group.map(item=>{
         const status=String(item.status||'scheduled').toLowerCase();
-        const options=portalScheduleOptionList(item.included_options);
+        const options=includedOptionsList(item.included_options);
         return `<article class="portal-schedule-card">
           <div class="portal-schedule-card-head">
             <div style="min-width:0;flex:1">
@@ -6417,6 +6417,10 @@ const bbSpecGroups={
  'Shutters':['Shutters','Shutters Color'],
  'Cedar Wrapped Columns':['Cedar Wrapped Columns','Cedar Wrapped Columns Color'],
  'Roofing':['Roofing Material Type','Roofing Color'],
+ 'Hardware & Fixtures':['Hardware Color','Fixture Color'],
+ 'Closet Shelving':['Closet Shelving'],
+ 'Bathroom Mirrors':['Master Bathroom Mirrors','Powder Bath'],
+ 'Blinds':['Blinds'],
  'Custom':[]
 };
 const bbAllSpecKeys=()=>Object.values(bbSpecGroups).flat();
@@ -7064,7 +7068,7 @@ function tradeDashboardMarkup(lot,company,data){
  const schedule=list('schedule').filter(x=>!x.starts_at||new Date(x.starts_at).getTime()>=Date.now()-86400000).sort((a,b)=>new Date(a.starts_at)-new Date(b.starts_at));
  const punchout=list('punchout'),files=list('files'),specs=list('specs');
  const hero=String(lot.color_rendering_url||'').trim();const img=/^(https?:\/\/|data:image\/(?:png|jpeg|jpg|webp|gif);base64,)/i.test(hero)?`<img src="${esc(hero)}" alt="${esc(lot.lot_name||'Lot')} color rendering" loading="lazy" onerror="this.style.display='none'">`:'';
- const options=portalScheduleOptionList(lot.included_options);
+ const options=includedOptionsList(lot.included_options);
  return `<div class="trade-lot-hero">${img}<div class="trade-lot-hero-copy"><span>${esc(data.subdivisions?.find(s=>String(s.id)===String(lot.subdivision_id))?.name||'Subdivision')}</span><h2>${esc(lot.lot_name||'Lot')}</h2><p>${esc(lot.plan_name||'')}</p><p>${esc(lot.address||'')}</p></div></div>
  <div class="trade-lot-meta"><div><small>Permit Number</small><strong>${esc(lot.permit_number||'Not entered')}</strong></div><div><small>Plan</small><strong>${esc(lot.plan_name||'Not entered')}</strong></div><div><small>Address</small><strong>${esc(lot.address||'Not entered')}</strong></div><div><small>Trade</small><strong>${esc(company.name||'Vendor')}</strong></div></div>
  <div class="trade-lot-actions">${[['Schedule','schedule'],['Punchout','punchout'],['Files','files'],['Specifications','specs'],['Included Options','options'],['Contacts','contacts']].map(([name,action])=>`<button class="trade-lot-action" type="button" data-trade-action="${action}">${esc(name)} →</button>`).join('')}</div>
@@ -7073,7 +7077,7 @@ function tradeDashboardMarkup(lot,company,data){
 }
 function tradeDetailMarkup(action,lot,data){
  const rows=(data?.[action]||[]).filter(x=>String(x.lot_id)===String(lot.id));
- if(action==='options')return `<h3>Included Options</h3>${portalScheduleOptionList(lot.included_options).map(x=>`<div class="trade-lot-row">${esc(x)}</div>`).join('')||'<p class="muted">No included options listed.</p>'}`;
+ if(action==='options')return `<h3>Included Options</h3>${includedOptionsList(lot.included_options).map(x=>`<div class="trade-lot-row">${esc(x)}</div>`).join('')||'<p class="muted">No included options listed.</p>'}`;
  if(action==='contacts'){
   const superintendent=data?.superintendent||null;
   return `<h3>Neighborhood Superintendent</h3>${superintendent?.full_name?`<div class="trade-lot-row"><strong>${esc(superintendent.full_name)}</strong>${superintendent.email?`<p><a href="mailto:${esc(superintendent.email)}">${esc(superintendent.email)}</a></p>`:''}${superintendent.phone?`<p><a href="tel:${esc(String(superintendent.phone).replace(/[^+0-9]/g,''))}">${esc(superintendent.phone)}</a></p>`:''}</div>`:'<p class="muted">Superintendent contact has not been assigned for this neighborhood.</p>'}`;
@@ -18562,7 +18566,7 @@ try{
 </script>
 
 <div id="bbBuildVersion" style="text-align:center;color:#8a96a8;font-size:10px;padding:10px 8px 18px">
-  BowenBuilder 4.9</div>
+  BowenBuilder 5.0</div>
 
 
 
