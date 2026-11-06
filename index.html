@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="5.7">
+<meta name="bowenbuilder-version" content="5.8">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -5239,7 +5239,7 @@ button.teams-file-row:hover{border-color:#bdccdd}
 <script>
 (async()=>{
 const $=id=>document.getElementById(id);
-const BOWENBUILDER_VERSION='5.7';
+const BOWENBUILDER_VERSION='5.8';
 const SB_URL='https://oztefiymckpyxiewgxtc.supabase.co';
 const SB_KEY='sb_publishable__ItoYGeHKEGTBFiE7JM74w_1F-qERVe';
 const db=window.supabase.createClient(SB_URL,SB_KEY);
@@ -6456,7 +6456,11 @@ let bbSpecDefaultMode=false;
 let bbSpecIsEditing=false;
 let bbSpecsViewRequest=0;
 function bbSetSpecsMode(edit){
- bbSpecIsEditing=!!edit;
+ const canEdit=isBowenBuilderAdmin();
+ bbSpecIsEditing=!!edit && canEdit;
+ edit=bbSpecIsEditing;
+ $('bbSpecsEditMode').classList.toggle('hidden',!canEdit);
+ $('bbSpecsEditMode').disabled=!canEdit;
  $('bbLotSpecs').classList.toggle('hidden',!edit);
  $('bbLotSpecsReadOnly').classList.toggle('hidden',edit);
  $('bbSpecsViewMode').className=edit?'secondary':'primary';
@@ -6492,6 +6496,7 @@ async function bbRenderInternalSpecsView(){
 }
 
 async function bbRenderInternalSpecs(){
+ if(!isBowenBuilderAdmin()){bbSetSpecsMode(false);return;}
  const root=$('bbLotSpecs');if(!root||!currentLot)return;
  const lot=lots.find(x=>String(x.id)===String(currentLot));if(!lot)return;
  root.innerHTML='<div class="muted">Loading specifications…</div>';
@@ -6514,6 +6519,7 @@ async function bbRenderInternalSpecs(){
   }).join('')}</div><div class="card"><strong>Custom Specification</strong><input id="bbSpecCustomKey" placeholder="New specification name"><button id="bbSpecCustomAdd" class="secondary" type="button">Add Specification</button></div></div>`;
   $('bbSpecsDefaultsMode').onchange=e=>{bbSpecDefaultMode=e.target.checked;bbRenderInternalSpecs()};
   root.querySelectorAll('[data-bb-save-group]').forEach(btn=>btn.onclick=async()=>{
+   if(!isBowenBuilderAdmin())return;
    const group=btn.closest('[data-bb-spec-group]');
    if(!group)return;
    const status=group.querySelector('[data-bb-save-status]');
@@ -6543,6 +6549,7 @@ async function bbRenderInternalSpecs(){
    finally{btn.disabled=false;btn.textContent=original}
   });
   $('bbSpecCustomAdd').onclick=async()=>{
+   if(!isBowenBuilderAdmin())return;
    const key=$('bbSpecCustomKey').value.trim();if(!key)return;
    if(keys.includes(key)){alert('This specification already exists.');return}
    try{await bbSpecRpc('save',{subdivision_id:lot.subdivision_id,lot_id:bbSpecDefaultMode?null:lot.id,spec_key:key,spec_value:''});const y=window.scrollY;await bbRenderInternalSpecs();window.scrollTo({top:y,behavior:'instant'});}catch(e){alert(e.message)}
@@ -13125,7 +13132,7 @@ function showLot(preserveScroll=false){
   if(lotViewEl) lotViewEl.classList.remove('hidden');
 
  const l=lots.find(x=>x.id===currentLot);if(!l)return;
- if(document.querySelector('.lot-tab.active')?.dataset.lottab==='specs')bbSetSpecsMode(bbSpecIsEditing);
+ if(document.querySelector('.lot-tab.active')?.dataset.lottab==='specs')bbSetSpecsMode(bbSpecIsEditing && isBowenBuilderAdmin());
  logBowenActivity('view_lot',{label:`Opened ${l.lot_name||'lot'}`,entityType:'lot',entityId:l.id,subdivisionId:l.subdivision_id,lotId:l.id});
  configurePowerCompanyButton(l);
  requestAnimationFrame(()=>{
@@ -17900,7 +17907,7 @@ document.querySelectorAll('.lot-tab').forEach(b=>b.onclick=()=>{
   $('punchoutPanel').classList.toggle('hidden',b.dataset.lottab!=='punchout');
   $('filesPanel').classList.toggle('hidden',b.dataset.lottab!=='files');
   $('specsPanel').classList.toggle('hidden',b.dataset.lottab!=='specs');
-  if(b.dataset.lottab==='specs')bbSetSpecsMode(bbSpecIsEditing);
+  if(b.dataset.lottab==='specs')bbSetSpecsMode(bbSpecIsEditing && isBowenBuilderAdmin());
   if(b.dataset.lottab==='punchout' && currentLot) renderPunchout(currentLot);
   if(b.dataset.lottab==='files'){
     if(!teamsFilesLoaded){
@@ -18655,7 +18662,7 @@ try{
 </script>
 
 <div id="bbBuildVersion" style="text-align:center;color:#8a96a8;font-size:10px;padding:10px 8px 18px">
-  BowenBuilder 5.7</div>
+  BowenBuilder 5.8</div>
 
 
 
