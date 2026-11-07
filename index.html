@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="5.9">
+<meta name="bowenbuilder-version" content="6.0">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -4904,6 +4904,7 @@ button.teams-file-row:hover{border-color:#bdccdd}
 </label>
   <label>Crew / Assignee<input id="scheduleCrew"></label>
   <div class="two"><label>Start Date<input id="scheduleStart" type="date" required></label><label>End Date<input id="scheduleEnd" type="date" required></label></div>
+  <label>Time (Eastern, optional)<input id="scheduleTime" type="time" step="60"><span class="muted" style="font-weight:650;font-size:12px">Leave blank for a date-only item. Enter Eastern Time, not the time on this device.</span></label>
   <label>Location<input id="scheduleLocation"></label>
   <label>Inspection Status<select id="inspectionStatus"><option>Not linked</option><option>Check County</option><option>Requested</option><option>Scheduled</option><option>Passed</option><option>Failed</option><option>Cancelled</option></select></label>
   <label>Notes<textarea id="scheduleNotes" rows="3" placeholder="Notes shared with authorized trades"></textarea></label>
@@ -5243,7 +5244,7 @@ const $=id=>document.getElementById(id);
 // labels identical: this constant, the bowenbuilder-version meta tag, and
 // the bbBuildVersion footer. Open tabs compare this constant with the
 // deployed meta tag.
-const BOWENBUILDER_VERSION='5.9';
+const BOWENBUILDER_VERSION='6.0';
 const SB_URL='https://oztefiymckpyxiewgxtc.supabase.co';
 const SB_KEY='sb_publishable__ItoYGeHKEGTBFiE7JM74w_1F-qERVe';
 const db=window.supabase.createClient(SB_URL,SB_KEY);
@@ -5454,7 +5455,7 @@ function portalScheduleUpcomingMarkup(){
           <div class="portal-schedule-card-head">
             <div style="min-width:0;flex:1">
               <div class="portal-schedule-work">${esc(item.name||'Scheduled Work')}</div>
-              <div class="portal-schedule-lot">${esc(item.lot_name||'Lot')}</div>
+              <div class="portal-schedule-lot">${esc(item.lot_name||'Lot')}${scheduleAppointmentTimeLabel(item.appointment_time)?` · ${esc(scheduleAppointmentTimeLabel(item.appointment_time))}`:''}</div>
               ${item.address?`<div class="portal-schedule-address">${esc(item.address)}</div>`:''}
               ${item.subdivision_name?`<div class="portal-schedule-subdivision">${esc(item.subdivision_name)}</div>`:''}
             </div>
@@ -5490,7 +5491,8 @@ function portalScheduleCalendarMarkup(){
       <div class="portal-schedule-calendar-events">
         ${dayItems.map(item=>{
           const status=String(item.status||'scheduled').toLowerCase();
-          return `<span class="portal-schedule-event ${esc(status)}" data-portal-schedule-event="${esc(item.id)}" role="button" tabindex="0" title="${esc(`${item.name||''} · ${item.lot_name||''}${item.notes?' · '+item.notes:''}`)}">${esc(item.name||'Work')} · ${esc(item.lot_name||'Lot')}</span>`;
+          const timeLabel=scheduleAppointmentTimeLabel(item.appointment_time);
+          return `<span class="portal-schedule-event ${esc(status)}" data-portal-schedule-event="${esc(item.id)}" role="button" tabindex="0" title="${esc(`${item.name||''} · ${item.lot_name||''}${timeLabel?' · '+timeLabel:''}${item.notes?' · '+item.notes:''}`)}">${esc(item.name||'Work')}${timeLabel?` · ${esc(timeLabel)}`:''} · ${esc(item.lot_name||'Lot')}</span>`;
         }).join('')}
       </div>
     </div>`);
@@ -5528,7 +5530,7 @@ function portalRenderSchedule(){
 
   portalScheduleHydrateMedia(root);
   root.querySelectorAll('[data-portal-schedule-event]').forEach(el=>{
-   const open=()=>{const item=portalScheduleItems().find(x=>String(x.id)===el.dataset.portalScheduleEvent);const detail=$('portalScheduleEventDetail');if(!item||!detail)return;detail.style.display='block';detail.innerHTML=`<h3>${esc(item.name||'Scheduled Work')} · ${esc(item.lot_name||'')}</h3>${portalScheduleNotesMarkup(item)||'<p class="muted">No notes attached.</p>'}`;portalScheduleHydrateMedia(detail);};
+   const open=()=>{const item=portalScheduleItems().find(x=>String(x.id)===el.dataset.portalScheduleEvent);const detail=$('portalScheduleEventDetail');if(!item||!detail)return;const timeLabel=scheduleAppointmentTimeLabel(item.appointment_time);detail.style.display='block';detail.innerHTML=`<h3>${esc(item.name||'Scheduled Work')} · ${esc(item.lot_name||'')}${timeLabel?` · ${esc(timeLabel)}`:''}</h3>${portalScheduleNotesMarkup(item)||'<p class="muted">No notes attached.</p>'}`;portalScheduleHydrateMedia(detail);};
    el.onclick=open;el.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open();}};
   });
   $('portalScheduleRefresh').onclick=async()=>{
@@ -5816,6 +5818,10 @@ function scheduleAlertRange(start,end){
  const a=scheduleAlertDate(start),b=scheduleAlertDate(end);
  return !end||a===b?a:`${a} – ${b}`;
 }
+function scheduleAlertDateWithTime(range,timeValue){
+ const time=scheduleAppointmentTimeLabel(timeValue);
+ return time?`${range} at ${time}`:String(range||'');
+}
 function scheduleAlertLabel(kind){return ({scheduled:'Scheduled',rescheduled:'Rescheduled',canceled:'Canceled'})[kind]||'Updated';}
 function scheduleAlertDefaultSubjectTemplate(){
  return '{lot} — {work} — {status}';
@@ -5861,12 +5867,12 @@ function scheduleAlertTemplateValues(notification){
   subdivision:d.subdivision||'',
   lot:d.lot||'Lot',
   address:d.address||'Not added',
-  date:scheduleAlertRange(d.start,d.end),
+  date:scheduleAlertDateWithTime(scheduleAlertRange(d.start,d.end),d.appointment_time),
   options:optionLines.join('\n'),
   farm_sink:farmSink,
-  previous_date:hasPrevious?previousDate:'',
+  previous_date:hasPrevious?scheduleAlertDateWithTime(previousDate,d.previous_appointment_time):'',
   date_label:dateLabel,
-  previous_date_line:hasPrevious?`Previous schedule date: ${previousDate}\n`:'',
+  previous_date_line:hasPrevious?`Previous schedule date: ${scheduleAlertDateWithTime(previousDate,d.previous_appointment_time)}\n`:'',
   portal_link:'https://bowen-builder.vercel.app/?portal=1'
  };
 }
@@ -7100,7 +7106,7 @@ function tradeDashboardMarkup(lot,company,data){
  return `<div class="trade-lot-hero">${img}<div class="trade-lot-hero-copy"><span>${esc(data.subdivisions?.find(s=>String(s.id)===String(lot.subdivision_id))?.name||'Subdivision')}</span><h2>${esc(lot.lot_name||'Lot')}</h2><p>${esc(lot.plan_name||'')}</p><p>${esc(lot.address||'')}</p></div></div>
  <div class="trade-lot-meta"><div><small>Permit Number</small><strong>${esc(lot.permit_number||'Not entered')}</strong></div><div><small>Plan</small><strong>${esc(lot.plan_name||'Not entered')}</strong></div><div><small>Address</small><strong>${esc(lot.address||'Not entered')}</strong></div><div><small>Trade</small><strong>${esc(company.name||'Vendor')}</strong></div></div>
  <div class="trade-lot-actions">${[['Schedule','schedule'],['Punchout','punchout'],['Files','files'],['Specifications','specs'],['Included Options','options'],['Contacts','contacts']].map(([name,action])=>`<button class="trade-lot-action" type="button" data-trade-action="${action}">${esc(name)} →</button>`).join('')}</div>
- <div class="trade-lot-panels"><section class="trade-lot-panel"><h3>Upcoming Schedule</h3>${schedule.slice(0,5).map(x=>`<div class="trade-lot-row"><strong>${esc(x.name||'Scheduled work')}</strong><small>${esc(x.starts_at?new Date(x.starts_at).toLocaleDateString():'')} · ${esc(portalScheduleStatusLabel(x.status))}</small>${portalScheduleNotesMarkup(x)}</div>`).join('')||'<p class="muted">No upcoming work shared with this company.</p>'}</section><section class="trade-lot-panel"><h3>Open Punchout (${punchout.length})</h3>${punchout.slice(0,5).map(x=>`<div class="trade-lot-row">${esc(x.description||'Punchout item')}</div>`).join('')||'<p class="muted">No open punchout assigned to this company.</p>'}</section></div>
+ <div class="trade-lot-panels"><section class="trade-lot-panel"><h3>Upcoming Schedule</h3>${schedule.slice(0,5).map(x=>`<div class="trade-lot-row"><strong>${esc(x.name||'Scheduled work')}</strong><small>${esc(x.starts_at?new Date(x.starts_at).toLocaleDateString():'')}${scheduleAppointmentTimeLabel(x.appointment_time)?` · ${esc(scheduleAppointmentTimeLabel(x.appointment_time))}`:''} · ${esc(portalScheduleStatusLabel(x.status))}</small>${portalScheduleNotesMarkup(x)}</div>`).join('')||'<p class="muted">No upcoming work shared with this company.</p>'}</section><section class="trade-lot-panel"><h3>Open Punchout (${punchout.length})</h3>${punchout.slice(0,5).map(x=>`<div class="trade-lot-row">${esc(x.description||'Punchout item')}</div>`).join('')||'<p class="muted">No open punchout assigned to this company.</p>'}</section></div>
  <section class="trade-lot-panel" id="trade-lot-detail" style="margin-top:12px"><h3>Lot Overview</h3><p class="muted">Choose a section above to see the details available to this company.</p></section>`;
 }
 function tradeDetailMarkup(action,lot,data){
@@ -7112,7 +7118,7 @@ function tradeDetailMarkup(action,lot,data){
  }
  const names={schedule:'Schedule',punchout:'Open Punchout',files:'Files',specs:'Specifications'};
  return `<h3>${names[action]||'Details'}</h3>${rows.map(x=>{
-  if(action==='schedule')return `<div class="trade-lot-row"><strong>${esc(x.name||'Work')}</strong><small>${esc(x.starts_at?new Date(x.starts_at).toLocaleDateString():'')} · ${esc(portalScheduleStatusLabel(x.status))}</small>${portalScheduleNotesMarkup(x)}</div>`;
+  if(action==='schedule')return `<div class="trade-lot-row"><strong>${esc(x.name||'Work')}</strong><small>${esc(x.starts_at?new Date(x.starts_at).toLocaleDateString():'')}${scheduleAppointmentTimeLabel(x.appointment_time)?` · ${esc(scheduleAppointmentTimeLabel(x.appointment_time))}`:''} · ${esc(portalScheduleStatusLabel(x.status))}</small>${portalScheduleNotesMarkup(x)}</div>`;
   if(action==='punchout')return `<div class="trade-lot-row">${esc(x.description||'Punchout')}</div>`;
   if(action==='files')return `<div class="trade-lot-row">📄 ${esc(x.file_name||'File')}</div>`;
   return `<div class="trade-lot-row"><strong>${esc(x.spec_key||'Specification')}: ${esc(x.spec_value||'Not selected')}</strong>${x.note?`<small>${esc(x.note)}</small>`:''}</div>`;
@@ -8849,7 +8855,7 @@ async function showPublicCrewView(token){
       </div>
     </div>
     ${crewSafeImageSrc(lot.rendering_signed_url)?`<div class="crew-card"><h2>Color Rendering</h2><img src="${crewSafeImageSrc(lot.rendering_signed_url)}" alt="Color rendering" style="width:100%;max-height:420px;object-fit:contain;border-radius:12px" onerror="this.closest('.crew-card').innerHTML='<h2>Color Rendering</h2><div class=&quot;muted&quot;>Rendering could not be loaded.</div>'"></div>`:''}
-    <div class="crew-card"><h2>Schedule</h2>${schedules.length?schedules.map(i=>`<div class="crew-schedule-item"><strong>${esc(i.name||'Scheduled Work')}</strong><div class="muted">${crewDateLabel(i.starts_at)}${i.ends_at&&String(i.ends_at).slice(0,10)!==String(i.starts_at).slice(0,10)?' → '+crewDateLabel(i.ends_at):''}${i.crew?' · '+esc(i.crew):''}</div></div>`).join(''):'<div class="muted">No upcoming work scheduled.</div>'}</div>
+    <div class="crew-card"><h2>Schedule</h2>${schedules.length?schedules.map(i=>`<div class="crew-schedule-item"><strong>${esc(i.name||'Scheduled Work')}</strong><div class="muted">${crewDateLabel(i.starts_at)}${i.ends_at&&String(i.ends_at).slice(0,10)!==String(i.starts_at).slice(0,10)?' → '+crewDateLabel(i.ends_at):''}${scheduleAppointmentTimeLabel(i.appointment_time)?` · ${esc(scheduleAppointmentTimeLabel(i.appointment_time))}`:''}${i.crew?' · '+esc(i.crew):''}</div></div>`).join(''):'<div class="muted">No upcoming work scheduled.</div>'}</div>
     ${(publicSubdivisionResources||resources)?`<div class="crew-card"><h2>Job Resources</h2><div class="crew-resource-grid">${publicSubdivisionResources}${resources}</div>${resources?`<p class="muted" style="margin:10px 0 0">Private BowenBuilder uploads and Microsoft Teams documents stay protected and are not exposed by the public QR page.</p>`:''}</div>`:''}
     <div class="crew-card"><h2>Open Punchout</h2>${punch.length?punch.map(p=>{
       const photos=Array.isArray(p.photos)?p.photos:[];
@@ -10288,7 +10294,7 @@ function renderSubdivisionAgendaDay(title,dateKey){
      <div class="subdivision-agenda-meta">
        ${lot?.address?`${esc(lot.address)}<br>`:''}
        ${i.crew?`Crew: ${esc(i.crew)}<br>`:''}
-       ${esc(dateRange)}
+       ${esc(dateRange)}${scheduleAppointmentTimeLabel(i.appointment_time)?` · ${esc(scheduleAppointmentTimeLabel(i.appointment_time))}`:''}
      </div>
      ${canQuickEdit?`<div class="subdivision-agenda-quick-actions">
        ${isInspectionItem?`
@@ -13209,7 +13215,7 @@ function showLot(preserveScroll=false){
        <span class="schedule-status-pill ${esc(i.status)}">${esc((i.status||'').replaceAll('_',' ').replace(/\b\w/g,c=>c.toUpperCase()))}</span>
        <h4>${esc(i.name)}</h4>
        ${inspectionLabel?`<div class="overview-inspection-result ${esc(inspectionRaw)}">Inspection: ${esc(inspectionLabel)}</div>`:''}
-       <div class="schedule-meta">${esc(i.item_type)}${i.crew?' · '+esc(i.crew):''}<br>${sd}${ed&&ed!==sd?' → '+ed:''}</div>
+       <div class="schedule-meta">${esc(i.item_type)}${i.crew?' · '+esc(i.crew):''}<br>${esc(scheduleDateRangeLabel(sd,ed,i))}</div>
        ${quickActions}
      </div>
      <div class="schedule-actions overview-schedule-actions">
@@ -13693,7 +13699,21 @@ function renderScheduleMoveBanner(){
  const end=itemEndKey(item);
  const range=end&&end!==start?`${start} → ${end}`:start;
  $('calendarMoveTitle').textContent=`Moving ${item.name||'scheduled item'}`;
- $('calendarMoveHelp').textContent=`Current date${end&&end!==start?'s':''}: ${range}. Tap the new start day.`;
+ const time=scheduleAppointmentTimeLabel(item.appointment_time);
+ $('calendarMoveHelp').textContent=time
+  ? `Current date${end&&end!==start?'s':''}: ${range} · ${time}. Tap the new start day. The Eastern time stays with this item.`
+  : `Current date${end&&end!==start?'s':''}: ${range}. Tap the new start day.`;
+}
+function scheduleMovePayload(item,newStartKey){
+ const oldStart=itemStartKey(item);
+ const oldEnd=itemEndKey(item)||oldStart;
+ const duration=calendarDaysBetween(oldStart,oldEnd);
+ const newEndKey=calendarAddDays(newStartKey,duration);
+ return {
+  p_start:newStartKey+'T12:00:00Z',
+  p_end:newEndKey+'T12:00:00Z',
+  appointment_time:item?.appointment_time??null
+ };
 }
 async function moveScheduleItemToDate(id,newStartKey){
  if(scheduleMoveBusy)return;
@@ -13708,18 +13728,17 @@ async function moveScheduleItemToDate(id,newStartKey){
    renderScheduleCalendar();
    return;
  }
- const duration=calendarDaysBetween(oldStart,oldEnd);
- const newEndKey=calendarAddDays(newStartKey,duration);
+ const moved=scheduleMovePayload(item,newStartKey);
  const oldSnapshot={...item};
  scheduleMoveBusy=true;
  renderScheduleMoveBanner();
  try{
-   // Permission-checked server operation returns exactly one updated schedule item.
-   // Avoid PostgREST .single() coercion failures on UPDATE for crew accounts.
+   // Dates move as noon-UTC calendar days. appointment_time is not sent, so the
+   // stored Eastern time stays on the row.
    const {data,error}=await db.rpc('bowenbuilder_move_schedule_item',{
      p_item_id:item.id,
-     p_start:newStartKey+'T12:00:00Z',
-     p_end:newEndKey+'T12:00:00Z'
+     p_start:moved.p_start,
+     p_end:moved.p_end
    });
    if(error)throw error;
 
@@ -13915,7 +13934,7 @@ function renderScheduleListView(){
      <div>
        <span class="schedule-status-pill ${esc(i.status||'scheduled')}">${esc(statusDisplay(i.status))}</span>
        <h4>${esc(scheduleLotName(i))} · ${esc(i.name)}</h4>
-       <div class="schedule-meta">${esc(i.item_type||'Job')}${i.crew?' · '+esc(i.crew):''}<br>${esc(sd)}${ed&&ed!==sd?' → '+esc(ed):''}</div>
+       <div class="schedule-meta">${esc(i.item_type||'Job')}${i.crew?' · '+esc(i.crew):''}<br>${esc(scheduleDateRangeLabel(sd,ed,i))}</div>
      </div>
      <div class="schedule-actions"><button class="iconbtn" type="button" data-schedule-list-edit="${i.id}">Edit</button></div>
    </div>`;
@@ -13962,7 +13981,8 @@ function renderScheduleCalendar(){
    const eventHtml=dayItems.slice(0,3).map(x=>{
      const inspection=inspectionStatusDisplay(x.inspection_status);
      const inspectionClass=esc(String(x.inspection_status||'').toLowerCase());
-     return `<span class="bb-calendar-event ${esc(x.status||'scheduled')}" data-bb-event-id="${x.id}" title="${esc(x.name)}${inspection?' · Inspection: '+esc(inspection):''}"><span>${esc(x.name)}</span>${inspection?`<span class="bb-calendar-inspection ${inspectionClass}">Inspection: ${esc(inspection)}</span>`:''}</span>`;
+     const timeLabel=scheduleAppointmentTimeLabel(x.appointment_time);
+     return `<span class="bb-calendar-event ${esc(x.status||'scheduled')}" data-bb-event-id="${x.id}" title="${esc(x.name)}${timeLabel?' · '+esc(timeLabel):''}${inspection?' · Inspection: '+esc(inspection):''}"><span>${esc(x.name)}${timeLabel?` · ${esc(timeLabel)}`:''}</span>${inspection?`<span class="bb-calendar-inspection ${inspectionClass}">Inspection: ${esc(inspection)}</span>`:''}</span>`;
    }).join('');
    const commHtml=(wasEmailedDate(key)||wasTextedDate(key))
      ? `<div class="bb-calendar-comm-marks">${wasEmailedDate(key)?'<span class="bb-calendar-comm-mark email" title="Email opened for this date">E</span>':''}${wasTextedDate(key)?'<span class="bb-calendar-comm-mark text" title="Text opened for this date">T</span>':''}</div>`
@@ -15583,7 +15603,7 @@ function linkedScheduleMessageBody(lotId,linkedItems,fallbackBody){
     const displayName=linkedScheduleCanonicalName(item.name)==='final drywall touch up'
       ? 'Final Drywall Touch Up'
       : item.name;
-    lines.push(`- ${displayName}: ${pretty}`);
+    lines.push(`- ${displayName}: ${scheduleMessageDateText(pretty,item)}`);
   });
 
   const options=includedOptionsLinesForMessage(lot);
@@ -15610,16 +15630,17 @@ function overviewScheduleItemMessage(item,planUrl='',includePlans=false,renderin
   const emailPrefs=scheduleInfoPrefsForItem(item,'email');
   const textPrefs=scheduleInfoPrefsForItem(item,'text');
 
+  const timeLabel=scheduleAppointmentTimeLabel(item.appointment_time);
   const detailLines=[`${lot?.lot_name||'Lot'} Schedule`];
   if(emailPrefs.has('address') && lot?.address)detailLines.push(lot.address);
   if(emailPrefs.has('subdivision') && sub?.name)detailLines.push(sub.name);
   if(emailPrefs.has('plan') && lot?.plan_name)detailLines.push(`Plan: ${lot.plan_name}`);
   if(emailPrefs.has('permit') && lot?.permit_number)detailLines.push(`Permit Number: ${lot.permit_number}`);
-  if(emailPrefs.has('date') && dateLabel)detailLines.push(`Requested Schedule Date: ${dateLabel}`);
+  if(emailPrefs.has('date') && dateLabel)detailLines.push(`Requested Schedule Date: ${scheduleMessageDateText(dateLabel,item)}`);
   if(emailPrefs.has('work')){
     detailLines.push('');
     detailLines.push('Scheduled Work:');
-    detailLines.push(`- ${work}${item.crew?' — '+item.crew:''}`);
+    detailLines.push(`- ${work}${item.crew?' — '+item.crew:''}${(!emailPrefs.has('date') && timeLabel)?` · ${timeLabel}`:''}`);
   }
   if(emailPrefs.has('options') && optionLines.length){
     detailLines.push('');
@@ -15628,12 +15649,12 @@ function overviewScheduleItemMessage(item,planUrl='',includePlans=false,renderin
   }
 
   const textLines=[`${lot?.lot_name||'Lot'} Schedule`];
-  if(textPrefs.has('work'))textLines.push(`Scheduled Work: ${work}`);
+  if(textPrefs.has('work'))textLines.push(`Scheduled Work: ${work}${(!textPrefs.has('date') && timeLabel)?` · ${timeLabel}`:''}`);
   if(textPrefs.has('address') && lot?.address)textLines.push(lot.address);
   if(textPrefs.has('subdivision') && sub?.name)textLines.push(sub.name);
   if(textPrefs.has('plan') && lot?.plan_name)textLines.push(`Plan: ${lot.plan_name}`);
   if(textPrefs.has('permit') && lot?.permit_number)textLines.push(`Permit Number: ${lot.permit_number}`);
-  if(textPrefs.has('date') && dateLabel)textLines.push(`Requested Schedule Date: ${dateLabel}`);
+  if(textPrefs.has('date') && dateLabel)textLines.push(`Requested Schedule Date: ${scheduleMessageDateText(dateLabel,item)}`);
   if(textPrefs.has('options') && optionLines.length){
     textLines.push('Included Options:');
     optionLines.forEach(x=>textLines.push(`- ${x}`));
@@ -16805,6 +16826,8 @@ function selectedDateMessage(planUrl='',includePlans=false,renderingUrl='',inclu
      arr.forEach(i=>{
        const parts=[i.name||'Schedule Item'];
        if(i.crew)parts.push(i.crew);
+       const timeLabel=scheduleAppointmentTimeLabel(i.appointment_time);
+       if(timeLabel)parts.push(timeLabel);
        detailLines.push(`- ${parts.join(' — ')}`);
      });
    }else{
@@ -16826,7 +16849,14 @@ function selectedDateMessage(planUrl='',includePlans=false,renderingUrl='',inclu
  const subject=`${lot?.lot_name||'Lot'} - ${workSubject}`;
 
  const textLines=[`${lot?.lot_name||'Lot'} Schedule`];
- if(textPrefs.has('work'))textLines.push(`Scheduled Work: ${workNames.length?workNames.join(', '):'None listed'}`);
+ if(textPrefs.has('work')){
+   const detailed=arr.map(i=>{
+     const timeLabel=scheduleAppointmentTimeLabel(i.appointment_time);
+     const name=i.name||'Schedule Item';
+     return timeLabel?`${name} at ${timeLabel}`:name;
+   });
+   textLines.push(`Scheduled Work: ${detailed.length?detailed.join(', '):'None listed'}`);
+ }
  if(textPrefs.has('address') && lot?.address)textLines.push(lot.address);
  if(textPrefs.has('subdivision') && sub?.name)textLines.push(sub.name);
  if(textPrefs.has('plan') && lot?.plan_name)textLines.push(`Plan: ${lot.plan_name}`);
@@ -17077,7 +17107,7 @@ function renderSelectedScheduleDay(){
      <div class="bb-calendar-selected-item bb-swipe-content" data-swipe-content="${i.id}">
        <div class="bb-calendar-selected-main">
          <div class="bb-calendar-selected-title">${esc(scheduleLotName(i))} · ${esc(i.name)}</div>
-         <div class="bb-calendar-selected-meta">${esc(statusDisplay(i.status))}${i.crew?' · '+esc(i.crew):''}${inspectionStatusDisplay(i.inspection_status)?' · Inspection: '+esc(inspectionStatusDisplay(i.inspection_status)):''}</div>
+         <div class="bb-calendar-selected-meta">${scheduleAppointmentTimeLabel(i.appointment_time)?esc(scheduleAppointmentTimeLabel(i.appointment_time))+' · ':''}${esc(statusDisplay(i.status))}${i.crew?' · '+esc(i.crew):''}${inspectionStatusDisplay(i.inspection_status)?' · Inspection: '+esc(inspectionStatusDisplay(i.inspection_status)):''}</div>
        </div>
        <button class="bb-calendar-item-more" type="button" data-bb-calendar-more="${i.id}" aria-label="Actions for ${esc(i.name)}" title="Actions (or press and hold)">⋯</button>
      </div>
@@ -17347,14 +17377,16 @@ async function saveSchedule(e){
    if(!startDate||!endDate){alert('Please enter a start and end date.');return}
    if(endDate<startDate){alert('End date must be on or after start date.');return}
 
+   const times=scheduleWriteTimes(startDate,endDate,$('scheduleTime').value);
    const payload={
     lot_id:$('scheduleLot').value,
     item_type:$('scheduleType').value,
     name:($('scheduleName').value==='__custom__' ? $('scheduleCustomName').value.trim() : $('scheduleName').value.trim()),
     status:$('scheduleStatus').value.toLowerCase().replaceAll(' ','_'),
     crew:$('scheduleCrew').value.trim(),
-    starts_at:startDate+'T12:00:00Z',
-    ends_at:endDate+'T12:00:00Z',
+    starts_at:times.starts_at,
+    ends_at:times.ends_at,
+    appointment_time:times.appointment_time,
     location:$('scheduleLocation').value.trim(),
     inspection_status:$('inspectionStatus').value.toLowerCase().replaceAll(' ','_'),
     notes:$('scheduleNotes').value.trim()
@@ -17517,6 +17549,47 @@ document.addEventListener('click',e=>{
  if(!wrap)toggleSubdivisionInspectionMenu(false);
 });
 $('backToLots').onclick=showLots;
+function scheduleAppointmentTimeValue(value){
+ const match=String(value??'').trim().match(/^(\d{2}):(\d{2})(?::(\d{2}))?$/);
+ if(!match)return '';
+ const hour=Number(match[1]);
+ const minute=Number(match[2]);
+ const second=match[3]===undefined?0:Number(match[3]);
+ if(hour>23||minute>59||second>59)return '';
+ return `${match[1]}:${match[2]}`;
+}
+function scheduleAppointmentTimeStorage(value){
+ const hm=scheduleAppointmentTimeValue(value);
+ return hm?`${hm}:00`:null;
+}
+function scheduleAppointmentTimeLabel(value){
+ const hm=scheduleAppointmentTimeValue(value);
+ if(!hm)return '';
+ const hour=Number(hm.slice(0,2));
+ const minute=hm.slice(3,5);
+ const suffix=hour>=12?'PM':'AM';
+ const hour12=hour%12||12;
+ return `${hour12}:${minute} ${suffix} ET`;
+}
+function scheduleDateRangeLabel(startText,endText,item){
+ const start=String(startText||'');
+ const end=String(endText||'');
+ const time=scheduleAppointmentTimeLabel(item&&item.appointment_time);
+ const startWithTime=time?`${start} · ${time}`:start;
+ if(end && end!==start)return `${startWithTime} → ${end}`;
+ return startWithTime;
+}
+function scheduleMessageDateText(dateLabel,item){
+ const time=scheduleAppointmentTimeLabel(item&&item.appointment_time);
+ return time?`${dateLabel} at ${time}`:String(dateLabel||'');
+}
+function scheduleWriteTimes(startDate,endDate,timeValue){
+ return {
+  starts_at:startDate+'T12:00:00Z',
+  ends_at:endDate+'T12:00:00Z',
+  appointment_time:scheduleAppointmentTimeStorage(timeValue)
+ };
+}
 function dateInputValue(v){
  if(!v) return '';
  const d=new Date(v);
@@ -17572,6 +17645,7 @@ function openScheduleDialogLive(id='',context='lot',prefillDate=''){
    $('scheduleCrew').value=existing.crew||'';
    $('scheduleStart').value=dateInputValue(existing.starts_at);
    $('scheduleEnd').value=dateInputValue(existing.ends_at);
+   $('scheduleTime').value=scheduleAppointmentTimeValue(existing.appointment_time);
    $('scheduleLocation').value=existing.location||'';
    const inspMap={not_linked:'Not linked',check_county:'Check County',requested:'Requested',scheduled:'Scheduled',passed:'Passed',failed:'Failed',cancelled:'Cancelled'};
    $('inspectionStatus').value=inspMap[existing.inspection_status]||'Not linked';
@@ -17585,6 +17659,7 @@ function openScheduleDialogLive(id='',context='lot',prefillDate=''){
    const t=prefillDate||todayInput();
    $('scheduleStart').value=t;
    $('scheduleEnd').value=t;
+   $('scheduleTime').value='';
  }
  $('scheduleDialog').showModal();
  scheduleMediaLoadExisting(id);
@@ -18666,7 +18741,7 @@ try{
 </script>
 
 <div id="bbBuildVersion" style="text-align:center;color:#8a96a8;font-size:10px;padding:10px 8px 18px">
-  BowenBuilder 5.9</div>
+  BowenBuilder 6.0</div>
 
 
 
