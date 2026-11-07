@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="6.1">
+<meta name="bowenbuilder-version" content="6.2">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -371,6 +371,10 @@ main{max-width:1240px;margin:0 auto;padding:26px}
 }
 .schedule-card h4{margin:6px 0 6px;font-size:17px}
 .schedule-meta{color:var(--muted);font-size:13px;line-height:1.55}
+.lot-marketing{margin-top:14px}
+.lot-marketing-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap}
+.lot-marketing-row{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:10px 0;border-top:1px solid var(--border)}
+.lot-marketing-actions{display:flex;gap:8px;flex-wrap:wrap}
 .schedule-actions{display:flex;gap:6px}
 .iconbtn{
   border:1px solid var(--border);
@@ -4146,7 +4150,6 @@ button.teams-file-row:hover{border-color:#bdccdd}
         <div class="lot-actions">
           <button id="editLot" class="secondary" type="button">✎ Edit Lot</button>
           <button id="crewQrBtn" class="secondary hidden" type="button">▦ Crew QR</button>
-          <button id="marketingFlyerBtn" class="secondary" type="button">Marketing Flyer</button>
           <button id="emailLot" class="secondary" type="button">✉ Email Lot</button>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
 <button id="lotCalendarBtn" class="secondary" type="button">▦ Lot Calendar</button>
@@ -4155,6 +4158,20 @@ button.teams-file-row:hover{border-color:#bdccdd}
         </div>
       </div>
       <div id="lotInfo"></div>
+      <section id="lotMarketing" class="card lot-marketing" aria-labelledby="lotMarketingTitle">
+        <div class="lot-marketing-head">
+          <div>
+            <strong id="lotMarketingTitle">Marketing</strong>
+            <div class="muted">Upload a finished PDF flyer for this lot. BowenBuilder stores the file and does not generate one.</div>
+          </div>
+          <div>
+            <button id="marketingFlyerUpload" class="secondary" type="button">Upload PDF</button>
+            <input id="marketingFlyerInput" type="file" accept="application/pdf,.pdf" hidden>
+          </div>
+        </div>
+        <div id="marketingFlyerStatus" class="muted" role="status" style="margin-top:10px"></div>
+        <div id="marketingFlyerList"></div>
+      </section>
       <div id="lotChecklist" class="lot-checklist card">
         <div class="lot-checklist-head">
           <div>
@@ -5245,7 +5262,7 @@ const $=id=>document.getElementById(id);
 // labels identical: this constant, the bowenbuilder-version meta tag, and
 // the bbBuildVersion footer. Open tabs compare this constant with the
 // deployed meta tag.
-const BOWENBUILDER_VERSION='6.1';
+const BOWENBUILDER_VERSION='6.2';
 const SB_URL='https://oztefiymckpyxiewgxtc.supabase.co';
 const SB_KEY='sb_publishable__ItoYGeHKEGTBFiE7JM74w_1F-qERVe';
 const db=window.supabase.createClient(SB_URL,SB_KEY);
@@ -8879,177 +8896,208 @@ function crewAccessUrl(token, origin, pathname){
   base.searchParams.set('crew', tokenText);
   return base.href;
 }
-function marketingFlyerEscape(value){
-  return String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const MARKETING_FLYER_MAX_BYTES=50*1024*1024;
+let lotMarketingFlyers=[];
+function marketingFlyerSafeName(name){
+  const base=String(name||'flyer.pdf').split(/[/\\]/).pop();
+  const cleaned=base.replace(/[^a-zA-Z0-9._-]+/g,'_').replace(/^\.+/,'').replace(/\.pdf$/i,'');
+  return `${(cleaned||'flyer').slice(0,80)}.pdf`;
 }
-function marketingFlyerImageSrc(value){
-  const raw=String(value||'').trim();
-  if(/^data:image\/(?:png|jpeg|jpg|webp|gif);base64,[a-z0-9+/=\s]+$/i.test(raw))return raw.replace(/\s/g,'');
-  try{
-    const url=new URL(raw);
-    if(url.protocol==='https:'||url.protocol==='http:')return url.href;
-  }catch(_){}
+function marketingFlyerPdfError(file){
+  if(!file)return 'Choose a PDF flyer.';
+  const name=String(file.name||'');
+  if(!/\.pdf$/i.test(name))return 'Marketing flyers must be PDF files.';
+  const type=String(file.type||'').toLowerCase();
+  if(type && type!=='application/pdf' && type!=='application/x-pdf')return 'Marketing flyers must be PDF files.';
+  if(!file.size)return 'That PDF is empty.';
+  if(file.size>MARKETING_FLYER_MAX_BYTES)return 'That PDF is larger than the 50 MB limit.';
   return '';
 }
-function marketingFlyerAddressHtml(address){
-  const text=String(address||'').trim();
-  if(!text)return marketingFlyerEscape('Address not added');
-  const comma=text.indexOf(',');
-  if(comma<1)return marketingFlyerEscape(text);
-  const line2=text.slice(comma+1).trim();
-  if(!line2)return marketingFlyerEscape(text);
-  return `${marketingFlyerEscape(text.slice(0,comma).trim())},<br>${marketingFlyerEscape(line2)}`;
+function marketingFlyerPdfBytes(bytes){
+  const head=bytes instanceof Uint8Array?bytes:new Uint8Array(bytes||[]);
+  return head.length>=4 && head[0]===0x25 && head[1]===0x50 && head[2]===0x44 && head[3]===0x46;
 }
-function marketingFlyerModel(lot, subdivisionName, origin, pathname){
-  if(!lot)return {ok:false,error:'Open a lot before printing a marketing flyer.'};
-  const token=String(lot.crew_access_token||'').trim();
-  if(!token){
-    return {ok:false,error:`${lot.lot_name||'This lot'} does not have a Crew QR yet. Create that existing Crew QR first. Marketing Flyer will not generate or reset a code.`};
-  }
-  const qrText=crewAccessUrl(token, origin, pathname);
-  if(!qrText)return {ok:false,error:'The Crew QR link could not be built.'};
-  const title=String(lot.lot_name||'Lot').trim().toUpperCase()||'LOT';
-  return {
-    ok:true,
-    title,
-    longTitle:title.length>16,
-    address:String(lot.address||'').trim(),
-    permit:String(lot.permit_number||'').trim(),
-    plan:String(lot.plan_name||'').trim(),
-    community:String(subdivisionName||'').trim(),
-    rendering:marketingFlyerImageSrc(lot.color_rendering_url),
-    qrText
+function marketingFlyerStoragePath(lotId,id){
+  return `${lotId}/marketing-flyer/${id}.pdf`;
+}
+function marketingFlyersForLot(rows,lotId){
+  return (Array.isArray(rows)?rows:[]).filter(row=>String(row?.lot_id)===String(lotId));
+}
+async function storeMarketingFlyer({lot,file,canEdit,upload,insertRow,remove,newId,userId}){
+  if(!lot?.id)return {ok:false,error:'Open a lot before uploading a marketing flyer.',uploaded:false,removed:false};
+  if(!canEdit)return {ok:false,error:'You do not have edit permission for this subdivision.',uploaded:false,removed:false};
+  const problem=marketingFlyerPdfError(file);
+  if(problem)return {ok:false,error:problem,uploaded:false,removed:false};
+  const head=new Uint8Array(await file.slice(0,5).arrayBuffer());
+  if(!marketingFlyerPdfBytes(head))return {ok:false,error:'That file is not a PDF.',uploaded:false,removed:false};
+  const id=newId();
+  const path=marketingFlyerStoragePath(lot.id,id);
+  const uploaded=await upload(path,file);
+  if(!uploaded?.ok)return {ok:false,error:uploaded?.error||'The PDF could not be uploaded.',uploaded:false,removed:false,path};
+  const row={
+    id,
+    lot_id:lot.id,
+    storage_path:path,
+    file_name:marketingFlyerSafeName(file.name),
+    mime_type:'application/pdf',
+    size_bytes:file.size,
+    created_by:userId||null
   };
-}
-function marketingFlyerHtml(model, qrDataUrl, options={}){
-  const autoPrint=options.autoPrint!==false;
-  const qr=String(qrDataUrl||'');
-  const qrSafe=/^data:image\/(?:png|jpeg|gif);base64,[a-z0-9+/=]+$/i.test(qr)?qr:'';
-  const rendering=model.rendering?marketingFlyerEscape(model.rendering):'';
-  const community=model.community?model.community.toUpperCase():'COMMUNITY NOT ADDED';
-  const hero=rendering
-    ? `<img id="flyerRendering" class="hero-photo" alt="" src="${rendering}">`
-    : `<div id="flyerRenderingMissing" class="hero-missing">Rendering not available</div>`;
-  return `<!doctype html><html><head><meta charset="utf-8"><title>${marketingFlyerEscape(model.title)} Marketing Flyer</title>
-<style>
-*{box-sizing:border-box}html,body{margin:0;width:850px;height:1100px}body{color:#07172d;background:#06162c;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-.page{position:relative;width:850px;height:1100px;overflow:hidden;background:#06162c;font-family:Georgia,"Palatino Linotype",Palatino,serif}
-.cream{position:absolute;top:670px;bottom:73px;width:100%;background:#f2eee6}
-.border{position:absolute;left:21px;right:21px;top:17px;bottom:16px;border:1.5px solid #b99a57}
-.title{position:absolute;top:11px;left:24px;right:24px;text-align:center;color:#f4f0e9;font:normal 92px/1.02 Georgia,serif;letter-spacing:2px}
-.title.long{top:18px;font-size:54px}
-.top-rule{position:absolute;top:146px;left:193px;width:464px;height:1px;background:#c6a761}
-.star{position:absolute;top:133px;left:410px;width:30px;height:29px;background:#06162c;color:#bc9d58;text-align:center;font:29px/29px Georgia,serif}
-.hero-photo{position:absolute;left:5px;top:200px;width:840px;height:500px;object-fit:cover;clip-path:ellipse(50% 62% at 50% 48%)}
-.hero-missing{position:absolute;left:80px;top:280px;width:690px;height:280px;display:flex;align-items:center;justify-content:center;color:#f4f0e9;font-size:28px}
-.logo{position:absolute;top:168px;left:300px;width:250px;height:120px}
-.row{position:absolute;left:59px;width:390px;min-height:70px;display:flex;align-items:center;gap:21px;font-weight:700}
-.row.address{top:763px}.row.permit{top:857px}.row.plan{top:944px}
-.icon{width:57px;height:57px;flex-shrink:0}
-.txt{font-size:25px;line-height:1.17;max-width:310px;overflow-wrap:anywhere}
-.permit .txt{font-size:22px}.plan .txt{font-size:22px;line-height:1.2}
-.divider{position:absolute;left:87px;width:352px;height:1px;background:#b99a57}.d1{top:846px}.d2{top:932px}
-.vertical{position:absolute;left:475px;top:771px;height:241px;width:1px;background:#b99a57}
-.qr-tab{position:absolute;left:529px;top:749px;width:230px;height:73px;border-radius:19px 19px 0 0;background:#06162c;color:#c6a561;text-align:center;font:700 27px/1.02 Georgia,serif;padding-top:11px}
-.qr-frame{position:absolute;left:512px;top:817px;width:263px;height:198px;border:3px solid #06162c;background:#fff;display:flex;align-items:center;justify-content:center}
-.qr-frame img{height:190px;width:190px}
-.footer{position:absolute;top:1027px;height:73px;width:100%;background:#06162c;color:#c6a561;display:flex;justify-content:center;align-items:center;gap:15px;font:600 28px Georgia,serif;letter-spacing:1px}
-.footer:before,.footer:after{content:"";height:1px;width:82px;background:#ba9958}.footer:after{transform:rotate(180deg)}
-.footer-border{position:absolute;left:21px;right:21px;bottom:16px;height:57px;border:1.5px solid #b99a57;border-top:0}
-.footer-star{position:absolute;top:1075px;left:410px;width:30px;text-align:center;font:26px/26px Georgia,serif;background:#06162c;color:#bb9a56}
-.actions{position:absolute;top:8px;right:28px}
-.actions button{font:700 14px Georgia,serif;padding:6px 10px}
-#flyerStatus{position:absolute;left:40px;top:8px;color:#f4f0e9;font:14px Georgia,serif}
-@page{size:letter;margin:0}
-@media print{html,body{width:8.5in;height:11in}.page{zoom:.96}.actions,#flyerStatus{display:none}}
-</style></head><body>
-<div class="page">
-<div class="cream"></div><div class="border"></div>
-<div class="${model.longTitle?'title long':'title'}">${marketingFlyerEscape(model.title)}</div>
-<div class="top-rule"></div><div class="star">✦</div>
-${hero}
-<svg class="logo" viewBox="0 0 250 120" role="img" aria-label="Bowen and Bowen Homebuilders"><rect width="250" height="120" rx="8" fill="#06162ccf"/><text x="125" y="48" text-anchor="middle" fill="#f4f0e9" font-family="Georgia,serif" font-size="28">BOWEN &amp; BOWEN</text><text x="125" y="82" text-anchor="middle" fill="#c6a561" font-family="Georgia,serif" font-size="16">HOMEBUILDERS</text></svg>
-<div class="row address"><svg class="icon" viewBox="-30 -30 60 60"><circle r="29" fill="#06162c"/><path d="M0-16c-10 0-16 7-16 16 0 12 16 28 16 28S16 12 16 0C16-9 10-16 0-16Zm0 8a7 7 0 1 1 0 14A7 7 0 0 1 0-8Z" fill="#f6f2e9"/></svg><div class="txt">${marketingFlyerAddressHtml(model.address)}</div></div>
-<div class="row permit"><svg class="icon" viewBox="-30 -30 60 60"><circle r="29" fill="#06162c"/><g fill="none" stroke="#f6f2e9" stroke-width="1.8" stroke-linejoin="round"><path d="M-11-16H8l7 7v30h-26Z"/><path d="M8-16v8h7M-5 2H9M-5 8H9M-5 14H9"/></g></svg><div class="txt">${marketingFlyerEscape(model.permit||'Permit not added')}</div></div>
-<div class="row plan"><svg class="icon" viewBox="-30 -30 60 60"><circle r="29" fill="#06162c"/><g fill="none" stroke="#f6f2e9" stroke-width="2" stroke-linejoin="round"><path d="m-20-1 20-18L20-1M-15-5v27h30V-5"/></g></svg><div class="txt">${marketingFlyerEscape(model.plan||'Plan not added')}</div></div>
-<div class="divider d1"></div><div class="divider d2"></div><div class="vertical"></div>
-<div class="qr-tab">SCAN FOR<br>MORE INFO</div>
-<div class="qr-frame">${qrSafe?`<img id="flyerQr" alt="Crew QR" src="${marketingFlyerEscape(qrSafe)}">`:`<div id="flyerQrMissing">Crew QR unavailable</div>`}</div>
-<div class="footer">${marketingFlyerEscape(community)}</div>
-<div class="footer-border"></div><div class="footer-star">✦</div>
-<div id="flyerStatus"></div>
-<div class="actions"><button id="flyerPrint" type="button">Print flyer</button></div>
-</div>
-<script>
-(function(){
-  const autoPrint=${autoPrint?'true':'false'};
-  const status=document.getElementById('flyerStatus');
-  function wait(img){
-    if(!img)return Promise.resolve(true);
-    if(img.complete)return Promise.resolve(!!img.naturalWidth);
-    return new Promise(resolve=>{img.onload=()=>resolve(true);img.onerror=()=>resolve(false);});
+  const saved=await insertRow(row);
+  if(!saved?.ok){
+    await remove(path);
+    return {ok:false,error:saved?.error||'The flyer could not be saved for this lot.',uploaded:true,removed:true,path};
   }
-  document.getElementById('flyerPrint').onclick=()=>window.print();
-  window.addEventListener('load',async function(){
-    const rendering=document.getElementById('flyerRendering');
-    const qr=document.getElementById('flyerQr');
-    const renderingOk=await wait(rendering);
-    if(rendering && !renderingOk){
-      rendering.remove();
-      const note=document.createElement('div');
-      note.className='hero-missing';
-      note.textContent='Rendering not available';
-      document.querySelector('.page').appendChild(note);
-    }
-    const qrOk=await wait(qr);
-    if(!qr || !qrOk){
-      status.textContent='The Crew QR did not render, so this flyer was not printed.';
-      return;
-    }
-    if(autoPrint)window.print();
-  });
-})();
-<\/script>
-</body></html>`;
+  return {ok:true,row:saved.row||row,path,removed:false};
 }
-function marketingFlyerQrDataUrl(text){
-  return new Promise(resolve=>{
-    if(!window.QRCode || !text){resolve('');return}
-    const host=document.createElement('div');
-    host.style.cssText='position:fixed;left:-10000px;top:0';
-    document.body.appendChild(host);
-    try{
-      new QRCode(host,{text,width:380,height:380,colorDark:'#000000',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.M});
-      const canvas=host.querySelector('canvas');
-      const img=host.querySelector('img');
-      const url=canvas?canvas.toDataURL('image/png'):(img&&String(img.src||'').startsWith('data:image/')?img.src:'');
-      host.remove();
-      resolve(url||'');
-    }catch(err){
-      host.remove();
-      resolve('');
-    }
-  });
+async function printStoredMarketingFlyer(row,{signedUrl,openWindow,printWindow}){
+  if(!row?.storage_path)return {ok:false,reason:'missing'};
+  const url=await signedUrl(row.storage_path,row.file_name);
+  if(!url)return {ok:false,reason:'unavailable'};
+  const popup=openWindow(url);
+  if(!popup)return {ok:false,reason:'popup-blocked',url};
+  try{
+    printWindow(popup);
+    return {ok:true,url,printed:true};
+  }catch(_){
+    return {ok:false,reason:'print-fallback',url,printed:false};
+  }
 }
-async function printMarketingFlyer(){
-  const lot=lots.find(x=>x.id===currentLot);
-  const subdivision=subdivisions.find(s=>String(s.id)===String(lot?.subdivision_id));
-  const model=marketingFlyerModel(lot, subdivision?.name||'', location.origin, location.pathname);
-  if(!model.ok){alert(model.error);return}
-  const qrDataUrl=await marketingFlyerQrDataUrl(model.qrText);
-  if(!/^data:image\/(?:png|jpeg|gif);base64,/i.test(qrDataUrl)){
-    alert('The Crew QR could not be drawn, so the flyer was not opened. Refresh BowenBuilder and try again.');
+function marketingFlyerStatusMessage(text,isError=false){
+  const box=$('marketingFlyerStatus');
+  if(!box)return;
+  box.textContent=text||'';
+  box.style.color=isError?'#b42318':'';
+}
+function renderLotMarketingList(){
+  const list=$('marketingFlyerList');
+  const upload=$('marketingFlyerUpload');
+  if(!list)return;
+  const lot=lots.find(item=>item.id===currentLot);
+  const canEdit=!!lot && canEditSubdivision(lot.subdivision_id);
+  if(upload)upload.classList.toggle('hidden',!canEdit);
+  const rows=marketingFlyersForLot(lotMarketingFlyers,currentLot);
+  if(!rows.length){
+    list.innerHTML='';
     return;
   }
-  const popup=window.open('about:blank','bowenMarketingFlyer');
-  if(!popup){
-    alert('The flyer window was blocked. Allow pop-ups for BowenBuilder, then press Marketing Flyer again.');
+  list.innerHTML=rows.map(row=>`<div class="lot-marketing-row">
+    <div>
+      <strong>${esc(row.file_name||'Flyer.pdf')}</strong>
+      <div class="muted">${esc(row.created_at?new Date(row.created_at).toLocaleString():'Uploaded PDF')}</div>
+    </div>
+    <div class="lot-marketing-actions">
+      <button class="secondary" type="button" data-marketing-open="${esc(row.id)}">Open</button>
+      <button class="secondary" type="button" data-marketing-download="${esc(row.id)}">Download</button>
+      <button class="primary" type="button" data-marketing-print="${esc(row.id)}">Print</button>
+    </div>
+  </div>`).join('');
+  list.querySelectorAll('[data-marketing-open]').forEach(btn=>{
+    btn.onclick=()=>openLotMarketingFlyer(btn.dataset.marketingOpen);
+  });
+  list.querySelectorAll('[data-marketing-download]').forEach(btn=>{
+    btn.onclick=()=>downloadLotMarketingFlyer(btn.dataset.marketingDownload);
+  });
+  list.querySelectorAll('[data-marketing-print]').forEach(btn=>{
+    btn.onclick=()=>printLotMarketingFlyer(btn.dataset.marketingPrint);
+  });
+}
+async function loadLotMarketingFlyers(){
+  const lotId=currentLot;
+  const list=$('marketingFlyerList');
+  if(!lotId||!list)return;
+  marketingFlyerStatusMessage('Loading marketing flyers…');
+  list.innerHTML='';
+  const {data,error}=await db.from('lot_marketing_flyers')
+    .select('id,lot_id,storage_path,file_name,mime_type,size_bytes,created_at')
+    .eq('lot_id',lotId)
+    .order('created_at',{ascending:false});
+  if(String(currentLot)!==String(lotId))return;
+  if(error){
+    lotMarketingFlyers=[];
+    marketingFlyerStatusMessage(error.message||'Could not load marketing flyers.',true);
+    renderLotMarketingList();
     return;
   }
-  popup.document.open();
-  popup.document.write(marketingFlyerHtml(model, qrDataUrl));
-  popup.document.close();
+  lotMarketingFlyers=data||[];
+  marketingFlyerStatusMessage(lotMarketingFlyers.length?'':'No finished flyer PDF has been uploaded for this lot yet.');
+  renderLotMarketingList();
 }
+async function uploadLotMarketingFlyer(file){
+  const lot=lots.find(item=>item.id===currentLot);
+  if(!lot)return;
+  const result=await storeMarketingFlyer({
+    lot,
+    file,
+    canEdit:canEditSubdivision(lot.subdivision_id),
+    userId:currentAuthUserId||null,
+    newId:()=>globalThis.crypto?.randomUUID?crypto.randomUUID():`${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    upload:async (path,file)=>{
+      const {error}=await db.storage.from('lot-documents').upload(path,file,{upsert:false,contentType:'application/pdf',cacheControl:'3600'});
+      return error?{ok:false,error:error.message}:{ok:true};
+    },
+    remove:async path=>{await db.storage.from('lot-documents').remove([path]);},
+    insertRow:async row=>{
+      const {data,error}=await db.from('lot_marketing_flyers').insert(row).select('id,lot_id,storage_path,file_name,mime_type,size_bytes,created_at').single();
+      return error?{ok:false,error:error.message}:{ok:true,row:data};
+    }
+  });
+  if(!result.ok){
+    marketingFlyerStatusMessage(result.error,true);
+    return;
+  }
+  if(String(result.row?.lot_id)===String(currentLot))lotMarketingFlyers.unshift(result.row);
+  marketingFlyerStatusMessage('Marketing flyer uploaded.');
+  renderLotMarketingList();
+  logBowenActivity('marketing_flyer_uploaded',{label:`Uploaded ${result.row.file_name}`,entityType:'lot_marketing_flyer',entityId:result.row.id,subdivisionId:lot.subdivision_id,lotId:lot.id,force:true});
+}
+function marketingFlyerRow(id){
+  return marketingFlyersForLot(lotMarketingFlyers,currentLot).find(row=>String(row.id)===String(id))||null;
+}
+function openLotMarketingFlyer(id){
+  const row=marketingFlyerRow(id);
+  if(!row)return;
+  openLotDocument(row.file_name||'Marketing flyer',row.storage_path);
+}
+async function downloadLotMarketingFlyer(id){
+  const row=marketingFlyerRow(id);
+  if(!row)return;
+  const {data,error}=await db.storage.from('lot-documents').createSignedUrl(row.storage_path,3600,{download:row.file_name||'flyer.pdf'});
+  if(error||!data?.signedUrl){
+    marketingFlyerStatusMessage(error?.message||'Could not download this flyer.',true);
+    return;
+  }
+  const link=document.createElement('a');
+  link.href=data.signedUrl;
+  link.download=row.file_name||'flyer.pdf';
+  link.rel='noopener';
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+}
+async function printLotMarketingFlyer(id){
+  const row=marketingFlyerRow(id);
+  if(!row)return;
+  const result=await printStoredMarketingFlyer(row,{
+    signedUrl:async path=>lotDocumentSignedUrl(path),
+    openWindow:url=>window.open(url,'bowenMarketingFlyerPdf'),
+    printWindow:popup=>{popup.focus();popup.print();}
+  });
+  if(result.ok){
+    marketingFlyerStatusMessage('');
+    return;
+  }
+  if(result.reason==='popup-blocked'){
+    marketingFlyerStatusMessage('Pop-up blocked. Use Open, then choose Print in the PDF viewer.',true);
+    return;
+  }
+  if(result.reason==='print-fallback'){
+    marketingFlyerStatusMessage('The PDF is open. If no print dialog appeared, use the PDF viewer’s Print command.',true);
+    return;
+  }
+  marketingFlyerStatusMessage('Could not open this flyer for printing.',true);
+}
+
 let crewQrCurrentUrl='';
 async function openCrewQrDialog(){
   const lot=lots.find(x=>x.id===currentLot); if(!lot)return;
@@ -13363,6 +13411,7 @@ function showLot(preserveScroll=false){
  wireLotTeamsDocumentButtons();
  wireScheduleInspectionExternal();
  wireLotInfoDoubleTapCopy();
+ void loadLotMarketingFlyers();
  const liveRendering=$('liveRendering');
  if(liveRendering){
    liveRendering.onclick=()=>openRenderingViewer(l.color_rendering_url);
@@ -18282,10 +18331,20 @@ $('crewQrBtn').onclick=()=>openCrewQrDialog().catch(err=>{
   console.error('Crew QR failed:',err);
   alert(`Crew QR could not open: ${err?.message||err}`);
 });
-$('marketingFlyerBtn').onclick=()=>printMarketingFlyer().catch(err=>{
-  console.error('Marketing flyer failed:',err);
-  alert(`Marketing Flyer could not open: ${err?.message||err}`);
-});
+$('marketingFlyerUpload').onclick=()=>{
+  const lot=lots.find(item=>item.id===currentLot);
+  if(!lot||!requireEditPermission(lot.subdivision_id))return;
+  const input=$('marketingFlyerInput');
+  input.value='';
+  input.click();
+};
+$('marketingFlyerInput').onchange=e=>{
+  const file=e.target.files?.[0];
+  if(file)uploadLotMarketingFlyer(file).catch(err=>{
+    console.error('Marketing flyer upload failed:',err);
+    marketingFlyerStatusMessage(err?.message||'The marketing flyer could not be uploaded.',true);
+  });
+};
 $('crewQrX').onclick=()=>$('crewQrDialog').close();
 $('crewQrDialog').addEventListener('click',e=>{if(e.target===e.currentTarget)$('crewQrDialog').close()});
 $('crewQrReset').onclick=()=>resetCrewQr().catch(err=>{
@@ -18926,7 +18985,7 @@ try{
 </script>
 
 <div id="bbBuildVersion" style="text-align:center;color:#8a96a8;font-size:10px;padding:10px 8px 18px">
-  BowenBuilder 6.1</div>
+  BowenBuilder 6.2</div>
 
 
 
