@@ -36,7 +36,7 @@ class FakeDOMParser {
   }
 }
 
-function createHarness({ remote = '5.9', search = '', signedIn = 'user-1', fetchBehavior } = {}) {
+function createHarness({ remote = '6.1', search = '', signedIn = 'user-1', fetchBehavior } = {}) {
   const labels = versionLabels(html);
   const blockStart = html.indexOf('let bowenBuilderVersionWatchTimer=null;');
   const blockEnd = html.indexOf('\nfunction crewDateLabel');
@@ -147,9 +147,9 @@ async function settled() {
   await new Promise(resolve => setImmediate(resolve));
 }
 
-test('the three release labels are 5.9', () => {
+test('the three release labels are 6.1', () => {
   const labels = versionLabels(html);
-  assert.deepEqual(labels, { meta: '5.9', constant: '5.9', footer: '5.9' });
+  assert.deepEqual(labels, { meta: '6.1', constant: '6.1', footer: '6.1' });
   assert.match(html, /Increase by 0\.1 on every release/);
   assert.doesNotMatch(html, /bowenbuilder-version" content="5\.8"/);
   assert.doesNotMatch(html, /BOWENBUILDER_VERSION='5\.8'/);
@@ -165,23 +165,23 @@ test('the version watcher polls every 5 seconds and leaves other timers alone', 
 });
 
 test('a different deployed version locks and signs out without reloading', async () => {
-  const harness = createHarness({ remote: '6.0' });
+  const harness = createHarness({ remote: '6.2' });
   assert.equal(await harness.checkForBowenBuilderUpdate(), true);
   assert.equal(harness.calls.fetches, 1);
   assert.equal(harness.calls.signOuts, 1);
   assert.equal(harness.calls.cleared, 0);
   assert.deepEqual(harness.lock.classList.removed, ['hidden']);
-  assert.equal(harness.versionLabel.textContent, 'BowenBuilder 5.9 → 6.0');
+  assert.equal(harness.versionLabel.textContent, 'BowenBuilder 6.1 → 6.2');
   assert.equal(harness.calls.activity[0].action, 'app_update_detected');
-  assert.equal(harness.calls.activity[0].detail.metadata.old_version, '5.9');
-  assert.equal(harness.calls.activity[0].detail.metadata.new_version, '6.0');
+  assert.equal(harness.calls.activity[0].detail.metadata.old_version, '6.1');
+  assert.equal(harness.calls.activity[0].detail.metadata.new_version, '6.2');
   assert.equal(harness.calls.replaced, null);
   assert.equal(await harness.checkForBowenBuilderUpdate(), false);
   assert.equal(harness.calls.fetches, 1);
 });
 
 test('the same deployed version does not lock or sign out', async () => {
-  const harness = createHarness({ remote: '5.9' });
+  const harness = createHarness({ remote: '6.1' });
   assert.equal(await harness.checkForBowenBuilderUpdate(), false);
   assert.equal(harness.calls.fetches, 1);
   assert.equal(harness.calls.signOuts, 0);
@@ -191,7 +191,7 @@ test('the same deployed version does not lock or sign out', async () => {
 });
 
 test('the open-tab interval is 5000ms, skips a hidden tab, and checks again when visible', async () => {
-  const harness = createHarness({ remote: '5.9' });
+  const harness = createHarness({ remote: '6.1' });
   harness.startBowenBuilderVersionWatch();
   await settled();
   assert.equal(harness.calls.intervalDelay, 5000);
@@ -210,7 +210,7 @@ test('the open-tab interval is 5000ms, skips a hidden tab, and checks again when
 });
 
 test('a visible interval tick locks when the deployed version changes', async () => {
-  const harness = createHarness({ remote: '6.0' });
+  const harness = createHarness({ remote: '6.2' });
   harness.startBowenBuilderVersionWatch();
   await settled();
   assert.equal(harness.calls.signOuts, 1);
