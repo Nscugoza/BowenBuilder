@@ -13090,7 +13090,7 @@ async function quickSetOverviewInspectionStatus(id,status){
 
   const pos=items.findIndex(i=>String(i.id)===String(item.id));
   if(pos>=0)items[pos]=data;
-  logBowenActivity('schedule_completed',{label:`Marked ${item.name||'schedule item'} complete`,entityType:'schedule_item',entityId:item.id,subdivisionId:subdivisionForLot(item.lot_id),lotId:item.lot_id,force:true});
+  logBowenActivity('inspection_status_changed',{label:`Marked ${item.name||'inspection'} ${normalized}`,entityType:'schedule_item',entityId:item.id,subdivisionId:subdivisionForLot(item.lot_id),lotId:item.lot_id,force:true,metadata:{inspection_status:normalized}});
   showLot(true);
 }
 
@@ -13113,7 +13113,7 @@ async function quickCompleteOverviewScheduleItem(id){
 
   const pos=items.findIndex(i=>String(i.id)===String(item.id));
   if(pos>=0)items[pos]=data;
-  logBowenActivity('inspection_status_changed',{label:`Marked ${item.name||'inspection'} ${normalized}`,entityType:'schedule_item',entityId:item.id,subdivisionId:subdivisionForLot(item.lot_id),lotId:item.lot_id,force:true,metadata:{inspection_status:normalized}});
+  logBowenActivity('schedule_completed',{label:`Marked ${item.name||'schedule item'} complete`,entityType:'schedule_item',entityId:item.id,subdivisionId:subdivisionForLot(item.lot_id),lotId:item.lot_id,force:true});
   showLot(true);
 }
 
