@@ -5,7 +5,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="bowenbuilder-version" content="6.2">
+<meta name="bowenbuilder-version" content="6.3">
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -4126,9 +4126,9 @@ button.teams-file-row:hover{border-color:#bdccdd}
           </div>
         </div>
         <div class="card subdivision-inspection-card">
-          <div class="subdivision-inspection-label">Barrow County · Civic Access</div>
-          <p class="muted" style="margin:8px 0 12px">Sign in through the county’s official website. Your Microsoft password and county session are never collected by BowenBuilder. If your browser has an active county session, it may remain signed in.</p>
-          <a class="primary" href="https://barrowcountyga-energovweb.tylerhost.net/apps/selfservice" target="_blank" rel="noopener noreferrer" style="display:inline-block;text-decoration:none;padding:11px 16px;border-radius:10px;margin-bottom:14px">Open Barrow County Portal ↗</a>
+          <div id="subdivisionCountyPortalLabel" class="subdivision-inspection-label">Barrow County · Civic Access</div>
+          <p id="subdivisionCountyPortalNote" class="muted" style="margin:8px 0 12px">Sign in through the county’s official website. Your Microsoft password and county session are never collected by BowenBuilder. If your browser has an active county session, it may remain signed in.</p>
+          <a id="subdivisionCountyPortalLink" class="primary" href="https://barrowcountyga-energovweb.tylerhost.net/apps/selfservice" target="_blank" rel="noopener noreferrer" style="display:inline-block;text-decoration:none;padding:11px 16px;border-radius:10px;margin-bottom:14px">Open Barrow County Portal ↗</a>
           <div class="subdivision-inspection-label" style="margin-top:10px">Open a Lot’s Permit / Inspections</div>
           <div class="subdivision-inspection-dropdown-wrap">
             <button id="subdivisionInspectionDropdownButton" class="secondary subdivision-inspection-dropdown-button" type="button" aria-expanded="false">Choose Lot ▾</button>
@@ -5262,7 +5262,7 @@ const $=id=>document.getElementById(id);
 // labels identical: this constant, the bowenbuilder-version meta tag, and
 // the bbBuildVersion footer. Open tabs compare this constant with the
 // deployed meta tag.
-const BOWENBUILDER_VERSION='6.2';
+const BOWENBUILDER_VERSION='6.3';
 const SB_URL='https://oztefiymckpyxiewgxtc.supabase.co';
 const SB_KEY='sb_publishable__ItoYGeHKEGTBFiE7JM74w_1F-qERVe';
 const db=window.supabase.createClient(SB_URL,SB_KEY);
@@ -10803,12 +10803,91 @@ function updateHeroSiteMap(subdivision){
 }
 
 
+const COUNTY_PORTALS={
+ barrow:{
+  key:'barrow',
+  label:'Barrow County · Civic Access',
+  countyName:'Barrow County, GA',
+  url:'https://barrowcountyga-energovweb.tylerhost.net/apps/selfservice',
+  linkText:'Open Barrow County Portal ↗',
+  note:'Sign in through the county’s official website. Your Microsoft password and county session are never collected by BowenBuilder. If your browser has an active county session, it may remain signed in.'
+ },
+ hall:{
+  key:'hall',
+  label:'Hall County · Accela',
+  countyName:'Hall County, GA',
+  agencyCode:'HALLCO',
+  module:'Gainesville',
+  url:'https://aca-prod.accela.com/HALLCO/Default.aspx?Module=Gainesville',
+  linkText:'Open Hall County Portal ↗',
+  note:'Hall County records open in Accela Citizen Access (Gainesville). BowenBuilder does not collect the county login. A saved permit URL opens that lot’s record. Automatic inspection sync is not enabled.'
+ }
+};
+
+function countyPortalForSubdivision(sub){
+ const explicit=String(sub?.county_portal_key||'').trim().toLowerCase();
+ if(COUNTY_PORTALS[explicit])return COUNTY_PORTALS[explicit];
+ const name=String(sub?.name||'');
+ if(/windsor\s*forest/i.test(name))return COUNTY_PORTALS.hall;
+ return COUNTY_PORTALS.barrow;
+}
+
+function renderCountyPortal(sub){
+ const portal=countyPortalForSubdivision(sub);
+ const label=$('subdivisionCountyPortalLabel');
+ const note=$('subdivisionCountyPortalNote');
+ const link=$('subdivisionCountyPortalLink');
+ if(label)label.textContent=portal.label;
+ if(note)note.textContent=portal.note;
+ if(link){
+  const url=safe(portal.url);
+  link.href=url||'#';
+  link.textContent=portal.linkText;
+  if(url)link.classList.remove('hidden');
+  else link.classList.add('hidden');
+ }
+}
+
+function parseHallCountyAccelaRecord(html){
+ const fail=error=>({ok:false,permitNumber:'',permitType:'',recordStatus:'',expirationDate:'',inspectionNote:'',error});
+ if(typeof html!=='string' || !html.trim())return fail('County record could not be read.');
+ const pick=id=>{
+  const re=new RegExp('id="'+id+'"[^>]*>([^<]*)<','i');
+  const match=html.match(re);
+  if(!match)return '';
+  return match[1]
+   .replace(/&nbsp;/gi,' ')
+   .replace(/&amp;/gi,'&')
+   .replace(/&lt;/gi,'<')
+   .replace(/&gt;/gi,'>')
+   .replace(/\s+/g,' ')
+   .trim();
+ };
+ const permitNumber=pick('ctl00_PlaceHolderMain_lblPermitNumber');
+ const permitType=pick('ctl00_PlaceHolderMain_lblPermitType');
+ const recordStatus=pick('ctl00_PlaceHolderMain_lblRecordStatus');
+ const expirationDate=pick('ctl00_PlaceHolderMain_lblExpirtionDate');
+ const completedEmpty=pick('ctl00_PlaceHolderMain_InspectionList_gvListCompleted_ctl01_lblEmptyCompleted');
+ const upcomingEmpty=pick('ctl00_PlaceHolderMain_InspectionList_lblEmptyUpcoming');
+ if(!permitNumber && !recordStatus)return fail('This Hall County page did not include a permit record.');
+ return {
+  ok:true,
+  permitNumber,
+  permitType,
+  recordStatus,
+  expirationDate,
+  inspectionNote:[completedEmpty,upcomingEmpty].filter(Boolean).join(' '),
+  error:''
+ };
+}
+
 function renderSubdivisionInspectionMenu(){
  const nameEl=$('subdivisionInspectionName');
  const menu=$('subdivisionInspectionMenu');
  const dropdown=$('subdivisionInspectionDropdownButton');
  const sub=subdivisions.find(s=>String(s.id)===String(currentSubdivision));
  if(nameEl)nameEl.textContent=sub?.name||'Subdivision';
+ renderCountyPortal(sub);
  if(!menu||!dropdown)return;
 
  const arr=lots
@@ -11887,6 +11966,9 @@ function showSubdivisionPanel(mode='lots'){
  $('subdivisionInspectionTab').classList.toggle('active',inspectionMode);
 
  toggleSubdivisionInspectionMenu(false);
+ if(inspectionMode){
+   renderCountyPortal(subdivisions.find(s=>String(s.id)===String(currentSubdivision)));
+ }
 
  if(filesMode){
    const sub=subdivisions.find(s=>String(s.id)===String(currentSubdivision));
@@ -11922,6 +12004,7 @@ function showLots(){
  if($('subdivisionFilesName'))$('subdivisionFilesName').textContent=`${s?.name||'Subdivision'} Files`;
  if($('subdivisionPunchoutName'))$('subdivisionPunchoutName').textContent=s?.name||'';
  if($('subdivisionInspectionName'))$('subdivisionInspectionName').textContent=s?.name||'';
+ renderCountyPortal(s);
 
  const arr=lots.filter(l=>l.subdivision_id===currentSubdivision);
  $('lotsGrid').innerHTML=arr.map(l=>`
@@ -18037,7 +18120,7 @@ function openLotDialogLive(id=''){
     $('hlpUrl').value=l.hlp_url||'';
     $('lgpUrl').value=l.lgp_url||'';
   } else {
-    $('county').value='Barrow County, GA';
+    $('county').value=countyPortalForSubdivision(subdivisions.find(x=>String(x.id)===String(currentSubdivision))).countyName;
     $('crewPlanLink').value='';
     $('crewPlanLinkLabel').value='';
     setIncludedOptionsEditor('');
@@ -18985,7 +19068,7 @@ try{
 </script>
 
 <div id="bbBuildVersion" style="text-align:center;color:#8a96a8;font-size:10px;padding:10px 8px 18px">
-  BowenBuilder 6.2</div>
+  BowenBuilder 6.3</div>
 
 
 
